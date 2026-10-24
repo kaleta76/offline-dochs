@@ -60,3 +60,24 @@ Každá fáza bude mať kritériá prijatia, napr. „výpočet sa zhoduje so st
 - PDF vytvorím cez reportlab s fontom DejaVu (diakritika) a vizuálne skontrolujem každú stranu.
 - Skripty `.ps1` dodám aj samostatne (UTF-8 s BOM, aby PowerShell 5.1 správne zobrazil diakritiku). Overím ich aspoň syntakticky, Access v prostredí nie je dostupný.
 - Voliteľne: ak namiesto Accessu chcete webovú aplikáciu (bez rizík zdieľaného súboru), viem pripraviť samostatný plán.
+
+## 6. Alternatívy k Access front-end/back-end (Windows 11 + Office 365, bez inštalácie, offline)
+
+| Možnosť | Zásah do PC | Offline | Plusy | Mínusy |
+|---|---|---|---|---|
+| A. Access FE lokálne + BE na zdieľanom priečinku (vylepšená v1.0) | Iba súbor `.accde` | Áno, lokálne tabuľky a dávková synchronizácia | Známe prostredie, VBA | Poškodenie súboru cez VPN/Wi-Fi, ťažká správa verzií, slabá ochrana dát, ťažko škáluje |
+| B. Webová aplikácia (PWA) v Edge + centrálny server | Žiadny (Edge je súčasťou Windows 11, inštalácia „ako aplikácia“ cez politiku Intune/GPO) | Áno: záznamy sa uložia v prehliadači (IndexedDB) a odošlú sa po pripojení | Prihlásenie cez Microsoft 365 (Entra ID SSO), jedna verzia pre všetkých, mobil aj PC, žiadne `.exe` ani makrá (vyhovuje SentinelOne), serverový čas a audit na centrále | Treba server (cloud alebo firemný IIS), prvé načítanie musí byť online |
+| C. Power Apps + SharePoint zoznamy + Power Automate | Žiadny (prehliadač/Teams) | Obmedzene (`SaveData/LoadData`, plný offline iba s licenciou Premium/Dataverse) | Súčasť M365, schvaľovanie cez Power Automate, Teams | Limity SharePointu (delegácia, 5000 položiek), offline zložitý, zložité výpočty KZ |
+| D. Excel/Forms + SharePoint | Žiadny | Nie (prakticky) | Jednoduché | Nevhodné pre audit a pravidlá |
+| E. PowerShell/HTA + lokálne CSV/JSON a synchronizácia na share | Žiadny | Áno | Bez licencií | Primitívne GUI, HTA je zastarané a EDR ho často blokuje |
+
+**Odporúčanie:** **B – PWA s offline frontou.**
+- Príchod alebo odchod sa uloží okamžite do zariadenia s lokálnym časom a poradovým číslom. Po pripojení sa odošle, server doplní vlastný čas a vypočíta hash reťaz (ukotvenú na serveri, nie na klientovi). Záznamy s veľkým rozdielom času sa označia na kontrolu manažérom.
+- Pravidlový motor (fond, obed, pružný čas, lekár, sviatky), schvaľovanie „Môj tím“, uzávierka, SAP export (xlsx) a A4 výkaz bežia na serveri.
+- Prihlásenie cez Microsoft 365, rola a manažér z Entra ID (atribúty `manager` a `department`, nahrádza LDAP skript).
+- Server: Lovable Cloud (rýchly štart) alebo neskôr on-prem/SQL Server, ak to vyžaduje IT politika.
+- Varianta A zostáva ako záloha, ak IT nepovolí žiadny server.
+
+**Kroky pre variant B:** prototyp terminálu s offline frontou → prihlásenie a profil → pravidlový motor + testy → schvaľovanie a uzávierka → exporty → pilot na jednom stredisku → nasadenie cez Intune/GPO.
+
+**Čo dodám po schválení:** PDF v1.1 (revízia + porovnanie A–E + odporúčanie). Voliteľne aj funkčný prototyp variantu B priamo v tomto projekte.

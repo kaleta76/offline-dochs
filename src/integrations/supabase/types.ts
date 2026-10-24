@@ -14,16 +14,301 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      absence_codes: {
+        Row: {
+          calc_type: string
+          code: string
+          counts: boolean
+          limit_days: number | null
+          name: string
+          sap_code: string
+          sort: number
+        }
+        Insert: {
+          calc_type: string
+          code: string
+          counts?: boolean
+          limit_days?: number | null
+          name: string
+          sap_code: string
+          sort?: number
+        }
+        Update: {
+          calc_type?: string
+          code?: string
+          counts?: boolean
+          limit_days?: number | null
+          name?: string
+          sap_code?: string
+          sort?: number
+        }
+        Relationships: []
+      }
+      audit_log: {
+        Row: {
+          action: string
+          actor: string | null
+          at: string
+          details: Json | null
+          id: number
+          target: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          at?: string
+          details?: Json | null
+          id?: number
+          target?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          at?: string
+          details?: Json | null
+          id?: number
+          target?: string | null
+        }
+        Relationships: []
+      }
+      corrections: {
+        Row: {
+          at_time: string
+          code: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          direction: string
+          id: string
+          reason: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          at_time: string
+          code: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          direction: string
+          id?: string
+          reason: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          at_time?: string
+          code?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          direction?: string
+          id?: string
+          reason?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corrections_code_fkey"
+            columns: ["code"]
+            isOneToOne: false
+            referencedRelation: "absence_codes"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      holidays: {
+        Row: {
+          day: string
+          name: string
+        }
+        Insert: {
+          day: string
+          name: string
+        }
+        Update: {
+          day?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      month_closures: {
+        Row: {
+          closed_at: string
+          closed_by: string
+          month: number
+          user_id: string
+          year: number
+        }
+        Insert: {
+          closed_at?: string
+          closed_by: string
+          month: number
+          user_id: string
+          year: number
+        }
+        Update: {
+          closed_at?: string
+          closed_by?: string
+          month?: number
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          daily_fund: number
+          department: string | null
+          email: string | null
+          full_name: string
+          id: string
+          manager_id: string | null
+          sap_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          daily_fund?: number
+          department?: string | null
+          email?: string | null
+          full_name?: string
+          id: string
+          manager_id?: string | null
+          sap_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          daily_fund?: number
+          department?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          manager_id?: string | null
+          sap_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      punches: {
+        Row: {
+          client_time: string
+          client_uuid: string
+          code: string
+          device: string | null
+          direction: string
+          drift_minutes: number
+          id: number
+          prev_hash: string | null
+          record_hash: string | null
+          server_time: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          client_time: string
+          client_uuid: string
+          code: string
+          device?: string | null
+          direction: string
+          drift_minutes?: number
+          id?: number
+          prev_hash?: string | null
+          record_hash?: string | null
+          server_time?: string
+          source?: string
+          user_id: string
+        }
+        Update: {
+          client_time?: string
+          client_uuid?: string
+          code?: string
+          device?: string | null
+          direction?: string
+          drift_minutes?: number
+          id?: number
+          prev_hash?: string | null
+          record_hash?: string | null
+          server_time?: string
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "punches_code_fkey"
+            columns: ["code"]
+            isOneToOne: false
+            referencedRelation: "absence_codes"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      settings: {
+        Row: {
+          description: string | null
+          key: string
+          value: string
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          value?: string
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      can_see: { Args: { _emp: string }; Returns: boolean }
+      decide_correction: {
+        Args: { _approve: boolean; _id: string }
+        Returns: undefined
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_closed: { Args: { _t: string; _user: string }; Returns: boolean }
+      is_manager_of: { Args: { _emp: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "employee" | "manager" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +435,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["employee", "manager", "admin"],
+    },
   },
 } as const

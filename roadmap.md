@@ -1,5 +1,5 @@
 # Roadmap
-- [ ] PDF v1.1 revízia + opravené .ps1 skripty (Files)
+- [x] PDF v1.1 revízia + opravené .ps1 skripty (Files)
 - [ ] Cloud: tabuľky, roly, RLS, hash chain
 - [ ] Terminál s offline frontou
 - [ ] Môj mesiac + výpočtový motor + testy

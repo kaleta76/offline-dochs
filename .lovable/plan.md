@@ -81,3 +81,23 @@ Každá fáza bude mať kritériá prijatia, napr. „výpočet sa zhoduje so st
 **Kroky pre variant B:** prototyp terminálu s offline frontou → prihlásenie a profil → pravidlový motor + testy → schvaľovanie a uzávierka → exporty → pilot na jednom stredisku → nasadenie cez Intune/GPO.
 
 **Čo dodám po schválení:** PDF v1.1 (revízia + porovnanie A–E + odporúčanie). Voliteľne aj funkčný prototyp variantu B priamo v tomto projekte.
+
+## 7. Rozsah dodávky (schválené: PDF + prototyp)
+
+**A) PDF v1.1** – podľa sekcií 1–6, s opravenými skriptmi `.ps1`. Uložím ho do Files.
+
+**B) Prototyp webovej aplikácie (variant B) v tomto projekte**
+- **Terminál:** veľké tlačidlá Príchod / Odchod / Lekár / Službka / Súkromne. Stav sa potvrdí a obrazovka sa po 3 s vyčistí. Záznamy sa ukladajú aj offline a odošlú sa po pripojení. Hore je pruh online/offline s počtom čakajúcich záznamov.
+- **Môj mesiac:** denný prehľad s vypočítanými hodinami (fond, obed nad 6 h, lekár podľa fondu, sviatky), saldo a žiadosť o korekciu s dôvodom.
+- **Môj tím (manažér):** neuzavreté dni, schválenie korekcií, uzávierka mesiaca, tlač A4 výkazu na podpis.
+- **Admin:** nastavenia pravidiel (kľúč/hodnota), číselník prerušení so SAP kódmi, sviatky, export SAP do xlsx.
+- **Prihlásenie:** e-mail pre prototyp. Microsoft 365 (Entra ID) pripravím ako ďalší krok, keď IT dodá údaje o registrácii aplikácie.
+- **Audit:** server dopĺňa vlastný čas, `prev_hash` a SHA-256 reťaz. Záznamy s veľkým rozdielom času sa označia.
+- **Offline:** aplikácia sa dá nainštalovať v Edge a otvoriť aj bez siete. Funguje iba v publikovanej verzii, nie v náhľade editora.
+- **Dizajn:** strohý priemyselný vzhľad terminálu s vysokým kontrastom, v slovenčine.
+
+### Technické detaily (prototyp)
+- Lovable Cloud: tabuľky employees, user_roles, settings, absence_codes, holidays, punches (append-only, hash chain cez trigger), corrections, month_closures, audit_log. RLS: zamestnanec vidí svoje dáta, manažér svoj tím, admin všetko.
+- Offline fronta v IndexedDB s client_uuid (idempotentné odoslanie), `vite-plugin-pwa` v režime generateSW s ochranou proti registrácii v náhľade.
+- Výpočtový motor ako čistá TS funkcia s unit testami (obed, fond 7,5 h, lekár, zaokrúhľovanie podľa nastavení).
+- Export xlsx na serveri (knižnica kompatibilná s Workers), A4 výkaz cez tlačové CSS.

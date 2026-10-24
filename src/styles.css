@@ -46,8 +46,8 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -105,8 +105,8 @@
   --sidebar-accent-foreground: oklch(0.97 0.004 85);
   --sidebar-border: oklch(0.32 0.012 260);
   --sidebar-ring: oklch(0.64 0.19 42);
-  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --app-font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --app-font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 @layer base {
@@ -121,8 +121,8 @@
 }
 
 @layer base {
-  body { font-family: var(--font-sans); }
-  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  body { font-family: var(--app-font-sans); }
+  .num { font-family: var(--app-font-mono); font-variant-numeric: tabular-nums; }
 }
 
 @media print {

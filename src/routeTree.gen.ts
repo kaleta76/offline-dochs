@@ -10,33 +10,84 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthenticatedMesiacRouteImport } from './routes/_authenticated/mesiac'
+import { Route as AuthenticatedTerminalRouteImport } from './routes/_authenticated/terminal'
+import { Route as AuthenticatedTimRouteImport } from './routes/_authenticated/tim'
+import { Route as AuthenticatedVykazUserIdYmRouteImport } from './routes/_authenticated/vykaz.$userId.$ym'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedMesiacRoute = AuthenticatedMesiacRouteImport.update({
+  id: '/mesiac',
+  path: '/mesiac',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTerminalRoute = AuthenticatedTerminalRouteImport.update({
+  id: '/terminal',
+  path: '/terminal',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTimRoute = AuthenticatedTimRouteImport.update({
+  id: '/tim',
+  path: '/tim',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedVykazUserIdYmRoute =
+  AuthenticatedVykazUserIdYmRouteImport.update({
+    id: '/vykaz/$userId/$ym',
+    path: '/vykaz/$userId/$ym',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/mesiac': typeof AuthenticatedMesiacRoute
+  '/terminal': typeof AuthenticatedTerminalRoute
+  '/tim': typeof AuthenticatedTimRoute
+  '/vykaz/$userId/$ym': typeof AuthenticatedVykazUserIdYmRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/mesiac': typeof AuthenticatedMesiacRoute
+  '/terminal': typeof AuthenticatedTerminalRoute
+  '/tim': typeof AuthenticatedTimRoute
+  '/vykaz/$userId/$ym': typeof AuthenticatedVykazUserIdYmRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/_authenticated/mesiac': typeof AuthenticatedMesiacRoute
+  '/_authenticated/terminal': typeof AuthenticatedTerminalRoute
+  '/_authenticated/tim': typeof AuthenticatedTimRoute
+  '/_authenticated/vykaz/$userId/$ym': typeof AuthenticatedVykazUserIdYmRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/mesiac' | '/terminal' | '/tim' | '/vykaz/$userId/$ym'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/mesiac' | '/terminal' | '/tim' | '/vykaz/$userId/$ym'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/_authenticated/mesiac'
+    | '/_authenticated/terminal'
+    | '/_authenticated/tim'
+    | '/_authenticated/vykaz/$userId/$ym'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +99,64 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/mesiac': {
+      id: '/_authenticated/mesiac'
+      path: '/mesiac'
+      fullPath: '/mesiac'
+      preLoaderRoute: typeof AuthenticatedMesiacRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/terminal': {
+      id: '/_authenticated/terminal'
+      path: '/terminal'
+      fullPath: '/terminal'
+      preLoaderRoute: typeof AuthenticatedTerminalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tim': {
+      id: '/_authenticated/tim'
+      path: '/tim'
+      fullPath: '/tim'
+      preLoaderRoute: typeof AuthenticatedTimRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/vykaz/$userId/$ym': {
+      id: '/_authenticated/vykaz/$userId/$ym'
+      path: '/vykaz/$userId/$ym'
+      fullPath: '/vykaz/$userId/$ym'
+      preLoaderRoute: typeof AuthenticatedVykazUserIdYmRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedMesiacRoute: typeof AuthenticatedMesiacRoute
+  AuthenticatedTerminalRoute: typeof AuthenticatedTerminalRoute
+  AuthenticatedTimRoute: typeof AuthenticatedTimRoute
+  AuthenticatedVykazUserIdYmRoute: typeof AuthenticatedVykazUserIdYmRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedMesiacRoute: AuthenticatedMesiacRoute,
+  AuthenticatedTerminalRoute: AuthenticatedTerminalRoute,
+  AuthenticatedTimRoute: AuthenticatedTimRoute,
+  AuthenticatedVykazUserIdYmRoute: AuthenticatedVykazUserIdYmRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

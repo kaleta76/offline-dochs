@@ -1,0 +1,9 @@
+{
+  "name": "Dochádzka",
+  "short_name": "Dochádzka",
+  "start_url": "/terminal",
+  "display": "standalone",
+  "background_color": "#2b2e35",
+  "theme_color": "#e8590c",
+  "icons": [{ "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }]
+}

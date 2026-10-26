@@ -66,7 +66,7 @@ export function computeDay(input: DayInput, s: EngineSettings): DayResult {
 
   let workMin = 0, creditMin = 0, privMin = 0, open = false;
   for (let i = 0; i < ps.length; i++) {
-    const cur = ps[i];
+    const cur = ps[i]!;
     const next = ps[i + 1];
     const dur = next ? Math.max(0, Math.round((next.time.getTime() - cur.time.getTime()) / MIN)) : null;
     if (cur.direction === "IN") {
@@ -84,7 +84,7 @@ export function computeDay(input: DayInput, s: EngineSettings): DayResult {
   if (workMin > s.breakAfterHours * 60) {
     breakMin = Math.min(s.breakMin, workMin - s.breakAfterHours * 60);
     workMin -= breakMin;
-    if (byCode.WORK) byCode.WORK = Math.max(0, byCode.WORK - breakMin);
+    if (byCode["WORK"]) byCode["WORK"] = Math.max(0, byCode["WORK"] - breakMin);
   }
 
   // Top-up to fund when the day ends with doctor / family / business trip

@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/vykaz/$userId/$ym")({
 
 function Report() {
   const { userId, ym } = Route.useParams();
-  const [y, m] = ym.split("-").map(Number);
+  const [y = 2026, m = 1] = ym.split("-").map(Number);
   const q = useQuery({ queryKey: ["month", userId, y, m], queryFn: () => loadMonth(userId, y, m) });
   if (!q.data) return <p className="text-muted-foreground">Načítavam…</p>;
   const d = q.data;

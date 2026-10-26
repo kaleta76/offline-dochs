@@ -31,7 +31,7 @@ describe("computeDay", () => {
     const r = computeDay(day([p("WORK", "IN", "07:00"), p("DOCTOR", "OUT", "10:00"), p("WORK", "IN", "12:00"), p("WORK", "OUT", "15:30")]), S);
     expect(r.workMin).toBe(360);
     expect(r.creditMin).toBe(120);
-    expect(r.byCode.DOCTOR).toBe(120);
+    expect(r.byCode["DOCTOR"]).toBe(120);
   });
 
   it("private interruption is not counted", () => {

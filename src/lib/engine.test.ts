@@ -49,7 +49,7 @@ describe("computeDay", () => {
 
   it("15 min rounding moves 7:05 to 7:15 and 15:40 to 15:30", () => {
     const r = computeDay(day([p("WORK", "IN", "07:05"), p("WORK", "OUT", "15:40")]), { ...S, roundInMin: 15, roundOutMin: 15 });
-    expect(r.workMin).toBe(465 - 30);
+    expect(r.workMin).toBe(495 - 30);
   });
 
   it("arrival without departure is flagged open", () => {

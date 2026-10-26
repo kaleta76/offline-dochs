@@ -34,7 +34,7 @@ function MyMonth() {
   const [msg, setMsg] = useState<string | null>(null);
   const submit = useMutation({
     mutationFn: async () => {
-      const [code, direction] = form.type.split(":");
+      const [code = "WORK", direction = "IN"] = form.type.split(":");
       const at = new Date(`${form.date}T${form.time || "08:00"}:00`);
       const { error } = await supabase.from("corrections").insert({ user_id: uid!, code, direction, at_time: at.toISOString(), reason: form.reason.trim() });
       if (error) throw error;
@@ -66,7 +66,7 @@ function MyMonth() {
             <Input type="time" required value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} aria-label="Čas" />
           </div>
           <select className="h-9 w-full rounded-sm border border-input bg-background px-2 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} aria-label="Typ">
-            {TYPES.map((t) => { const [c, d] = t.split(":"); return <option key={t} value={t}>{labelOf(c, d)}</option>; })}
+            {TYPES.map((t) => { const [c = "", d = ""] = t.split(":"); return <option key={t} value={t}>{labelOf(c, d)}</option>; })}
           </select>
           <Textarea required minLength={3} maxLength={500} placeholder="Dôvod (napr. zabudnutý odchod)" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
           <Button type="submit" className="w-full" disabled={submit.isPending}>Odoslať</Button>

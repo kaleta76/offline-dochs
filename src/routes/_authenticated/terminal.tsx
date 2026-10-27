@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { LogIn, LogOut, Stethoscope, Briefcase, Coffee, CheckCircle2, CloudOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { enqueue, discard, useQueue } from "@/lib/offline-queue";
+import { enqueue, useQueue } from "@/lib/offline-queue";
+import { Button } from "@/components/ui/button";
 import { dayKey, hm, labelOf } from "@/lib/month";
 
 export const Route = createFileRoute("/_authenticated/terminal")({
@@ -22,7 +23,9 @@ const ACTIONS = [
 
 function Terminal() {
   const { session, profile } = useAuth();
-  const { items, online } = useQueue();
+  const { items, online } = useQueue(session?.user.id);
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [now, setNow] = useState<Date | null>(null);
   const [confirm, setConfirm] = useState<{ label: string; time: Date; queued: boolean } | null>(null);
   const uid = session?.user.id;
@@ -42,24 +45,29 @@ function Terminal() {
     queryKey: ["today", uid, items.length],
     enabled: !!uid && online,
     queryFn: async () => {
+      if (!uid) return [];
       const start = new Date(); start.setHours(0, 0, 0, 0);
       const { data, error } = await supabase.from("punches").select("client_uuid, code, direction, client_time, drift_minutes")
-        .eq("user_id", uid!).gte("client_time", start.toISOString()).order("client_time");
+        .eq("user_id", uid).gte("client_time", start.toISOString()).order("client_time");
       if (error) throw error;
       return data;
     },
   });
 
   async function punch(a: (typeof ACTIONS)[number]) {
-    if (!uid) return;
-    const item = await enqueue({ user_id: uid, code: a.code, direction: a.dir });
-    setConfirm({ label: a.label, time: new Date(item.client_time), queued: !navigator.onLine });
+    if (!uid || busy) return;
+    setBusy(true); setSaveError(null);
+    try {
+      const item = await enqueue({ user_id: uid, code: a.code, direction: a.dir });
+      setConfirm({ label: a.label, time: new Date(item.client_time), queued: true });
+    } catch { setSaveError('Záznam sa nepodarilo uložiť. Skúste znova; nezatvárajte aplikáciu.'); }
+    finally { setBusy(false); }
   }
 
   const todayKey = dayKey(new Date());
   const list = [
     ...(today.data ?? []).map((p) => ({ id: p.client_uuid, code: p.code, dir: p.direction, time: new Date(p.client_time), pending: false, error: undefined as string | undefined })),
-    ...items.filter((i) => dayKey(new Date(i.client_time)) === todayKey).map((i) => ({ id: i.client_uuid, code: i.code, dir: i.direction, time: new Date(i.client_time), pending: true, error: i.error })),
+    ...items.filter((i) => dayKey(new Date(i.client_time)) === todayKey && !(today.data ?? []).some(p => p.client_uuid === i.client_uuid)).map((i) => ({ id: i.client_uuid, code: i.code, dir: i.direction, time: new Date(i.client_time), pending: true, error: i.error })),
   ].sort((a, b) => a.time.getTime() - b.time.getTime());
   const last = list[list.length - 1];
   const atWork = last ? last.dir === "IN" : false;
@@ -93,16 +101,18 @@ function Terminal() {
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {ACTIONS.map((a, i) => (
-            <button
+            <Button
               key={a.label}
+              disabled={busy || !uid}
               onClick={() => punch(a)}
-              className={`flex flex-col items-center justify-center gap-2 rounded-sm px-4 py-8 text-xl font-black uppercase tracking-wide shadow-[4px_4px_0_0_var(--foreground)] transition active:translate-x-1 active:translate-y-1 active:shadow-none ${a.cls} ${i < 2 ? "sm:py-12" : ""}`}
+              className={`h-auto flex flex-col items-center justify-center gap-2 rounded-sm px-4 py-8 text-xl font-black uppercase tracking-wide shadow-[4px_4px_0_0_var(--foreground)] transition active:translate-x-1 active:translate-y-1 active:shadow-none ${a.cls} ${i < 2 ? "sm:py-12" : ""}`}
             >
               <a.icon className="h-9 w-9" />
               {a.label}
-            </button>
+            </Button>
           ))}
         </div>
+        {saveError && <p role="alert" className="mt-3 text-destructive">{saveError}</p>}
       </section>
       <aside className="rounded-sm border-2 border-foreground bg-card p-4">
         <h2 className="mb-3 text-sm font-bold uppercase tracking-widest">Dnešné záznamy</h2>
@@ -117,7 +127,7 @@ function Terminal() {
               </span>
               {p.error && (
                 <span className="w-full text-xs text-destructive">
-                  {p.error} <button className="underline" onClick={() => discard(p.id)}>zahodiť</button>
+                  {p.error}
                 </span>
               )}
             </li>

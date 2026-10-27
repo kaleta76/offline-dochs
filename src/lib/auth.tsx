@@ -21,25 +21,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, []);
   const uid = session?.user.id;
+  const [cached, setCached] = useState<AuthCtx | null>(null);
+  useEffect(() => {
+    setCached(null);
+    if (!uid) return;
+    try { setCached(JSON.parse(localStorage.getItem(`me-cache:${uid}`) ?? 'null')); } catch { /* unavailable storage */ }
+  }, [uid]);
   const { data } = useQuery({
     queryKey: ["me", uid],
     enabled: !!uid,
     queryFn: async () => {
+      if (!uid) throw new Error('Prihlásenie je potrebné.');
       const [r, p] = await Promise.all([
-        supabase.from("user_roles").select("role").eq("user_id", uid!),
-        supabase.from("profiles").select("id, full_name, department, daily_fund").eq("id", uid!).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", uid),
+        supabase.from("profiles").select("id, full_name, department, daily_fund").eq("id", uid).maybeSingle(),
       ]);
+      if (r.error || p.error) throw r.error ?? p.error;
       const v = { roles: (r.data ?? []).map((x) => x.role as Role), profile: p.data };
-      localStorage.setItem("me-cache", JSON.stringify(v));
+      localStorage.setItem(`me-cache:${uid}`, JSON.stringify(v));
       return v;
-    },
-    initialData: () => {
-      if (typeof window === "undefined") return undefined;
-      try { return JSON.parse(localStorage.getItem("me-cache") ?? "null") ?? undefined; } catch { return undefined; }
     },
   });
   return (
-    <Ctx.Provider value={{ session, ready, roles: data?.roles ?? [], profile: data?.profile ?? null }}>
+    <Ctx.Provider value={{ session, ready, roles: data?.roles ?? cached?.roles ?? [], profile: data?.profile ?? cached?.profile ?? null }}>
       {children}
     </Ctx.Provider>
   );

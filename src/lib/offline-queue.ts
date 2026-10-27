@@ -27,9 +27,11 @@ function openDb(): Promise<IDBDatabase> {
 async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   const db = await openDb();
   return new Promise((res, rej) => {
-    const req = fn(db.transaction(STORE, mode).objectStore(STORE));
-    req.onsuccess = () => res(req.result);
-    req.onerror = () => rej(req.error);
+    const transaction = db.transaction(STORE, mode);
+    const req = fn(transaction.objectStore(STORE));
+    transaction.oncomplete = () => { db.close(); res(req.result); };
+    transaction.onerror = () => { db.close(); rej(transaction.error ?? req.error); };
+    transaction.onabort = () => { db.close(); rej(transaction.error ?? new Error('Uloženie záznamu zlyhalo.')); };
   });
 }
 
@@ -58,8 +60,14 @@ export async function syncQueue() {
   if (syncing || typeof navigator === "undefined" || !navigator.onLine) return;
   syncing = true;
   try {
+    const { data, error: authError } = await supabase.auth.getUser();
+    if (authError || !data.user) return;
+    const uid = data.user.id;
     await refresh();
-    for (const item of snapshot) {
+    for (const item of snapshot.filter(p => p.user_id === uid)) {
+      if (!navigator.onLine) break;
+      const current = await supabase.auth.getSession();
+      if (current.data.session?.user.id !== uid) break;
       const { error } = await supabase.from("punches").insert({
         client_uuid: item.client_uuid,
         user_id: item.user_id,
@@ -68,14 +76,27 @@ export async function syncQueue() {
         client_time: item.client_time,
         device: item.device,
       });
-      if (!error || error.code === "23505") {
-        await tx("readwrite", (s) => s.delete(item.client_uuid));
-      } else if (/fetch|network/i.test(error.message)) {
-        break; // still offline
-      } else {
+      if (error && error.code !== '23505') {
+        if (/fetch|network|jwt|token|unauthorized/i.test(error.message) || error.code === '42501') break;
         await tx("readwrite", (s) => s.put({ ...item, error: error.message }));
+        break; // Do not send later events out of order after rejection.
       }
+      // Read back exact owner and payload before deleting the durable local copy.
+      // A generic unique violation is never evidence that this punch was accepted.
+      const accepted = await supabase.from('punches')
+        .select('client_uuid, user_id, code, direction, client_time, device')
+        .eq('client_uuid', item.client_uuid).eq('user_id', uid).maybeSingle();
+      const row = accepted.data;
+      if (accepted.error || !row) break;
+      if (row.code !== item.code || row.direction !== item.direction || row.device !== item.device ||
+        new Date(row.client_time).getTime() !== new Date(item.client_time).getTime()) {
+        await tx('readwrite', s => s.put({ ...item, error: 'Konflikt záznamu – záznam zostáva uložený v zariadení.' }));
+        break;
+      }
+      await tx('readwrite', s => s.delete(item.client_uuid));
     }
+  } catch {
+    // Network or auth failure: retain all unacknowledged events for the next retry.
   } finally {
     syncing = false;
     await refresh();
@@ -88,7 +109,7 @@ export async function discard(uuid: string) {
   await refresh();
 }
 
-export function useQueue() {
+export function useQueue(userId?: string) {
   const items = useSyncExternalStore(
     (l) => { listeners.add(l); return () => listeners.delete(l); },
     () => snapshot,
@@ -105,5 +126,5 @@ export function useQueue() {
     const iv = setInterval(() => void syncQueue(), 30_000);
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); clearInterval(iv); };
   }, []);
-  return { items, online };
+  return { items: items.filter(item => item.user_id === userId), online };
 }

@@ -6,8 +6,8 @@ import { useAuth } from "@/lib/auth";
 import { useQueue } from "@/lib/offline-queue";
 
 export function AppShell() {
-  const { roles, profile } = useAuth();
-  const { items, online } = useQueue();
+  const { roles, profile, session } = useAuth();
+  const { items, online } = useQueue(session?.user.id);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const isMgr = roles.includes("manager") || roles.includes("admin");

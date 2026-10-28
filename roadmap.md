@@ -5,5 +5,6 @@
 - [x] Môj mesiac + výpočtový motor + testy
 - [x] Môj tím: korekcie, uzávierka, A4 výkaz
 - [x] Admin: nastavenia, číselník, sviatky, SAP export
-- [ ] Otvorenie aplikácie úplne bez siete + bezpečná synchronizácia po obnovení siete (požiadavka zopakovaná 27. 10.)
+- [x] Offline shell + synchronizácia s overením prijatia a oddelením používateľov (implementované, automatické testy)
+- [ ] Overenie offline otvorenia a synchronizácie na publikovanej verzii — čaká na publikovanie a prihlásenie v náhľade
 - [ ] Microsoft 365 prihlásenie (čaká na údaje od IT)

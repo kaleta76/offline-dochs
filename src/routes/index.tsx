@@ -8,6 +8,8 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Evidencia dochádzky v prehliadači: funguje aj offline, schvaľovanie manažérom a export do SAP." },
       { property: "og:title", content: "Dochádzka – podnikový dochádzkový systém" },
       { property: "og:description", content: "Evidencia dochádzky v prehliadači: funguje aj offline, schvaľovanie manažérom a export do SAP." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Index,

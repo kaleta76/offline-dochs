@@ -11,6 +11,8 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Prihlásenie do dochádzkového systému." },
       { property: "og:title", content: "Prihlásenie – Dochádzka" },
       { property: "og:description", content: "Prihlásenie do dochádzkového systému." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AuthPage,

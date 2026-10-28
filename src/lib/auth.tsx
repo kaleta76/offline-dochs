@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
   return (
-    <Ctx.Provider value={{ session, ready, roles: data?.roles ?? cached?.roles ?? [], profile: data?.profile ?? cached?.profile ?? null }}>
+    <Ctx.Provider value={{ session, ready, roles: data?.roles ?? (cached && cached.profile?.id === uid ? cached.roles : []), profile: data?.profile ?? (cached && cached.profile?.id === uid ? cached.profile : null) }}>
       {children}
     </Ctx.Provider>
   );

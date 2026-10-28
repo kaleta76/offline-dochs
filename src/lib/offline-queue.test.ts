@@ -56,4 +56,19 @@ describe('Durable owner-scoped synchronization', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true }); await syncQueue();
     expect(await rows()).toHaveLength(1);
   });
+  it('never sends another user’s events when the session changes', async () => {
+    const p = await enqueue({ user_id: 'user-a', code: 'WORK', direction: 'IN' });
+    mocks.uid = 'user-b';
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true }); await syncQueue();
+    expect(mocks.sends).toHaveLength(0);
+    expect((await rows())[0].client_uuid).toBe(p.client_uuid);
+  });
+  it('retains an unverified duplicate and retries permission failures later', async () => {
+    await enqueue({ user_id: 'user-a', code: 'WORK', direction: 'IN' });
+    mocks.insert.mockResolvedValueOnce({ error: { code: '23505', message: 'duplicate' } }).mockResolvedValueOnce({ error: { code: '42501', message: 'permission denied' } });
+    mocks.read.mockResolvedValue({ error: null, data: null });
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    await syncQueue(); expect(await rows()).toHaveLength(1);
+    await syncQueue(); expect(await rows()).toHaveLength(1);
+  });
 });

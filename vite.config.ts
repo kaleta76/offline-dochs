@@ -19,21 +19,20 @@ const pwa = VitePWA({
     globDirectory: 'dist/client',
     globPatterns: ['**/*.{js,css,woff,woff2,ico,png,webmanifest}', '_shell.html'],
     maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
-    navigateFallback: '/_shell.html',
-    navigateFallbackAllowlist: [/^\/(?:$|terminal\/?$|auth\/?$|mesiac\/?$|tim\/?$|admin\/?$|vykaz\/)/],
-    navigateFallbackDenylist: [/^\/api\//, /^\/~oauth/],
+    // NetworkFirst navigation below falls back to the precached public shell.
+    // No catch-all NavigationRoute: it would intercept online navigations first.
     cleanupOutdatedCaches: true,
     runtimeCaching: [{
       urlPattern: ({ request, url }) => request.mode === 'navigate' && url.origin === self.location.origin && /^\/(?:$|terminal\/?$|auth\/?$|mesiac\/?$|tim\/?$|admin\/?$|vykaz\/)/.test(url.pathname),
       handler: 'NetworkFirst',
-      options: { cacheName: 'dochadzka-navigation', networkTimeoutSeconds: 4, cacheableResponse: { statuses: [200] }, expiration: { maxEntries: 15, maxAgeSeconds: 7 * 86400 } },
+      options: { cacheName: 'dochadzka-navigation', networkTimeoutSeconds: 4, precacheFallback: { fallbackURL: '/_shell.html' }, cacheableResponse: { statuses: [200] }, expiration: { maxEntries: 15, maxAgeSeconds: 7 * 86400 } },
     }],
   },
 });
 // Start prerenders after the client bundle closes: generate the worker after all
 // environments finish so its precache includes the actual shell and route chunks.
 const pwaBuild = pwa.find(plugin => plugin.name === 'vite-plugin-pwa:build');
-if (pwaBuild) pwaBuild.closeBundle = undefined;
+if (pwaBuild) delete pwaBuild.closeBundle;
 
 export default defineConfig({
   tanstackStart: {

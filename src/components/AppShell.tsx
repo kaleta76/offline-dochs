@@ -18,6 +18,7 @@ export function AppShell() {
     await qc.cancelQueries();
     qc.clear();
     localStorage.removeItem("me-cache");
+    if (session?.user.id) localStorage.removeItem(`me-cache:${session.user.id}`);
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }

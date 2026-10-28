@@ -78,7 +78,7 @@ function Terminal() {
         {confirm.queued ? <CloudOff className="h-20 w-20 text-warning" /> : <CheckCircle2 className="h-20 w-20 text-success" />}
         <div className="text-4xl font-black uppercase">{confirm.label}</div>
         <div className="num text-6xl font-bold">{hm(confirm.time)}</div>
-        <div className="text-muted-foreground">{confirm.queued ? "Uložené v zariadení – odošle sa po pripojení." : "Zaznamenané."}</div>
+        <div className="text-muted-foreground">{confirm.queued ? (online ? "Uložené v zariadení – čaká na potvrdenie serverom." : "Uložené v zariadení – odošle sa po pripojení.") : "Zaznamenané."}</div>
       </div>
     );
   }

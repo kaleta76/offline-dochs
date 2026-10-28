@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_authenticated/mesiac")({
-  head: () => ({ meta: [{ title: "Môj mesiac – Dochádzka" }, { name: "description", content: "Mesačný prehľad odpracovaného času a korekcie." }] }),
+  head: () => ({ meta: [{ title: "Môj mesiac – Dochádzka" }, { name: "description", content: "Mesačný prehľad odpracovaného času a korekcie." }, { property: "og:title", content: "Môj mesiac – Dochádzka" }, { property: "og:description", content: "Mesačný prehľad odpracovaného času a korekcie." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: MyMonth,
 });
 

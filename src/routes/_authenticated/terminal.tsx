@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { dayKey, hm, labelOf } from "@/lib/month";
 
 export const Route = createFileRoute("/_authenticated/terminal")({
-  head: () => ({ meta: [{ title: "Terminál – Dochádzka" }, { name: "description", content: "Záznam príchodu, odchodu a prerušení." }] }),
+  head: () => ({ meta: [{ title: "Terminál – Dochádzka" }, { name: "description", content: "Záznam príchodu, odchodu a prerušení." }, { property: "og:title", content: "Terminál – Dochádzka" }, { property: "og:description", content: "Záznam príchodu, odchodu a prerušení." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: Terminal,
 });
 

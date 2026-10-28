@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  head: () => ({ meta: [{ title: "Správa – Dochádzka" }, { name: "description", content: "Pravidlá, číselníky, zamestnanci a SAP export." }] }),
+  head: () => ({ meta: [{ title: "Správa – Dochádzka" }, { name: "description", content: "Pravidlá, číselníky, zamestnanci a SAP export." }, { property: "og:title", content: "Správa – Dochádzka" }, { property: "og:description", content: "Pravidlá, číselníky, zamestnanci a SAP export." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: Admin,
 });
 

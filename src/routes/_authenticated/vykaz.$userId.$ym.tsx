@@ -5,7 +5,7 @@ import { MonthTable } from "@/components/MonthTable";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/vykaz/$userId/$ym")({
-  head: () => ({ meta: [{ title: "Mesačný výkaz – Dochádzka" }, { name: "description", content: "Mesačný výkaz dochádzky na podpis." }] }),
+  head: () => ({ meta: [{ title: "Mesačný výkaz – Dochádzka" }, { name: "description", content: "Mesačný výkaz dochádzky na podpis." }, { property: "og:title", content: "Mesačný výkaz – Dochádzka" }, { property: "og:description", content: "Mesačný výkaz dochádzky na podpis." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: Report,
 });
 

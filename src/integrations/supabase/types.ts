@@ -292,6 +292,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calc_settings: {
+        Args: never
+        Returns: {
+          key: string
+          value: string
+        }[]
+      }
       can_see: { Args: { _emp: string }; Returns: boolean }
       decide_correction: {
         Args: { _approve: boolean; _id: string }

@@ -157,6 +157,153 @@ export type Database = {
         }
         Relationships: []
       }
+      organization_codes: {
+        Row: {
+          calc_type: string
+          code: string
+          counts: boolean
+          limit_days: number | null
+          name: string
+          organization_id: string
+          sap_code: string
+          sort: number
+        }
+        Insert: {
+          calc_type: string
+          code: string
+          counts?: boolean
+          limit_days?: number | null
+          name: string
+          organization_id?: string
+          sap_code: string
+          sort?: number
+        }
+        Update: {
+          calc_type?: string
+          code?: string
+          counts?: boolean
+          limit_days?: number | null
+          name?: string
+          organization_id?: string
+          sap_code?: string
+          sort?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_codes_code_fkey"
+            columns: ["code"]
+            isOneToOne: false
+            referencedRelation: "absence_codes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "organization_codes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_holidays: {
+        Row: {
+          day: string
+          name: string
+          organization_id: string
+        }
+        Insert: {
+          day: string
+          name: string
+          organization_id?: string
+        }
+        Update: {
+          day?: string
+          name?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_holidays_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_invites: {
+        Row: {
+          code: string
+          organization_id: string
+        }
+        Insert: {
+          code?: string
+          organization_id: string
+        }
+        Update: {
+          code?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_settings: {
+        Row: {
+          description: string | null
+          key: string
+          organization_id: string
+          value: string
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          organization_id?: string
+          value?: string
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          organization_id?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -166,6 +313,7 @@ export type Database = {
           full_name: string
           id: string
           manager_id: string | null
+          organization_id: string | null
           sap_id: string | null
         }
         Insert: {
@@ -176,6 +324,7 @@ export type Database = {
           full_name?: string
           id: string
           manager_id?: string | null
+          organization_id?: string | null
           sap_id?: string | null
         }
         Update: {
@@ -186,6 +335,7 @@ export type Database = {
           full_name?: string
           id?: string
           manager_id?: string | null
+          organization_id?: string | null
           sap_id?: string | null
         }
         Relationships: [
@@ -194,6 +344,13 @@ export type Database = {
             columns: ["manager_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -313,6 +470,9 @@ export type Database = {
       }
       is_closed: { Args: { _t: string; _user: string }; Returns: boolean }
       is_manager_of: { Args: { _emp: string }; Returns: boolean }
+      my_organization: { Args: never; Returns: string }
+      rotate_organization_invite: { Args: never; Returns: string }
+      same_organization: { Args: { _user: string }; Returns: boolean }
     }
     Enums: {
       app_role: "employee" | "manager" | "admin"

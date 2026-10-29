@@ -10,6 +10,9 @@
 <!-- LOVABLE:END -->
 
 ## Architecture rules
+- Each account belongs to one immutable organization via profiles; roles stay in user_roles and all RLS/RPC authorization checks organization equality — prevents cross-company access and keeps offline queued user IDs unambiguous.
+- Company signup is provisioned atomically by the auth lifecycle trigger; joining requires a rotatable private organization invitation and grants employee only — client metadata never chooses existing tenancy or privileges.
+- Organization reference data is stored in organization_settings, organization_codes and organization_holidays; legacy tables are provisioning templates only — company admins cannot alter another company's payroll configuration.
 - Attendance math lives only in `src/lib/engine.ts` as a pure function with tests in `engine.test.ts`; UI and exports call it, never reimplement it — keeps payroll results consistent.
 - Punches are written to the IndexedDB queue (`src/lib/offline-queue.ts`) first and synced with an idempotent `client_uuid` — offline is a core requirement.
 - Server time, drift and SHA-256 hash chain are set by the `punches_chain` DB trigger, never by the client — tamper evidence must not depend on the device.

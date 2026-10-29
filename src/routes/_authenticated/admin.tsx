@@ -17,13 +17,16 @@ const H = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 t
 const box = "rounded-sm border-2 border-foreground bg-card p-4";
 
 function Admin() {
-  const { roles } = useAuth();
+  const { roles, session, organization } = useAuth();
   const qc = useQueryClient();
-  const settings = useQuery({ queryKey: ["settings"], queryFn: async () => (await supabase.from("settings").select("*").order("key")).data ?? [] });
-  const codes = useQuery({ queryKey: ["codes"], queryFn: async () => (await supabase.from("absence_codes").select("*").order("sort")).data ?? [] });
-  const holidays = useQuery({ queryKey: ["holidays"], queryFn: async () => (await supabase.from("holidays").select("*").order("day")).data ?? [] });
+  const settings = useQuery({ queryKey: ["settings", organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: async () => (await supabase.from("organization_settings").select("*").order("key")).data ?? [] });
+  const codes = useQuery({ queryKey: ["codes", organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: async () => (await supabase.from("organization_codes").select("*").order("sort")).data ?? [] });
+  const holidays = useQuery({ queryKey: ["holidays", organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: async () => (await supabase.from("organization_holidays").select("*").order("day")).data ?? [] });
+  const invite = useQuery({ queryKey: ['organization-invite', organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: async () => { const { data, error } = await supabase.from('organization_invites').select('code').maybeSingle(); if (error) throw error; return data?.code; } });
+  const [inviteMessage, setInviteMessage] = useState('');
   const people = useQuery({
-    queryKey: ["people"],
+    queryKey: ["people", organization?.id, session?.user.id],
+    enabled: roles.includes('admin'),
     queryFn: async () => {
       const [p, r] = await Promise.all([supabase.from("profiles").select("*").order("full_name"), supabase.from("user_roles").select("user_id, role")]);
       return (p.data ?? []).map((x) => ({ ...x, roles: (r.data ?? []).filter((y) => y.user_id === x.id).map((y) => y.role) }));
@@ -73,6 +76,16 @@ function Admin() {
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-black uppercase">Správa</h1>
+      <section className="space-y-3 border-b-2 border-foreground pb-5">
+        <H>{organization?.name ?? 'Organizácia'}</H>
+        <label className="block text-sm font-semibold" htmlFor="organization-invite">Pozývací kód pre zamestnancov</label>
+        <div className="flex flex-wrap gap-2">
+          <Input id="organization-invite" readOnly value={invite.data ?? ''} className="num min-w-0 flex-1" />
+          <Button variant="outline" disabled={!invite.data} onClick={async () => { try { await navigator.clipboard.writeText(invite.data ?? ''); setInviteMessage('Kód bol skopírovaný.'); } catch { setInviteMessage('Kód označte a skopírujte.'); } }}>Kopírovať</Button>
+          <Button variant="outline" onClick={async () => { if (!window.confirm('Zneplatniť pôvodný pozývací kód?')) return; const { error } = await supabase.rpc('rotate_organization_invite'); setInviteMessage(error ? error.message : 'Pôvodný kód už neplatí.'); qc.invalidateQueries({ queryKey: ['organization-invite'] }); }}>Obnoviť kód</Button>
+        </div>
+        {inviteMessage && <p role="status" className="text-sm">{inviteMessage}</p>}
+      </section>
 
       <section className={box}>
         <H>Export pre mzdovú účtáreň (SAP)</H>
@@ -125,7 +138,7 @@ function Admin() {
             {(settings.data ?? []).map((s) => (
               <div key={s.key} className="grid grid-cols-[1fr_110px] items-center gap-2">
                 <div><div className="num text-xs font-bold">{s.key}</div><div className="text-xs text-muted-foreground">{s.description}</div></div>
-                <Input defaultValue={s.value} onBlur={(e) => e.target.value !== s.value && run(supabase.from("settings").update({ value: e.target.value }).eq("key", s.key), "settings")} />
+                <Input defaultValue={s.value} onBlur={(e) => e.target.value !== s.value && run(supabase.from("organization_settings").update({ value: e.target.value }).eq("key", s.key), "settings")} />
               </div>
             ))}
           </div>
@@ -137,15 +150,15 @@ function Admin() {
             {(codes.data ?? []).map((c) => (
               <div key={c.code} className="mb-1.5 grid grid-cols-[70px_80px_1fr] items-center gap-2">
                 <span className="num text-xs font-bold">{c.code}</span>
-                <Input defaultValue={c.sap_code} onBlur={(e) => run(supabase.from("absence_codes").update({ sap_code: e.target.value }).eq("code", c.code), "codes")} aria-label="SAP kód" />
-                <Input defaultValue={c.name} onBlur={(e) => run(supabase.from("absence_codes").update({ name: e.target.value }).eq("code", c.code), "codes")} aria-label="Názov" />
+                <Input defaultValue={c.sap_code} onBlur={(e) => run(supabase.from("organization_codes").update({ sap_code: e.target.value }).eq("code", c.code), "codes")} aria-label="SAP kód" />
+                <Input defaultValue={c.name} onBlur={(e) => run(supabase.from("organization_codes").update({ name: e.target.value }).eq("code", c.code), "codes")} aria-label="Názov" />
               </div>
             ))}
           </section>
 
           <section className={box}>
             <H>Sviatky</H>
-            <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); run(supabase.from("holidays").insert(newHol), "holidays"); setNewHol({ day: "", name: "" }); }}>
+            <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); run(supabase.from("organization_holidays").insert(newHol), "holidays"); setNewHol({ day: "", name: "" }); }}>
               <Input type="date" required value={newHol.day} onChange={(e) => setNewHol({ ...newHol, day: e.target.value })} className="w-40" />
               <Input required placeholder="Názov" value={newHol.name} onChange={(e) => setNewHol({ ...newHol, name: e.target.value })} />
               <Button type="submit">Pridať</Button>
@@ -154,7 +167,7 @@ function Admin() {
               {(holidays.data ?? []).map((h) => (
                 <li key={h.day} className="flex justify-between border-b border-border pb-1">
                   <span><span className="num">{new Date(h.day).toLocaleDateString("sk-SK")}</span> {h.name}</span>
-                  <button className="text-xs text-destructive" onClick={() => run(supabase.from("holidays").delete().eq("day", h.day), "holidays")}>odstrániť</button>
+                  <Button variant="link" className="text-xs text-destructive" onClick={() => run(supabase.from("organization_holidays").delete().eq("day", h.day), "holidays")}>odstrániť</Button>
                 </li>
               ))}
             </ul>

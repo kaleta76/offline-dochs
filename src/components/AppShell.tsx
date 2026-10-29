@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useQueue } from "@/lib/offline-queue";
 
 export function AppShell() {
-  const { roles, profile, session } = useAuth();
+  const { roles, profile, session, organization } = useAuth();
   const { items, online } = useQueue(session?.user.id);
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -47,9 +47,9 @@ export function AppShell() {
       </div>
       <header className="no-print border-b-4 border-primary bg-secondary text-secondary-foreground">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <div className="flex items-baseline gap-2">
+          <div className="flex flex-col gap-1">
             <span className="text-lg font-black uppercase tracking-tight">Dochádzka</span>
-            <span className="num text-xs text-secondary-foreground/60">v1.1</span>
+            <span className="max-w-64 break-words text-xs text-secondary-foreground/60">{organization?.name}</span>
           </div>
           <nav className="flex flex-1 flex-wrap gap-1">
             {nav.filter((n) => n.show).map((n) => (

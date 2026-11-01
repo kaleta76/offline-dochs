@@ -54,3 +54,12 @@ export async function getOrCreateDeviceKey(userId: string) {
   if (existing) return { key: existing, persisted: (await navigator.storage?.persisted?.().catch(() => false)) ?? false };
   return createDeviceKey(userId);
 }
+
+export async function saveDeviceKey(key: DeviceKey) {
+  await run("readwrite", (s) => s.put(key));
+  try { await navigator.storage?.persist?.(); } catch { /* unsupported */ }
+}
+export async function newDeviceKey(userId: string): Promise<DeviceKey> {
+  const token = generateToken();
+  return { user_id: userId, token, hash: await sha256Hex(token), created_at: new Date().toISOString() };
+}

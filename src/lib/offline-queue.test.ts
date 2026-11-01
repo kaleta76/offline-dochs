@@ -7,6 +7,7 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {
   from: () => ({ insert: (p: unknown) => { mocks.sends.push(p); return mocks.insert(p); }, select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: mocks.read }) }) }) }),
 } }));
 import { enqueue, syncQueue } from './offline-queue';
+import { createDeviceKey } from './device';
 
 async function rows() {
   const db = await new Promise<IDBDatabase>((resolve) => { const r = indexedDB.open('dochadzka', 1); r.onsuccess = () => resolve(r.result); });
@@ -20,6 +21,13 @@ describe('Durable owner-scoped synchronization', () => {
   beforeEach(async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     mocks.uid = 'user-a'; mocks.sends = []; mocks.insert.mockReset(); mocks.read.mockReset(); await clear();
+  });
+  it('attaches the device key when this browser has one, and omits it otherwise', async () => {
+    const plain = await enqueue({ user_id: 'user-a', code: 'WORK', direction: 'IN' });
+    expect(plain.device_token).toBeUndefined();
+    const { key } = await createDeviceKey('user-c');
+    const keyed = await enqueue({ user_id: 'user-c', code: 'WORK', direction: 'IN' });
+    expect(keyed.device_token).toBe(key.token);
   });
   it('commits punches locally without a network connection', async () => {
     const p = await enqueue({ user_id: 'user-a', code: 'WORK', direction: 'IN' });

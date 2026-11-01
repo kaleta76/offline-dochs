@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { enqueue, useQueue } from "@/lib/offline-queue";
 import { Button } from "@/components/ui/button";
+import { DeviceRegistration } from "@/components/DeviceRegistration";
 import { dayKey, hm, labelOf } from "@/lib/month";
 
 export const Route = createFileRoute("/_authenticated/terminal")({
@@ -86,6 +87,7 @@ function Terminal() {
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
       <section>
+        {uid && <DeviceRegistration userId={uid} online={online} />}
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b-2 border-foreground pb-4">
           <div>
             <div className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Prihlásený</div>

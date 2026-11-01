@@ -8,4 +8,5 @@
 - [x] Admin: nastavenia, číselník, sviatky, SAP export
 - [x] Offline shell + synchronizácia s overením prijatia a oddelením používateľov (implementované, automatické testy)
 - [ ] Overenie offline otvorenia a synchronizácie na publikovanej verzii — čaká na publikovanie a prihlásenie v náhľade
+- [x] Overovanie zariadení: párovací kód, schválenie, zrušenie, záchranný kód, náhrada, audit
 - [ ] Microsoft 365 prihlásenie (čaká na údaje od IT)

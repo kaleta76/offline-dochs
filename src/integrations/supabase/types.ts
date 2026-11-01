@@ -118,6 +118,91 @@ export type Database = {
           },
         ]
       }
+      devices: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          device_token_hash: string
+          id: string
+          last_seen_at: string | null
+          organization_id: string
+          pairing_code: string | null
+          pairing_expires_at: string | null
+          recovery_code_hash: string | null
+          recovery_code_pending: string | null
+          replaces_device_id: string | null
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          status: string
+          user_agent_hint: string | null
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          device_token_hash: string
+          id?: string
+          last_seen_at?: string | null
+          organization_id: string
+          pairing_code?: string | null
+          pairing_expires_at?: string | null
+          recovery_code_hash?: string | null
+          recovery_code_pending?: string | null
+          replaces_device_id?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          user_agent_hint?: string | null
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          device_token_hash?: string
+          id?: string
+          last_seen_at?: string | null
+          organization_id?: string
+          pairing_code?: string | null
+          pairing_expires_at?: string | null
+          recovery_code_hash?: string | null
+          recovery_code_pending?: string | null
+          replaces_device_id?: string | null
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          user_agent_hint?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_replaces_device_id_fkey"
+            columns: ["replaces_device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holidays: {
         Row: {
           day: string
@@ -361,6 +446,9 @@ export type Database = {
           client_uuid: string
           code: string
           device: string | null
+          device_id: string | null
+          device_token: string | null
+          device_verification: string
           direction: string
           drift_minutes: number
           id: number
@@ -375,6 +463,9 @@ export type Database = {
           client_uuid: string
           code: string
           device?: string | null
+          device_id?: string | null
+          device_token?: string | null
+          device_verification?: string
           direction: string
           drift_minutes?: number
           id?: number
@@ -389,6 +480,9 @@ export type Database = {
           client_uuid?: string
           code?: string
           device?: string | null
+          device_id?: string | null
+          device_token?: string | null
+          device_verification?: string
           direction?: string
           drift_minutes?: number
           id?: number
@@ -405,6 +499,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "absence_codes"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "punches_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -449,6 +550,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_device: {
+        Args: { _as_backup?: boolean; _id: string }
+        Returns: undefined
+      }
       calc_settings: {
         Args: never
         Returns: {
@@ -457,10 +562,16 @@ export type Database = {
         }[]
       }
       can_see: { Args: { _emp: string }; Returns: boolean }
+      claim_recovery_code: { Args: { _token_hash: string }; Returns: string }
+      confirm_unverified_punch: {
+        Args: { _punch_id: number }
+        Returns: undefined
+      }
       decide_correction: {
         Args: { _approve: boolean; _id: string }
         Returns: undefined
       }
+      device_manager_ok: { Args: { _user: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -468,9 +579,33 @@ export type Database = {
         }
         Returns: boolean
       }
+      hash_recovery_code: { Args: { _code: string }; Returns: string }
       is_closed: { Args: { _t: string; _user: string }; Returns: boolean }
       is_manager_of: { Args: { _emp: string }; Returns: boolean }
       my_organization: { Args: never; Returns: string }
+      new_pairing_code: { Args: never; Returns: string }
+      new_recovery_code: { Args: never; Returns: string }
+      recover_device: {
+        Args: {
+          _new_token_hash: string
+          _recovery_code: string
+          _ua_hint: string
+        }
+        Returns: string
+      }
+      register_device: {
+        Args: { _replace?: boolean; _token_hash: string; _ua_hint: string }
+        Returns: {
+          device_id: string
+          pairing_code: string
+          pairing_expires_at: string
+          status: string
+        }[]
+      }
+      revoke_device: {
+        Args: { _id: string; _reason: string }
+        Returns: undefined
+      }
       rotate_organization_invite: { Args: never; Returns: string }
       same_organization: { Args: { _user: string }; Returns: boolean }
     }

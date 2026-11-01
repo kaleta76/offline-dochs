@@ -22,6 +22,13 @@
       "when": 1793281594726,
       "tag": "0002_organization_registration_and_isolation",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793493701770,
+      "tag": "0003_device_verification",
+      "breakpoints": true
     }
   ]
 }

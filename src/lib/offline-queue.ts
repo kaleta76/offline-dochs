@@ -2,6 +2,7 @@
 // then sent to the server; client_uuid makes resending idempotent.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getDeviceKey } from "@/lib/device";
 
 export interface QueuedPunch {
   client_uuid: string;
@@ -10,6 +11,8 @@ export interface QueuedPunch {
   direction: "IN" | "OUT";
   client_time: string;
   device: string;
+  /** Raw device key; server hashes it to mark the punch verified, then discards it. */
+  device_token?: string;
   error?: string;
 }
 
@@ -42,9 +45,11 @@ async function refresh() {
   listeners.forEach((l) => l());
 }
 
-export async function enqueue(p: Omit<QueuedPunch, "client_uuid" | "client_time" | "device">) {
+export async function enqueue(p: Omit<QueuedPunch, "client_uuid" | "client_time" | "device" | "device_token">) {
+  const key = await getDeviceKey(p.user_id);
   const item: QueuedPunch = {
     ...p,
+    ...(key ? { device_token: key.token } : {}),
     client_uuid: crypto.randomUUID(),
     client_time: new Date().toISOString(),
     device: navigator.userAgent.slice(0, 60),
@@ -75,6 +80,7 @@ export async function syncQueue() {
         direction: item.direction,
         client_time: item.client_time,
         device: item.device,
+        ...(item.device_token ? { device_token: item.device_token } : {}),
       });
       if (error && error.code !== '23505') {
         if (/fetch|network|jwt|token|unauthorized/i.test(error.message) || error.code === '42501') break;

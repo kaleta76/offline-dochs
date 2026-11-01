@@ -7,6 +7,7 @@ import { loadMonth, labelOf } from "@/lib/month";
 import { fmtMin } from "@/lib/engine";
 import { MonthPicker } from "@/components/MonthTable";
 import { Button } from "@/components/ui/button";
+import { DevicesPanel } from "@/components/DevicesPanel";
 
 export const Route = createFileRoute("/_authenticated/tim")({
   head: () => ({ meta: [{ title: "Môj tím – Dochádzka" }, { name: "description", content: "Schvaľovanie korekcií a uzávierka mesiaca." }, { property: "og:title", content: "Môj tím – Dochádzka" }, { property: "og:description", content: "Schvaľovanie korekcií a uzávierka mesiaca." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -84,6 +85,8 @@ function Team() {
           ))}
         </ul>
       </section>
+
+      {uid && <DevicesPanel uid={uid} />}
 
       <section>
         <h2 className="mb-2 text-sm font-bold uppercase tracking-widest">Prehľad mesiaca</h2>

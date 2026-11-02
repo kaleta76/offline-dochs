@@ -10,6 +10,7 @@
 <!-- LOVABLE:END -->
 
 ## Architecture rules
+- Attendance identity uses the existing SAP string identifier, never names/email; column grants block legacy profile identity and raw audit payload reads, while cache sanitization preserves offline records — display-only masking is insufficient pseudonymization.
 - Each account belongs to one immutable organization via profiles; roles stay in user_roles and all RLS/RPC authorization checks organization equality — prevents cross-company access and keeps offline queued user IDs unambiguous.
 - Company signup is provisioned atomically by the auth lifecycle trigger; joining requires a rotatable private organization invitation and grants employee only — client metadata never chooses existing tenancy or privileges.
 - Organization reference data is stored in organization_settings, organization_codes and organization_holidays; legacy tables are provisioning templates only — company admins cannot alter another company's payroll configuration.

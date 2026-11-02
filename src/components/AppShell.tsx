@@ -1,3 +1,4 @@
+import { personnelLabel } from "@/lib/personnel";
 import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Clock, CalendarDays, Users, Settings, LogOut, Wifi, WifiOff, CloudUpload } from "lucide-react";
@@ -65,7 +66,7 @@ export function AppShell() {
             ))}
           </nav>
           <div className="flex items-center gap-3 text-sm">
-            <span className="hidden text-secondary-foreground/80 sm:inline">{profile?.full_name}</span>
+            <span className="hidden text-secondary-foreground/80 sm:inline">{personnelLabel(profile)}</span>
             <button onClick={signOut} className="flex items-center gap-1 text-secondary-foreground/70 hover:text-secondary-foreground" aria-label="Odhlásiť">
               <LogOut className="h-4 w-4" />
             </button>

@@ -1,3 +1,4 @@
+import { personnelLabel } from "@/lib/personnel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -26,8 +27,9 @@ function Team() {
     queryKey: ["team", uid, isAdmin, ym.y, ym.m],
     enabled: !!uid,
     queryFn: async () => {
-      let q = supabase.from("profiles").select("id, full_name, department").order("full_name");
-      if (!isAdmin) q = q.eq("manager_id", uid!);
+      if (!uid) throw new Error("Prihlásenie je potrebné.");
+      let q = supabase.from("profiles").select("id, sap_id, department").order("sap_id");
+      if (!isAdmin) q = q.eq("manager_id", uid);
       const { data, error } = await q;
       if (error) throw error;
       return Promise.all((data ?? []).map(async (p) => ({ p, m: await loadMonth(p.id, ym.y, ym.m) })));
@@ -38,10 +40,11 @@ function Team() {
     queryKey: ["pending-corr", uid],
     enabled: !!uid,
     queryFn: async () => {
-      const { data } = await supabase.from("corrections").select("*").eq("status", "pending").neq("user_id", isAdmin ? "00000000-0000-0000-0000-000000000000" : uid!).order("at_time");
+      if (!uid) throw new Error("Prihlásenie je potrebné.");
+      const { data } = await supabase.from("corrections").select("*").eq("status", "pending").neq("user_id", isAdmin ? "00000000-0000-0000-0000-000000000000" : uid).order("at_time");
       const ids = [...new Set((data ?? []).map((c) => c.user_id))];
-      const { data: ps } = ids.length ? await supabase.from("profiles").select("id, full_name").in("id", ids) : { data: [] };
-      const names = new Map((ps ?? []).map((p) => [p.id, p.full_name]));
+      const { data: ps } = ids.length ? await supabase.from("profiles").select("id, sap_id").in("id", ids) : { data: [] };
+      const names = new Map((ps ?? []).map((p) => [p.id, personnelLabel(p)]));
       return (data ?? []).map((c) => ({ ...c, name: names.get(c.user_id) ?? "?" }));
     },
   });
@@ -56,7 +59,8 @@ function Team() {
   });
   const close = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase.from("month_closures").insert({ user_id: userId, year: ym.y, month: ym.m, closed_by: uid! });
+      if (!uid) throw new Error("Prihlásenie je potrebné.");
+      const { error } = await supabase.from("month_closures").insert({ user_id: userId, year: ym.y, month: ym.m, closed_by: uid });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["team"] }),
@@ -103,7 +107,7 @@ function Team() {
             <tbody>
               {(team.data ?? []).map(({ p, m }) => (
                 <tr key={p.id} className="border-b border-border">
-                  <td className="py-2"><div className="font-semibold">{p.full_name}</div><div className="text-xs text-muted-foreground">{p.department}</div></td>
+                  <td className="py-2"><div className="font-semibold">{personnelLabel(p)}</div><div className="text-xs text-muted-foreground">{p.department}</div></td>
                   <td className="num py-2 text-right">{fmtMin(m.totals.total)}</td>
                   <td className={`num py-2 text-right ${m.totals.balance < 0 ? "text-destructive" : "text-success"}`}>{fmtMin(m.totals.balance)}</td>
                   <td className={`py-2 text-center font-bold ${m.openDays ? "text-destructive" : ""}`}>{m.openDays}</td>
@@ -114,7 +118,7 @@ function Team() {
                       {m.closedAt ? (
                         <span className="rounded-sm bg-muted px-2 py-1 text-xs font-bold">Uzavretý</span>
                       ) : (
-                        <Button size="sm" onClick={() => confirm(`Uzavrieť ${ym.m}/${ym.y} pre ${p.full_name}?`) && close.mutate(p.id)}>Uzavrieť</Button>
+                        <Button size="sm" onClick={() => confirm(`Uzavrieť ${ym.m}/${ym.y} pre ${personnelLabel(p)}?`) && close.mutate(p.id)}>Uzavrieť</Button>
                       )}
                     </div>
                   </td>

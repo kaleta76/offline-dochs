@@ -22,7 +22,7 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"in" | "up" | "organization">("in");
-  const [f, setF] = useState({ email: "", password: "", name: "", organization: "", invite: "" });
+  const [f, setF] = useState({ email: "", password: "", organization: "", invite: "" });
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -42,7 +42,7 @@ function AuthPage() {
       const metadata = organizationSignupMetadata(mode === 'organization' ? { kind: 'organization', name: f.organization } : { kind: 'employee', invite: f.invite });
       const { data, error } = await supabase.auth.signUp({
         email: f.email, password: f.password,
-        options: { emailRedirectTo: window.location.origin, data: { full_name: f.name.trim(), ...metadata } },
+        options: { emailRedirectTo: window.location.origin, data: metadata },
       });
       if (data.session) navigate({ to: '/terminal' });
       setMsg(error ? (error.message.includes('Database error') ? 'Registrácia sa nepodarila. Skontrolujte pozývací kód a údaje organizácie.' : error.message) : "Skontrolujte e-mail a potvrďte registráciu.");
@@ -58,7 +58,6 @@ function AuthPage() {
           <div className="text-2xl font-black uppercase">Dochádzka</div>
           <div className="text-sm text-muted-foreground">{mode === "in" ? "Prihlásenie" : mode === 'organization' ? "Registrácia organizácie / firmy" : "Registrácia zamestnanca"}</div>
         </div>
-        {mode !== "in" && <Input required maxLength={160} aria-label="Meno a priezvisko" placeholder="Meno a priezvisko" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />}
         {mode === 'organization' && <Input required minLength={2} maxLength={160} aria-label="Názov organizácie / firmy" placeholder="Názov organizácie / firmy" value={f.organization} onChange={e => setF({ ...f, organization: e.target.value })} />}
         {mode === 'up' && <Input required maxLength={48} aria-label="Pozývací kód organizácie" placeholder="Pozývací kód organizácie" value={f.invite} onChange={e => setF({ ...f, invite: e.target.value.trim() })} />}
         <Input required type="email" placeholder="Pracovný e-mail" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />

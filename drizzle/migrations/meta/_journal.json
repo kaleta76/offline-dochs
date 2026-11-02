@@ -29,6 +29,13 @@
       "when": 1793493701770,
       "tag": "0003_device_verification",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793585260231,
+      "tag": "0004_personnel_number_pseudonymization",
+      "breakpoints": true
     }
   ]
 }

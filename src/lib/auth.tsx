@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, []);
   const uid = session?.user.id;
-  const [cached, setCached] = useState<AuthCtx | null>(null);
+  const [cached, setCached] = useState<Pick<AuthCtx, "roles" | "profile" | "organization"> | null>(null);
   useEffect(() => {
     setCached(null);
     try {

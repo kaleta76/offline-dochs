@@ -2,10 +2,10 @@ import { z } from "zod";
 
 export const personnelNumberSchema = z.string().regex(/^[0-9]{7,8}$/, "Osobné číslo zo SAP musí mať 7 alebo 8 číslic.");
 
-export function personnelLabel(profile: { id: string; sap_id: string | null } | null | undefined) {
-  return profile && personnelNumberSchema.safeParse(profile.sap_id).success
-    ? profile.sap_id
-    : profile ? `Bez osobného čísla · ${profile.id.slice(0, 8)}` : "…";
+export function personnelLabel(profile: { id: string; sap_id: string | null } | null | undefined): string {
+  if (!profile) return "…";
+  const number = personnelNumberSchema.safeParse(profile.sap_id);
+  return number.success ? number.data : `Bez osobného čísla · ${profile.id.slice(0, 8)}`;
 }
 
 const cachedProfileSchema = z.object({

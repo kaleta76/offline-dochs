@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] GDPR pseudonymizácia: 7–8-miestne osobné čísla namiesto mien — čaká na určenie zdroja čísel a prístupu k menám
 - [ ] Registrácia organizácie, pozvanie zamestnancov, samostatní správcovia a oddelenie údajov
 - [x] PDF v1.1 revízia + opravené .ps1 skripty (Files)
 - [x] Cloud: tabuľky, roly, RLS, hash chain

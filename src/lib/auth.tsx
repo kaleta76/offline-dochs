@@ -1,3 +1,4 @@
+import { migrateProfileCaches, sanitizeProfileCache } from "./personnel";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { useQuery } from "@tanstack/react-query";
@@ -8,7 +9,7 @@ interface AuthCtx {
   session: Session | null;
   ready: boolean;
   roles: Role[];
-  profile: { id: string; full_name: string; department: string | null; daily_fund: number; organization_id: string | null } | null;
+  profile: { id: string; sap_id: string | null; department: string | null; daily_fund: number; organization_id: string | null } | null;
   organization: { id: string; name: string } | null;
 }
 const Ctx = createContext<AuthCtx>({ session: null, ready: false, roles: [], profile: null, organization: null });
@@ -25,8 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [cached, setCached] = useState<AuthCtx | null>(null);
   useEffect(() => {
     setCached(null);
-    if (!uid) return;
-    try { setCached(JSON.parse(localStorage.getItem(`me-cache:${uid}`) ?? 'null')); } catch { /* unavailable storage */ }
+    try {
+      migrateProfileCaches(localStorage);
+      if (!uid) return;
+      setCached(sanitizeProfileCache(JSON.parse(localStorage.getItem(`me-cache:${uid}`) ?? 'null')));
+    } catch { /* unavailable storage */ }
   }, [uid]);
   const { data } = useQuery({
     queryKey: ["me", uid],
@@ -35,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!uid) throw new Error('Prihlásenie je potrebné.');
       const [r, p] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", uid),
-        supabase.from("profiles").select("id, full_name, department, daily_fund, organization_id").eq("id", uid).maybeSingle(),
+        supabase.from("profiles").select("id, sap_id, department, daily_fund, organization_id").eq("id", uid).maybeSingle(),
       ]);
       if (r.error || p.error) throw r.error ?? p.error;
       const org = await supabase.from('organizations').select('id, name').maybeSingle();

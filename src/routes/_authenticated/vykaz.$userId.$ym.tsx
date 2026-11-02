@@ -1,3 +1,4 @@
+import { personnelLabel } from "@/lib/personnel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { loadMonth, MONTHS } from "@/lib/month";
@@ -24,8 +25,8 @@ function Report() {
       <div className="mb-4 flex items-end justify-between border-b-2 border-foreground pb-2">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Mesačný výkaz dochádzky</div>
-          <div className="text-xl font-black">{d.profile?.full_name}</div>
-          <div className="text-sm">{d.profile?.department} {d.profile?.sap_id && `· SAP ${d.profile.sap_id}`}</div>
+          <div className="text-xl font-black">{personnelLabel(d.profile)}</div>
+          <div className="text-sm">{d.profile?.department}</div>
         </div>
         <div className="text-right text-lg font-bold">{MONTHS[m - 1]} {y}</div>
       </div>

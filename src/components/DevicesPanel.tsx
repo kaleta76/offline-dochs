@@ -1,3 +1,4 @@
+import { personnelLabel } from "@/lib/personnel";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,8 +19,8 @@ export function DevicesPanel({ uid }: { uid: string }) {
         .select("id, user_id, status, pairing_code, pairing_expires_at, created_at, last_seen_at, user_agent_hint, replaces_device_id")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      const names = new Map(((await supabase.from("profiles").select("id, full_name")).data ?? []).map((p) => [p.id, p.full_name]));
-      return (data ?? []).map((d) => ({ ...d, name: names.get(d.user_id) ?? "?" }));
+      const names = new Map(((await supabase.from("profiles").select("id, sap_id")).data ?? []).map((p) => [p.id, personnelLabel(p)]));
+      return (data ?? []).map((d) => ({ ...d, name: names.get(d.user_id) ?? personnelLabel({ id: d.user_id, sap_id: null }) }));
     },
   });
   const unverified = useQuery({
@@ -28,8 +29,8 @@ export function DevicesPanel({ uid }: { uid: string }) {
       const { data, error } = await supabase.from("punches").select("id, user_id, code, direction, client_time")
         .eq("device_verification", "unverified").neq("user_id", uid).order("client_time", { ascending: false }).limit(100);
       if (error) throw error;
-      const names = new Map(((await supabase.from("profiles").select("id, full_name")).data ?? []).map((p) => [p.id, p.full_name]));
-      return (data ?? []).map((p) => ({ ...p, name: names.get(p.user_id) ?? "?" }));
+      const names = new Map(((await supabase.from("profiles").select("id, sap_id")).data ?? []).map((p) => [p.id, personnelLabel(p)]));
+      return (data ?? []).map((p) => ({ ...p, name: names.get(p.user_id) ?? personnelLabel({ id: p.user_id, sap_id: null }) }));
     },
   });
   async function act(p: PromiseLike<{ error: { message: string } | null }>) {
@@ -46,7 +47,7 @@ export function DevicesPanel({ uid }: { uid: string }) {
       <div>
         <h2 className="mb-2 text-sm font-bold uppercase tracking-widest">Zariadenia zamestnancov</h2>
         <div className="mb-2 flex flex-wrap items-center gap-3">
-          <Input className="max-w-60" placeholder="Párovací kód alebo meno" value={filter} onChange={(e) => setFilter(e.target.value.trim())} />
+          <Input className="max-w-60" placeholder="Párovací kód alebo osobné číslo" value={filter} onChange={(e) => setFilter(e.target.value.trim())} />
           <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)} /> iba čakajúce</label>
         </div>
         {list.length === 0 && <p className="text-sm text-muted-foreground">Žiadne zariadenia.</p>}

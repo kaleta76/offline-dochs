@@ -1,3 +1,4 @@
+import { personnelLabel } from "@/lib/personnel";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -91,7 +92,7 @@ function Terminal() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b-2 border-foreground pb-4">
           <div>
             <div className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Prihlásený</div>
-            <div className="text-2xl font-black">{profile?.full_name ?? "…"}</div>
+            <div className="text-2xl font-black">{personnelLabel(profile)}</div>
             <div className={`mt-1 inline-block rounded-sm px-2 py-0.5 text-xs font-bold uppercase ${atWork ? "bg-success text-success-foreground" : "bg-muted text-muted-foreground"}`}>
               {atWork ? "Na pracovisku" : last ? `Mimo – ${labelOf(last.code, last.dir)}` : "Dnes bez záznamu"}
             </div>

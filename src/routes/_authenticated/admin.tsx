@@ -1,3 +1,4 @@
+import { personnelLabel, personnelNumberSchema } from "@/lib/personnel";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,7 +29,8 @@ function Admin() {
     queryKey: ["people", organization?.id, session?.user.id],
     enabled: roles.includes('admin'),
     queryFn: async () => {
-      const [p, r] = await Promise.all([supabase.from("profiles").select("*").order("full_name"), supabase.from("user_roles").select("user_id, role")]);
+      const [p, r] = await Promise.all([supabase.from("profiles").select("id, sap_id, department, manager_id, daily_fund, organization_id").order("sap_id"), supabase.from("user_roles").select("user_id, role")]);
+      if (p.error || r.error) throw p.error ?? r.error;
       return (p.data ?? []).map((x) => ({ ...x, roles: (r.data ?? []).filter((y) => y.user_id === x.id).map((y) => y.role) }));
     },
   });
@@ -48,11 +50,12 @@ function Admin() {
   async function exportSap() {
     setExporting(true);
     try {
+      if ((people.data ?? []).some(p => !personnelNumberSchema.safeParse(p.sap_id).success)) throw new Error("Pred exportom doplňte platné osobné čísla zo SAP všetkým zamestnancom.");
       const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet(`${MONTHS[ym.m - 1]} ${ym.y}`);
       ws.columns = [
-        { header: "SAP ID", key: "sap", width: 12 }, { header: "Meno", key: "name", width: 28 }, { header: "Stredisko", key: "dep", width: 16 },
+        { header: "Osobné číslo SAP", key: "sap", width: 20 }, { header: "Stredisko", key: "dep", width: 16 },
         { header: "Mzdový druh", key: "wt", width: 12 }, { header: "Názov", key: "label", width: 30 }, { header: "Hodiny", key: "h", width: 10 },
         { header: "Uzavreté", key: "closed", width: 10 },
       ];
@@ -62,7 +65,7 @@ function Admin() {
         const m = await loadMonth(p.id, ym.y, ym.m);
         for (const [code, min] of Object.entries(m.byCode)) {
           const c = codeMap.get(code);
-          ws.addRow({ sap: p.sap_id ?? "", name: p.full_name, dep: p.department ?? "", wt: c?.sap_code ?? code, label: c?.name ?? code, h: Math.round((min / 60) * 100) / 100, closed: m.closedAt ? "áno" : "NIE" });
+          ws.addRow({ sap: p.sap_id ?? "", dep: p.department ?? "", wt: c?.sap_code ?? code, label: c?.name ?? code, h: Math.round((min / 60) * 100) / 100, closed: m.closedAt ? "áno" : "NIE" });
         }
       }
       const buf = await wb.xlsx.writeBuffer();
@@ -70,7 +73,7 @@ function Admin() {
       const a = document.createElement("a");
       a.href = url; a.download = `SAP_export_${ym.y}_${String(ym.m).padStart(2, "0")}.xlsx`; a.click();
       URL.revokeObjectURL(url);
-    } finally { setExporting(false); }
+    } catch (error) { alert(error instanceof Error ? error.message : "Export sa nepodaril."); } finally { setExporting(false); }
   }
 
   return (
@@ -91,27 +94,28 @@ function Admin() {
         <H>Export pre mzdovú účtáreň (SAP)</H>
         <div className="flex flex-wrap items-center gap-3">
           <MonthPicker ym={ym} onChange={setYm} />
-          <Button onClick={exportSap} disabled={exporting}>{exporting ? "Pripravujem…" : "Stiahnuť .xlsx"}</Button>
+          <Button onClick={exportSap} disabled={exporting || people.isPending || !!people.error}>{exporting ? "Pripravujem…" : "Stiahnuť .xlsx"}</Button>
           <span className="text-xs text-muted-foreground">Hodiny podľa mzdových druhov za každého zamestnanca.</span>
         </div>
       </section>
 
       <section className={box}>
         <H>Zamestnanci</H>
+        {people.error && <p role="alert" className="text-destructive">Zoznam zamestnancov sa nepodarilo načítať.</p>}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b-2 border-foreground text-left text-xs uppercase"><th className="py-1">Meno</th><th>Stredisko</th><th>SAP ID</th><th>Fond h</th><th>Manažér</th><th>Roly</th></tr></thead>
+            <thead><tr className="border-b-2 border-foreground text-left text-xs uppercase"><th className="py-1">Zamestnanec</th><th>Stredisko</th><th>Osobné číslo SAP</th><th>Fond h</th><th>Manažér</th><th>Roly</th></tr></thead>
             <tbody>
               {(people.data ?? []).map((p) => (
                 <tr key={p.id} className="border-b border-border align-middle">
-                  <td className="py-1.5 pr-2"><div className="font-semibold">{p.full_name}</div><div className="text-xs text-muted-foreground">{p.email}</div></td>
+                  <td className="py-1.5 pr-2"><div className="font-semibold">{personnelLabel(p)}</div></td>
                   <td className="pr-2"><Input defaultValue={p.department ?? ""} onBlur={(e) => run(supabase.from("profiles").update({ department: e.target.value }).eq("id", p.id), "people")} /></td>
-                  <td className="pr-2"><Input defaultValue={p.sap_id ?? ""} className="w-24" onBlur={(e) => run(supabase.from("profiles").update({ sap_id: e.target.value }).eq("id", p.id), "people")} /></td>
+                  <td className="pr-2"><Input key={p.sap_id ?? "missing"} aria-label={`Osobné číslo SAP · ${p.id.slice(0, 8)}`} defaultValue={p.sap_id ?? ""} inputMode="numeric" maxLength={8} className="w-28" onBlur={(e) => { if (e.target.value === (p.sap_id ?? "")) return; const result = personnelNumberSchema.safeParse(e.target.value); if (!result.success) { alert("Osobné číslo zo SAP musí mať 7 alebo 8 číslic."); e.target.value = p.sap_id ?? ""; return; } void run(supabase.from("profiles").update({ sap_id: result.data }).eq("id", p.id), "people"); }} /></td>
                   <td className="pr-2"><Input type="number" step="0.25" defaultValue={p.daily_fund} className="w-20" onBlur={(e) => run(supabase.from("profiles").update({ daily_fund: Number(e.target.value) }).eq("id", p.id), "people")} /></td>
                   <td className="pr-2">
                     <select className="h-9 rounded-sm border border-input bg-background px-2" value={p.manager_id ?? ""} onChange={(e) => run(supabase.from("profiles").update({ manager_id: e.target.value || null }).eq("id", p.id), "people")}>
                       <option value="">—</option>
-                      {(people.data ?? []).filter((x) => x.id !== p.id).map((x) => <option key={x.id} value={x.id}>{x.full_name}</option>)}
+                      {(people.data ?? []).filter((x) => x.id !== p.id).map((x) => <option key={x.id} value={x.id}>{personnelLabel(x)}</option>)}
                     </select>
                   </td>
                   <td className="whitespace-nowrap">

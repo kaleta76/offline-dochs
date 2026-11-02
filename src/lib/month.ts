@@ -21,7 +21,7 @@ export async function loadMonth(userId: string, year: number, month: number) {
       .eq("user_id", userId).gte("client_time", from.toISOString()).lt("client_time", to.toISOString()).order("client_time"),
     supabase.from("organization_holidays").select("day, name").gte("day", dayKey(from)).lt("day", dayKey(to)),
     supabase.rpc("calc_settings"),
-    supabase.from("profiles").select("id, full_name, department, sap_id, daily_fund").eq("id", userId).maybeSingle(),
+    supabase.from("profiles").select("id, department, sap_id, daily_fund").eq("id", userId).maybeSingle(),
     supabase.from("month_closures").select("closed_at").eq("user_id", userId).eq("year", year).eq("month", month).maybeSingle(),
   ]);
   const err = punches.error ?? holidays.error ?? settings.error ?? profile.error;

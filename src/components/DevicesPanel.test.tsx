@@ -13,7 +13,7 @@ describe("DevicesPanel own-device approval", () => {
     vi.clearAllMocks();
     rpc.mockResolvedValue({ error: null });
     from.mockImplementation((table: string) => {
-      if (table === "profiles") return { select: () => Promise.resolve({ data: [{ id: "owner", full_name: "Marián" }] }) };
+      if (table === "profiles") return { select: () => Promise.resolve({ data: [{ id: "owner", sap_id: "00123456" }] }) };
       const query = {
         select: () => query,
         eq: () => query,

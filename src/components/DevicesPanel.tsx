@@ -16,7 +16,7 @@ export function DevicesPanel({ uid }: { uid: string }) {
     queryFn: async () => {
       const { data, error } = await supabase.from("devices")
         .select("id, user_id, status, pairing_code, pairing_expires_at, created_at, last_seen_at, user_agent_hint, replaces_device_id")
-        .neq("user_id", uid).order("created_at", { ascending: false });
+        .order("created_at", { ascending: false });
       if (error) throw error;
       const names = new Map(((await supabase.from("profiles").select("id, full_name")).data ?? []).map((p) => [p.id, p.full_name]));
       return (data ?? []).map((d) => ({ ...d, name: names.get(d.user_id) ?? "?" }));

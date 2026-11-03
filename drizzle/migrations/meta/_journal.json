@@ -36,6 +36,13 @@
       "when": 1793585260231,
       "tag": "0004_personnel_number_pseudonymization",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793664456832,
+      "tag": "0005_employee_account_workflows",
+      "breakpoints": true
     }
   ]
 }

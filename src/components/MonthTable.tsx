@@ -1,6 +1,7 @@
 import { AlertTriangle } from "lucide-react";
 import { fmtMin } from "@/lib/engine";
 import { hm, labelOf, WEEKDAYS, type MonthData } from "@/lib/month";
+import { unverifiedSummary } from "@/lib/device-trace";
 
 export interface VoidTarget {
   id: number;
@@ -23,6 +24,11 @@ export function MonthTable({
 }) {
   return (
     <div className="overflow-x-auto">
+      {data.unverifiedCount > 0 && (
+        <p role="status" className="no-print mb-2 rounded-sm border border-warning bg-muted px-3 py-2 text-sm">
+          {unverifiedSummary(data.unverifiedCount)}
+        </p>
+      )}
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b-2 border-foreground text-left text-xs uppercase tracking-wider">
@@ -57,6 +63,14 @@ export function MonthTable({
                         </span>
                       )}
                       {p.source === "correction" && <sup className="ml-0.5 font-bold text-primary">K</sup>}
+                      {p.verification === "unverified" && !p.voided && (
+                        <span
+                          className="ml-1 rounded-sm border border-warning px-1 text-[10px] font-semibold uppercase text-warning-foreground"
+                          title="Razenie z neschváleného zariadenia. Počíta sa, kým ho vedúci nepotvrdí."
+                        >
+                          neoverené
+                        </span>
+                      )}
                       {p.voidPending && <span className="ml-1 font-semibold text-warning-foreground">(čaká na zneplatnenie)</span>}
                       {onVoid && !p.voided && !p.voidPending && !data.closedAt && (
                         <button

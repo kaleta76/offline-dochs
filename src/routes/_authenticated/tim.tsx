@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { loadMonth, labelOf } from "@/lib/month";
+import { unverifiedSummary } from "@/lib/device-trace";
 import { fmtMin } from "@/lib/engine";
 import { MonthPicker } from "@/components/MonthTable";
 import { Button } from "@/components/ui/button";
@@ -152,7 +153,7 @@ function Team() {
             <thead>
               <tr className="border-b-2 border-foreground text-left text-xs uppercase tracking-wider">
                 <th className="py-2">Zamestnanec</th><th className="py-2 text-right">Spolu</th><th className="py-2 text-right">Saldo</th>
-                <th className="py-2 text-center">Chýba odchod</th><th className="py-2 text-center">Offline odchýlky</th><th className="py-2 text-right">Akcie</th>
+                <th className="py-2 text-center">Chýba odchod</th><th className="py-2 text-center">Offline odchýlky</th><th className="py-2 text-center">Neoverené</th><th className="py-2 text-right">Akcie</th>
               </tr>
             </thead>
             <tbody>
@@ -163,13 +164,14 @@ function Team() {
                   <td className={`num py-2 text-right ${m.totals.balance < 0 ? "text-destructive" : "text-success"}`}>{fmtMin(m.totals.balance)}</td>
                   <td className={`py-2 text-center font-bold ${m.openDays ? "text-destructive" : ""}`}>{m.openDays}</td>
                   <td className={`py-2 text-center font-bold ${m.driftCount ? "text-warning-foreground" : ""}`}>{m.driftCount}</td>
+                  <td className={`py-2 text-center font-bold ${m.unverifiedCount ? "text-warning-foreground" : ""}`}>{m.unverifiedCount}</td>
                   <td className="py-2 text-right">
                     <div className="flex justify-end gap-2">
                       <Link to="/vykaz/$userId/$ym" params={{ userId: p.id, ym: `${ym.y}-${ym.m}` }} className="rounded-sm border-2 border-foreground px-2 py-1 text-xs font-bold">Výkaz A4</Link>
                       {m.closedAt ? (
                         <span className="rounded-sm bg-muted px-2 py-1 text-xs font-bold">Uzavretý</span>
                       ) : (
-                        <Button size="sm" onClick={() => confirm(`Uzavrieť ${ym.m}/${ym.y} pre ${personnelLabel(p)}?`) && close.mutate(p.id)}>Uzavrieť</Button>
+                        <Button size="sm" onClick={() => confirm(`Uzavrieť ${ym.m}/${ym.y} pre ${personnelLabel(p)}?${m.unverifiedCount ? `\n\nPozor: ${unverifiedSummary(m.unverifiedCount)}` : ""}`) && close.mutate(p.id)}>Uzavrieť</Button>
                       )}
                     </div>
                   </td>

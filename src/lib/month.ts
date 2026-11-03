@@ -1,13 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
 import { computeDay, settingsFromRows, type DayResult, type PunchLike } from "./engine";
+import { asVerification, countUnverified, type DeviceVerification } from "./device-trace";
 
 export interface DayRow extends DayResult {
   date: Date;
   key: string;
   holiday: string | null;
   weekend: boolean;
-  /** všetky razenia dňa vrátane zneplatnených (tie sa do výpočtu nezapočítavajú) */
-  punches: (PunchLike & { id: number; drift: number; source: string; voided: boolean; voidPending: boolean })[];
+  /** všetky razenia dňa vrátane zneplatnených (tie sa do výpočtu nezapočítavajú); `verification` je len príznak, výpočet ho nepoužíva */
+  punches: (PunchLike & { id: number; drift: number; source: string; voided: boolean; voidPending: boolean; verification: DeviceVerification })[];
   future: boolean;
 }
 
@@ -18,7 +19,7 @@ export async function loadMonth(userId: string, year: number, month: number) {
   const from = new Date(year, month - 1, 1);
   const to = new Date(year, month, 1);
   const [punches, holidays, settings, profile, closure] = await Promise.all([
-    supabase.from("punches").select("id, code, direction, client_time, drift_minutes, source, voided_at")
+    supabase.from("punches").select("id, code, direction, client_time, drift_minutes, source, voided_at, device_verification")
       .eq("user_id", userId).gte("client_time", from.toISOString()).lt("client_time", to.toISOString()).order("client_time"),
     supabase.from("organization_holidays").select("day, name").gte("day", dayKey(from)).lt("day", dayKey(to)),
     supabase.rpc("calc_settings"),
@@ -46,7 +47,7 @@ export async function loadMonth(userId: string, year: number, month: number) {
     const key = dayKey(date);
     const ps = (punches.data ?? [])
       .filter((p) => dayKey(new Date(p.client_time)) === key)
-      .map((p) => ({ id: p.id, code: p.code, direction: p.direction as "IN" | "OUT", time: new Date(p.client_time), drift: p.drift_minutes, source: p.source, voided: !!p.voided_at, voidPending: pendingVoid.has(p.id) }));
+      .map((p) => ({ id: p.id, code: p.code, direction: p.direction as "IN" | "OUT", time: new Date(p.client_time), drift: p.drift_minutes, source: p.source, voided: !!p.voided_at, voidPending: pendingVoid.has(p.id), verification: asVerification(p.device_verification) }));
     const weekend = date.getDay() === 0 || date.getDay() === 6;
     const holiday = hol.get(key) ?? null;
     const future = date > now;
@@ -64,6 +65,8 @@ export async function loadMonth(userId: string, year: number, month: number) {
     totals: { work: sum("workMin"), credit: sum("creditMin"), total: sum("totalMin"), expected: sum("expectedMin"), balance: sum("balanceMin") },
     byCode,
     openDays: days.filter((d) => d.open && !d.future && d.key !== dayKey(now)).length,
+    /** razenia z neschválených zariadení (započítavajú sa, kým ich vedúci nepotvrdí) */
+    unverifiedCount: days.reduce((a, d) => a + countUnverified(d.punches), 0),
     driftCount: days.reduce((a, d) => a + d.punches.filter((p) => !p.voided && p.source === "terminal" && Math.abs(p.drift) > s.maxDrift).length, 0),
   };
 }

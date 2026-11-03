@@ -1,0 +1,49 @@
+# Kontrakt terminál ⇄ Access (verzia 1)
+
+Tento priečinok je **jediné miesto, na ktorom sa dohodne rozhranie** medzi terminálom (tento repozitár, vyvíja ho Lovable agent)
+a lokálnym dochádzkovým systémom v Accesse (vyvíja ho Claude). Zmena súborov tu = zmena dohody, preto ide **iba cez pull request**
+a schvaľuje ju vlastník repozitára (pozri `.github/CODEOWNERS`).
+
+## Zásady
+1. Terminál posiela len **fakty** (kto, aký kód, smer, kedy, z akého zariadenia). Nepočíta mzdové ani fondové výsledky pre Access.
+2. Osobné údaje (mená) nikdy neopúšťajú Access. Terminál pozná len **osobné číslo SAP** (pseudonym).
+3. Prenos je **idempotentný**: ten istý záznam môže prísť viackrát, Access ho nespracuje dvakrát (`external_id`).
+4. Prenos je **overiteľný**: súbor má pätičku so SHA-256 a každý záznam nesie hash reťaz (`prev_hash` → `record_hash`).
+5. Zmena kontraktu = nová hlavná verzia (`contract_version`), stará verzia sa podporuje aspoň do ďalšieho mesačného uzatvorenia.
+
+## Súbor `punches_YYYYMM.csv` (alebo `punches_YYYYMMDD_HHMM.csv` pre prírastok)
+* UTF-8 s BOM, oddeľovač `;`, texty v `"..."`, čísla bez úvodzoviek, riadky končia `CRLF`.
+* Prvý riadok = hlavička, posledný riadok = pätička `#END;rows=<počet>;sha256=<hex>`.
+  SHA-256 sa počíta zo **všetkých bajtov od hlavičky po posledné `CRLF` pred pätičkou** (bez BOM).
+* Riadky sú zoradené podľa `punch_id` vzostupne.
+
+| stĺpec | typ | význam |
+|---|---|---|
+| `contract_version` | číslo | vždy `1` |
+| `organization_id` | uuid | organizácia v terminále (Access má jednu a overuje ju pri prvom importe) |
+| `punch_id` | číslo | `punches.id` – rastúce, slúži ako kurzor prírastkového importu |
+| `external_id` | uuid | `punches.client_uuid` – kľúč na deduplikáciu (Access ho ukladá do `DochadzkaImport.ExterneID`) |
+| `personnel_number` | text | osobné číslo SAP, **text** (môže mať vedúce nuly, Access porovnáva po odstránení nulí) |
+| `code` | text | `WORK`, `TRIP`, `DOCTOR`, `FAMILY`, `LEAVE`, `SICK`, `PRIV` (rozšíriteľné, pozri `code-mapping.csv`) |
+| `direction` | text | `IN` / `OUT` |
+| `client_time_local` | text | čas na zariadení v `Europe/Bratislava`, `RRRR-MM-DD HH:MM:SS` |
+| `client_time_utc` | text | rovnaký okamih v UTC, `RRRR-MM-DDTHH:MM:SSZ` (**záväzný**, lokálny je len na čítanie) |
+| `server_time_utc` | text | kedy záznam prijal server |
+| `drift_minutes` | číslo | `server_time − client_time` v minútach (veľké číslo = záznam prišiel neskoro/offline) |
+| `source` | text | `terminal` (razil zamestnanec) / `correction` (schválená oprava vedúcim) |
+| `device_verification` | text | `verified` / `unverified` / `confirmed` (neoverené potvrdil vedúci) |
+| `device_id` | uuid alebo prázdne | zariadenie, z ktorého prišlo razenie (prázdne pri korekcii) |
+| `user_uuid` | uuid | interný pseudonymný účet (len pre kontrolu reťaze) |
+| `prev_hash`, `record_hash` | hex | hash reťaz po používateľovi (vzorec nižšie) |
+
+### Hash reťaz
+`record_hash = SHA-256( prev_hash | user_uuid | code | direction | client_time_utc(do sekundy, bez Z) | server_time_utc(do sekundy, bez Z) | external_id [| device_id] )`,
+`prev_hash` prvého záznamu používateľa je `GENESIS`. Vzorec je presná kópia databázového triggera `punches_chain`
+(`drizzle/migrations/0003_device_verification.sql`) a bol overený proti PostgreSQL 16. Overenie: `tools/verify_export.py`.
+
+## Pravidlá, ktoré musí dodržať Access pri importe (zhrnutie, detail v dokumente `docs/SPOLUPRACA.md`)
+* **Mapovanie kódov je kontextové.** `X/OUT` (okrem `WORK`) = *začiatok* prerušenia X, nasledujúce `WORK/IN` = *koniec* prerušenia X;
+  prvé `WORK/IN` dňa = príchod, posledné `WORK/OUT` = odchod. Tabuľka je v `code-mapping.csv` a vlastní ju Access.
+* **Mesiac uzavretý v Accesse:** razenie sa nezahodí, ostane v `TerminalInbox` so stavom `UZAVRETY` a spracuje sa po otvorení mesiaca.
+* **Neoverené razenia** (`unverified`) sa importujú, ale Access ich označí na kontrolu; oprava/potvrdenie ide cez vedúceho v terminále.
+* **Prírastok:** Access si pamätá posledné `punch_id` a pri ďalšom importe žiada `punch_id > posledné − 500` (prekrytie); duplicity vyradí `external_id`.

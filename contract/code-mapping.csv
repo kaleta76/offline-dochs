@@ -1,0 +1,11 @@
+code;direction;poradie_v_dni;ordata_cislo_preruseni;ordata_smer;poznamka
+WORK;IN;prve;1;Z;priestor pre vyplnenie: príchod do práce = začiatok prerušenia č. 1 (práca)
+WORK;OUT;posledne;1;K;odchod z práce = koniec prerušenia č. 1
+WORK;IN;po_inom_OUT;<podľa predchádzajúceho OUT>;K;návrat po prerušení = koniec prerušenia, ktoré začalo predchádzajúce OUT
+WORK;OUT;nie_posledne;<doplniť>;Z;odchod počas dňa bez dôvodu – Access rozhodne podľa nastavenia (obed č. 7 alebo neidentifikované)
+TRIP;OUT;;<doplniť>;Z;služobná cesta – začiatok
+DOCTOR;OUT;;<doplniť>;Z;lekár – začiatok
+FAMILY;OUT;;<doplniť>;Z;sprievod rodinného príslušníka – začiatok
+PRIV;OUT;;<doplniť>;Z;súkromné prerušenie – začiatok
+LEAVE;OUT;;<doplniť>;Z;dovolenka (celodenné) – Access vytvorí udalosť dňa, nie razenie
+SICK;OUT;;<doplniť>;Z;PN (celodenné) – Access vytvorí udalosť dňa, nie razenie

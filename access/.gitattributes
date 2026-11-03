@@ -1,0 +1,2 @@
+# Súbory sa nesmú meniť (konverzia koncov riadkov) - inštalátor overuje SHA-256 každého modulu po bajtoch
+* -text

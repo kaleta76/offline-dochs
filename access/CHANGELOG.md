@@ -1,0 +1,184 @@
+# Dochádzka – zmeny
+
+## Balík 2.11.0
+Zneplatnené razenia z terminála (kontrakt 1.1, súbor `voids_RRRRMM.csv`).
+- **Súvislosť**: zamestnanec (alebo vedúci / správca vo výkaze) môže v terminále požiadať o zneplatnenie razenia, napr. duplicity; vedúci alebo správca ju
+  schváli. V terminále sa razenie nemaže ani nemení jeho hash. Terminál ho posiela v exporte razení ďalej a zneplatnenia v samostatnom súbore.
+- **`mod_19_TerminalImport` 1.2.0**: `ImportujZneplatnenia` overí súbor (pätička, SHA-256, počet riadkov, hlavička, verzia, jedna organizácia), uloží zneplatnenia do novej
+  tabuľky `TerminalZneplatnenia` (idempotentne podľa `external_id`) a použije ich: riadok `DochadzkaImport` dostane `Platnost = Nie` a `DovodNeplatnosti = ZNEPLATNENE_V_TERMINALI`.
+  Razenie sa nemaže. Kontroluje sa `record_hash` (z pôvodného riadku vo fronte) a osobné číslo; pri nezhode sa nezneplatní (stav `NEZHODA`).
+  Ak razenie ešte nie je importované, zneplatnenie čaká (`CAKA`) a použije sa po importe razení; pri uzavretom mesiaci čaká (`UZAVRETY`) a použije sa po jeho otvorení
+  pri ďalšom spracovaní. Nové tlačidlá nie sú: súbor `voids_*.csv` sa vyberie v tom istom tlačidle „Importovať súbor z terminála“, ktoré ho podľa hlavičky rozpozná.
+- **Samočinný test zneplatnení** (`SamoTestZneplatneni`; karta 7 > Samočinný test terminála > Nie): nanečisto, ostrý import nad testovacími údajmi 90000xx, výsledky pred a po
+  (`terminal_test_access_vysledky_pred_zneplatnenim.csv`, `terminal_test_access_vysledky.csv`) a `terminal_test_zneplatnenia_report.txt`.
+- **`mod_UI_Tab_Export` 2.11.0**: rozpoznanie `voids_*.csv`, voľba, ktorý samočinný test spustiť.
+- **Test**: `testy/terminal/mesiac-2026-10/` doplnený o `voids_test_2026-10.csv` a `voids_test_negativne_2026-10.csv` a postupy C a D v `POSTUP.txt`.
+- **Upozornenie k párovaniu**: kódy razení (príchod / odchod, obed) sa určujú pri importe z poradia razení za deň. Po zneplatnení sa nepárujú znova. U bežnej duplicity (rovnaké
+  razenie dvakrát) je výsledok správny. Ak sa zneplatní prvé z dvoch rôzne spárovaných razení (napr. príchod, ktorý ukončil obed), skontrolujte deň v editore dochádzky.
+- **Neoverené v skutočnom Accesse**: celý nový kód (lint, kontrola párovania blokov a modelová kontrola súborov; spustené nebolo). Pri chybe pošlite
+  `terminal_test_zneplatnenia_report.txt` a text chyby s názvom procedúry.
+
+## Balík 2.10.2
+Opakovateľný test terminála a scenár na celý mesiac.
+- **`mod_19_TerminalImport` 1.1.0**: samočinný test sa pred ostrým importom opýta, či odstrániť staré testovacie údaje 90000xx (inak by sa razenia z iného
+  súboru pridali k starým a saldá by sa zdvojili). Po odstránení, ak vo fronte terminála nezostane nič, sa vynuluje zapamätaná organizácia a posledné punch_id,
+  takže sa dá importovať súbor z inej organizácie terminála bez ručného zásahu.
+- **Test na celý mesiac**: `testy/terminal/mesiac-2026-10/` (október 2026, zamestnanci 9000001 až 9000004, 237 razení, aj prechod na zimný čas,
+  duplicity, otvorený deň a deň bez razenia), očakávané saldá z enginu terminálu a skript `porovnaj.py` na porovnanie terminál / Access. Postup je v `POSTUP.txt`.
+- Neoverené v skutočnom Accesse.
+
+## Balík 2.10.1
+Oprava okna Pomocník: políčko „Nezobrazovať pri otvorení karty“ sa nedalo zaškrtnúť.
+- **Príčina**: formulár `frmPomocnik` mal `AllowEdits = Nie`. V spojitom formulári to zamkne aj nesviazané ovládacie prvky v hlavičke a päte,
+  takže sa nedalo zmeniť ani políčko, ani kliknutím na text vedľa neho (zmena hodnoty zlyhala potichu).
+- **Oprava** (`mod_UI_Pomocnik` 1.2.1): `AllowEdits = Áno`, podklad okna je snapshot (`RecordsetType = 2`) a textové polia ostávajú `Locked`, takže texty sa
+  stále nedajú prepísať. Stav sa pri kliknutí na text zapíše do `PomocnikStav` ako prvý a až potom do políčka; zmena sa zapíše do protokolu (`INFO`).
+  Verzia formulára 1.2, takže sa okno pri najbližšom otvorení vytvorí znova (nič netreba mazať).
+- Neoverené v skutočnom Accesse (príčina sa potvrdila zo správania Accessu v spojitých formulároch, nie spustením). Ak by to nepomohlo, pošlite riadky
+  `mod_UI_Pomocnik` z tabuľky protokolu.
+
+## Balík 2.10.0
+Import súboru z terminála (kontrakt v1) a samočinný test spolupráce Access <-> terminál.
+- **Nový modul `mod_19_TerminalImport` 1.0.0**: načíta `punches_*.csv`, overí pätičku (počet riadkov, SHA-256) a hash reťaz po používateľovi
+  (čistý VBA, bez .NET), prevedie kódy terminála na prerušenia a kódy razenia Accessu (tabuľka `TerminalMapaKodov`, predvolené mapovanie siedmich kódov),
+  spáruje odchod / príchod za deň, zapíše razenia do `TerminalInbox` (idempotentne) a spracuje ich do `DochadzkaImport` cez `SpracujInbox`.
+  Zamestnanec sa hľadá cez `TerminalMapaOsob` alebo zhodou po odstránení / doplnení úvodných núl. Beh nanečisto nič nezapíše.
+- **Karta 7 Exporty**: tlačidlá „Importovať súbor z terminála“ a „Samočinný test terminála“ (`mod_UI_Tab_Export` 2.10.0).
+- **Samočinný test**: SHA-256 na známych vektoroch, kontrola mapovania a číselníka kódov razenia, beh nanečisto, voliteľne ostrý import testovacích
+  zamestnancov 9000001 až 9000099, prepočet mesiaca a zápis `terminal_test_report.txt` a `terminal_test_access_vysledky.csv` (denné výsledky, intervaly, anomálie).
+  Testovacie údaje: `testy/terminal/`. Upratanie: `mod_19_TerminalImport.OdstranTestoveData()`.
+- **Neoverené v skutočnom Accesse**: celý modul (len lint, krížová kontrola a model algoritmov v Pythone: SHA-256 na 211 vstupoch zhodný s referenčnou
+  implementáciou vrátane kontroly pretečenia 32-bitových Long, párovanie a hash reťaz na zlatom súbore kontraktu a na testovacom súbore).
+  Pri chybe pošlite `terminal_test_report.txt` a text chyby s názvom procedúry.
+- Nekontroluje sa zatiaľ nadväznosť reťaze na predchádzajúci import (posledný hash používateľa) a nespracúvajú sa celodenné udalosti dňa
+  (LEAVE / SICK sa vedú ako začiatok prerušenia č. 8 / 11, ktoré sa ukončí podľa pravidla „koniec do konca smeny“).
+
+## Balík 2.9.0
+Uzávierka mesiaca (ochrana podpísaných zostáv), verzie fondov a pravidiel „platné od mesiaca“ s históriou, skok na zamestnanca a predvolené hodnoty v editoroch.
+- **Uzávierka mesiaca** (`mod_18_Uzavierka`, `mod_UI_Uzavierka`, karta 6 > Uzávierka mesiaca…): postup návrh → tlač → podpis → Uzavrieť. Uzavrieť sa dá od posledného
+  dňa mesiaca a len ak sa údaje od vytvorenia zostavy nezmenili (kontrolný kód zostavy musí sedieť s aktuálnym); zapíše sa, kto zostavu potvrdil.
+  Uzavretý mesiac zamestnanca sa neprepočítava (aj hromadný prepočet ho preskočí), nedá sa meniť v editore dňa, nemažú sa jeho razenia ani výpočty (čistenie pomocných
+  tabuliek), neprepíše ho import z Ordata ani import z modelu a nedá sa zmeniť fondom, pravidlami, úväzkom, kalendárom ani vyradením, ktoré by ho zasiahli.
+  Razenia z terminálu do uzavretého mesiaca ostanú v `TerminalInbox` (stav UZAVRETY) a spracujú sa po otvorení. Otvorenie vyžaduje dôvod a zapíše sa do
+  `DochadzkaUzavierkaLog`. „Overiť“ porovná uložené hodnoty s kontrolným kódom. Päta zostavy ukazuje NÁVRH alebo MESIAC JE UZAVRETÝ (dátum, kto potvrdil, kód),
+  prípadne upozornenie, ak sa údaje po uzavretí zmenili. Ochrana je na úrovni aplikácie; kontrolný kód zmenu mimo aplikácie odhalí, ale nezabráni jej.
+- **Editor fondov a pravidiel prerušení** (`mod_UI_Sablony` 1.1.0, `mod_17_FondyPravidla` 1.1.0): zoznam Zamestnanec (skok na fond / šablónu platnú pre neho
+  v zvolenom mesiaci; z karty 2 sa editor otvorí na označenom zamestnancovi), zoznam Verzie (história „platné od mesiaca“), tlačidlo Kto používa, zoznam
+  Predvoľba + Použiť (pevná 7:30 / 8:00, pružná, voľná, mesačný fond 165:00, dvanásťhodinová zmena; pravidlá: bez kontroly, obed, krátke prerušenie, lekár),
+  nový fond z predvoľby, červené upozornenie pred uložením, ak by zmena zasiahla uzavretý mesiac.
+- **Platnosť od mesiaca, bez kopírovania**: fond, pravidlá aj priradenie zamestnanca platia od zvoleného mesiaca až do ďalšej verzie. Nekopírujú sa po mesiacoch (ako
+  šablóny v Ordata). Úväzok je súčasťou verzie priradenia (`ZamestnanciFondy.UvazokPercent`), takže zmena úväzku od mesiaca nemení minulosť.
+- **Karta zamestnanca** (`mod_UI_ZamKarta` 1.1.0): zmena mesiaca zobrazí priradenie platné pre zamestnanca v tom mesiaci vrátane úväzku; uloženie zapíše verziu priradenia.
+- **Ochrana pri importe a údržbe**: `mod_02_DBFImport`, `mod_14_ImportModelu`, `mod_06_AdminTools` (čistenie výpočtov), `mod_09_AutoOprava`, `mod_12_TerminalPriprava`
+  nemenia uzavreté mesiace.
+- **Pomocník 1.2.0**: texty o uzávierke, päte zostavy, verziách a predvoľbách v editoroch.
+- Moduly: mod_UI_Core 2.9.0, mod_01_SystemInit 2.9.0, mod_UI_Tab_Vypocet 2.9.0, mod_06_AdminTools 2.6.0, mod_02_DBFImport 2.6.0, modMesaatnaDochadzka 2.7.0,
+  mod_05_UI_AttendanceEditor 2.7.0, mod_08_UdalostiDna 1.2.0, mod_09_AutoOprava 1.2.0, mod_12_TerminalPriprava 1.1.0, mod_14_ImportModelu 1.1.0,
+  mod_15_Zamestnanci 1.1.0, mod_17_FondyPravidla 1.1.0, mod_UI_Sablony 1.1.0, mod_UI_ZamKarta 1.1.0, mod_UI_Tab_Zamestnanci 1.1.0, mod_UI_Pomocnik 1.2.0,
+  mod_UI_PomocnikTexty 1.2.0; nové: mod_18_Uzavierka 1.0.0, mod_UI_Uzavierka 1.0.0.
+- **Neoverené v skutočnom Accesse** (len kontrola kódom, lint a simulácia inštalátora): rozloženie okien Uzávierka mesiaca, Pracovné fondy a Pravidlá prerušení, zoznam
+  s poľami z funkcií VBA (`Uz_PoleZoznamu`), päta zostavy (`Uz_TextZostavy`), zoznam Zamestnanec (Table/Query) a dotazy volajúce funkcie VBA. Pri chybe pošlite
+  inštalačný protokol alebo snímku s názvom modulu, riadkom a textom chyby.
+
+## Balík 2.8.0
+Oprava číslovania kariet, nová karta Zamestnanci, individuálne fondy/úväzky/vyradenie a pravidlá prerušení s upozorneniami.
+- **Oprava posunu kariet**: karta Active Directory sa pri chýbajúcej doméne nevytvárala, no navigácia mapovala tlačidlá na strany podľa
+  pozície – po jej zapnutí sa všetko posunulo a pod „2 AD“ sa zobrazil obsah Kontroly. Teraz majú karty pevné čísla (1 Import, 2 Zamestnanci,
+  3 Kontrola, 4 Editor, 5 Prerušenia, 6 Výpočet, 7 Exporty, 8 Admin, 9 Active Directory – voliteľná, len v doméne alebo podľa nastavenia
+  `ADKartaZobraz` = auto/1/0). Strana nesie svoj kľúč (Tag) a konzola sa prestaví, keď sa zmení zoznam kariet (`UIKonzolaKarty`).
+- **„Invalid use of Null“ v `PomocnikAutoZobraz`**: `TVGet` spracuje neexistujúcu TempVar (Null) a nepoužije `CLng(Null)`.
+- **Nová karta 2 Zamestnanci** (`mod_UI_Tab_Zamestnanci`, `mod_UI_ZamKarta`): zoznam pre zvolený mesiac (úväzok, pracovný fond, šablóna prerušení,
+  stav), hľadanie, „aj vyradení“, karta zamestnanca (nový / úprava), úväzok v %, vyradenie od dátumu a vrátenie do evidencie,
+  hromadné priradenie fondu, pravidiel, kalendára a úväzku vybraným zamestnancom vrátane vytvorenia novej skupiny (kópia fondu a šablóny).
+- **Dátový model** (`mod_15_Zamestnanci`): nové stĺpce `Zamestnanci.Vyradeny`, `VyradenyOd`, `UvazokPercent`, `TextDisplej`, `Poznamka`.
+  Fond a šablóna prerušení už boli viazané na zamestnanca (`ZamestnanciFondy`, platnosť od mesiaca), no chýbalo UI; `ParametrePreruseni` sa
+  importovali, ale nepoužívali. Teraz sa používajú. Vyradení sa vynechajú z výpočtov, zostáv a analýzy; úväzok skracuje denný fond (`mod_08_UdalostiDna`).
+- **Editor pracovných fondov** (`mod_UI_Sablony`, `mod_17_FondyPravidla`): typ fondu (1–4), denný/mesačný fond, voliteľne dĺžka podľa dňa v týždni
+  (príchod od, odchod do, fond, prestávka). Ukladá sa od zvoleného mesiaca; nový fond vzniká kópiou.
+- **Editor pravidiel prerušení**: povolený čas, najdlhšie/najkratšie trvanie, „odpracovať pred začiatkom“ (napr. obed najskôr po 3 h práce
+  a v okne 11:00–13:30), voliteľne po dňoch v týždni, možnosť pravidlo vypnúť. Kontrola (`mod_16_PravidlaPreruseni`) pri porušení pridá anomáliu
+  so závažnosťou VAROVANIE (v zozname „Na ručné posúdenie“ so značkou „(!)“); výpočet sa nemení. Celú kontrolu vypne `KontrolaPravidielPreruseni` = 0.
+- **Menu a objekty**: tlačidlo Menu (Alt+M) ovláda len pás kariet, nové tlačidlo Objekty (Alt+O) ľavý navigačný panel s objektmi. Panel sa pri štarte
+  skrýva spoľahlivejšie (`StartupShowDBWindow` + `NavigateTo` + `acCmdWindowHide`); konzola sa po skrytí vždy vráti do popredia.
+- **Karta 5 Prerušenia**: tlačidlá „Pracovné fondy…“ a „Pravidlá prerušení…“ (sekcie 2 a 3 sa posunuli nižšie).
+- **Pomocník 1.1.0**: texty pre 9 kariet, nová karta Zamestnanci, upozornenia z pravidiel, tlačidlo Objekty.
+- Moduly: mod_UI_Core 2.8.0, mod_UI_Spolocne 1.2.0 (okná `Dlg*`), mod_UI_Pomocnik 1.1.0, mod_UI_PomocnikTexty 1.1.0, mod_UI_Tab_ADSync/Admin/Prerusenia 2.8.0,
+  mod_UI_Tab_Vypocet 2.7.1, mod_01_SystemInit 2.8.0, mod_00_Common 2.7.0, mod_08_UdalostiDna 1.1.0, mod_09_AutoOprava 1.1.0, modMesaatnaDochadzka 2.6.0;
+  nové: mod_15_Zamestnanci, mod_16_PravidlaPreruseni, mod_17_FondyPravidla, mod_UI_Tab_Zamestnanci, mod_UI_ZamKarta, mod_UI_Sablony (všetky 1.0.0).
+- **Neoverené v skutočnom Accesse**: rozloženie nových okien, skrývanie navigačného panelu a dotazy volajúce funkcie VBA (`Zam_FondText`) bolo
+  overené len kontrolou kódu a simuláciou inštalátora. Pri chybe pošlite modul, riadok a text z okna / protokolu.
+
+## Balík 2.7.0
+Opravy rozloženia konzoly, skrytie menu Accessu a kontextové info okná (Pomocník).
+- **Navigácia kariet**: pevná hlavička konzoly s tlačidlami kariet 1–8 (Alt+1 … Alt+8), záložky tab-ovládača sú skryté, takže
+  navigácia nezmizne ani pri posúvaní dlhej karty (napr. 3. Kontrola & Auto-oprava). Obsah konzoly má zvislý aj vodorovný
+  posuvník; stavový riadok je v pevnej päte. Ak Access nepustí hlavičku/pätu formulára, použije sa záložné rozloženie s viditeľnými záložkami.
+- **Menu a objekty Accessu**: pás kariet a navigačný panel sa pri štarte skryjú; tlačidlo Menu (Alt+M) ich zobrazí aj skryje,
+  nastavenie `UIPriStarteSkryMenu` (karta 8). Vývojársky režim a skúšobný štart inštalátora menu neskrývajú. Pri zobrazení zostavy sa pás kariet zobrazí sám.
+- **Pomocník (info okná kariet)**: nový `mod_UI_Pomocnik` + `mod_UI_PomocnikTexty`. Pre každú kartu (a prehľad celého postupu) okno s tabuľkou
+  Druh | Čo | Popis (ČO TO JE, KROK, MOŽNOSŤ, TIP, POZOR, ĎALEJ), farebne formátované. Samo sa ukáže, ak činnosť na karte ešte nebola vykonaná
+  (prázdna databáza → postup importu z Ordata / zadania osobných čísel; kontrola → ak nie sú opravy; …), nie je zaškrtnuté „Nezobrazovať“
+  a v relácii sa pre kartu ešte neukázalo. Vyvolanie: tlačidlo Pomocník / Alt+P. Texty sú v tabuľkách `PomocnikKarty`, `PomocnikTexty`
+  (upravený riadok sa neprepíše), stav v `PomocnikStav`.
+- **Rozloženie okien**: roztiahnutie obsahu kariet na šírku konzoly, písmo Segoe UI, zmenšenie písma tam, kde by sa text orezal
+  (`mod_UI_Spolocne 1.1.0`: `NormalizujFormular`), odstránenie pripojených popiskov polí; názvy stĺpcov v zoznamoch auto-opráv („Os. číslo“, „Typ anomálie“ …).
+  Okno úpravy dňa: širšie stĺpce, Esc = Koniec, opravené popisy tlačidiel a klávesové skratky (skryté `[Ins]`/`[Del]` nefungovali). Okno priebehu má popisky polí.
+- **Chyby „Invalid use of Null“**: `mod_03_ADSync.PrepocitajHierarchiu` (IIf vyhodnocuje oba argumenty → `CStr(Null)`) a
+  `mod_05_UI_AttendanceEditor` (`Ed_PosunZamestnanca`, `Ed_ObnovZoznamZamestnancov` – `ItemData` s Null).
+- **Import**: tlačidlá „Tento rok“ a „Minulý mesiac“ majú popisok (aké obdobie nastavia) a zapíšu ho do stavového riadka; tlačidlo „Pridať ako zamestnancov“ je širšie.
+  „Minulý mesiac“ nastaví Od aj Do na celý predošlý mesiac (v novembri 2026 = október 2026) – správne.
+- **Inštalátor / diagnostika**: skúšobný štart (`InstalacnyTestStartu`) neskrýva menu a nezobrazuje info okná, vždy vygeneruje konzolu nanovo,
+  vypíše diagnostiku rozloženia a odlíši chyby z tohto štartu od starších záznamov v logu.
+- Moduly: mod_UI_Core 2.7.0, mod_UI_Spolocne 1.1.0, mod_UI_Pomocnik 1.0.0 (nový), mod_UI_PomocnikTexty 1.0.0 (nový), mod_01_SystemInit 2.7.0,
+  mod_13_Instalacia 1.0.3, mod_00_Common 2.6.0, mod_05_UI_AttendanceEditor 2.6.0, mod_09_AutoOprava 1.0.2, mod_03_ADSync 2.5.1,
+  modMesaatnaDochadzka 2.5.2, mod_UI_Tab_Import/Export/ADSync/Prerusenia/Admin 2.7.0.
+
+## Balík 2.6.5
+- **Inštalátor**: hľadá databázy v priečinku inštalátora (rozlíši databázu z inštalátora a staršiu bez verzionovania),
+  novú databázu vytvára v tom istom priečinku ako `dochadzka-<verzia>.accdb` a ponúkne predvolený postup
+  (N = nová, I = nová + import, K = kópia + aktualizácia, A = aktualizácia na mieste) – stačí potvrdiť Enterom.
+- **mod_UI_Spolocne 1.0.0 (nový)** – výber mesiaca rozbaľovacím zoznamom (dá sa písať aj názov mesiaca), zadávanie osobných
+  čísel textom s automatickým rozpoznaním oddeľovača a rozsahov (1001-1010).
+- **mod_02_DBFImport 2.5.1** – import už neignoruje obdobie z karty Import (čítal ho zo starého formulára sprievodcu
+  a pýtal sa cez InputBox); nový filter osobných čísel pre import zamestnancov aj razení.
+- **mod_UI_Tab_Import 2.6.1** – obdobie od–do zo zoznamu mesiacov + rýchle voľby (Tento rok, Minulý mesiac), pole Osobné čísla,
+  tlačidlo „Pridať ako zamestnancov“, potvrdenie volieb pred importom, zapamätanie posledného obdobia.
+- **mod_UI_Tab_Vypocet 2.6.0** – výber mesiaca zo zoznamu (+ tlačidlá < >), zadanie osobných čísel textom, priebeh v stavovom riadku.
+- **mod_UI_Tab_Export 2.5.1, mod_UI_Tab_Konsolidacia 2.5.1, mod_05_UI_AttendanceEditor 2.5.1, mod_09_AutoOprava 1.0.1** – výber mesiaca zo zoznamu;
+  export: osobné čísla s ľubovoľným oddeľovačom, vlastný dialóg priečinka (už neprepisuje cestu k DBF).
+- **mod_14_ImportModelu 1.0.1** – opakovaný import zo staršej databázy sa „zacyklil“: doplňovanie do neprázdnej tabuľky porovnávalo
+  kľúče cez Nz(), čo vylúčilo index (pri 60 000 razeniach miliardy porovnaní). Teraz sa porovnáva priamo (s indexom), v stavovom
+  riadku je vidieť priebeh a pri opakovanom importe toho istého súboru sa zobrazí upozornenie.
+- **mod_00_Common 2.5.1** – správy z logu sa zobrazujú v stavovom riadku konzoly; dialógy DBF čítajú cestu z konzoly.
+- **mod_13_Instalacia 1.0.2** – `NastavVerziuBalika` (inštalátor zapisuje verziu balíka do databázy).
+- **mod_UI_Core 2.6.1** – verzia UI 2.6.1 (konzola sa pri štarte prestaví s novými ovládacími prvkami).
+
+## Balík 2.6.4
+- **mod_13_Instalacia 1.0.1** – `InstalacnyTestStartu()` a `PoslednyChybyLog(n)` (diagnostika štartu aplikácie).
+- Inštalátor: po vytvorení makra AutoExec sa jeho obsah znovu načíta (SaveAsText) a overí, že volá `AutoExecStart()` (inak sa skúsi iný formát makra); potom sa skúšobne spustí `AutoExecStart()` a do protokolu sa vypíšu posledné chyby z `LogImportu`.
+
+## Balík 2.6.3
+- **mod_10_Konfiguracia 1.0.1** – oprava chyby „Syntax error“: premenná `mOd` je v VBA nerozlíšiteľná od operátora `Mod` (premenované na `lOdMin`/`lDoMin`).
+
+## Balík 2.6.2
+- **modMesaatnaDochadzka 2.5.1** – oprava chyby kompilácie „Variable not defined“ (deklarácia `mDicNazvy` bola až za prvou procedúrou, presunutá na začiatok modulu).
+- Inštalátor: spoľahlivá detekcia chyby kompilácie (príkaz Ladenie > Kompilovať projekt v editore VBA; po chybe inštalácia zastaví a nechá Access otvorený).
+
+## Balík 2.6.1
+- Inštalátor: oprava volania `Application.Run` z PowerShellu (argumenty sa odovzdávajú cez `[ref]`; chyba „Argument: '2' should be a PSReference“ po kompilácii). Moduly VBA sa nezmenili.
+- Pri neúspechu inštalátor vypíše, ako pokračovať (zmazať rozpracovanú databázu alebo spustiť znova nad ňou).
+
+## Balík 2.6.0
+Prvý balík s inštalátorom a verzionovanými modulmi. Zahŕňa revíziu 2.5.0 (auto-oprava pípnutí, konfigurácia, import CSV/AD,
+príprava terminálu) a:
+
+- **Inštalátor** `Instaluj-Dochadzku.ps1` (+ `Instaluj.cmd`), manifest s SHA-256, selektívna aktualizácia modulov, záloha DB aj modulov.
+- **mod_13_Instalacia 1.0.0** – inštalačná inicializácia, evidencia verzií (`VerzieModulov`).
+- **mod_14_ImportModelu 1.0.0** – import dát zo staršej verzie databázy (nedeštruktívne dopĺňanie, jedna transakcia).
+- **mod_01_SystemInit 2.6.0** – `AutoExecStart` vždy dorovná štruktúru; tabuľky so starou štruktúrou sa už nemažú, ale premenúvajú na `old_<čas>_<názov>`.
+- **mod_UI_Core 2.6.0** – verzia UI 2.6.0 (konzola sa pri štarte prestaví).
+- **mod_UI_Tab_Import 2.6.0** – tlačidlo „Importovať dáta zo staršej verzie databázy“.
+- Zrušené moduly: `modExportLovableConfig`, `mod_UI_Tab_AutoOprava`.
+
+### Pravidlo verzií
+Zmena obsahu modulu ⇒ vyššia `'@Verzia X.Y.Z` (inak `tools/zostav_balik.py` zostavenie odmietne).

@@ -91,6 +91,7 @@ CI na GitHube (`.github/workflows/ci.yml`) spúšťa po každom PR a pushi do `m
 | [`docs/REGISTRACIA.md`](docs/REGISTRACIA.md) | registrácia firiem a zamestnancov bez e-mailu |
 | [`docs/OVERENIE-ZARIADENI.md`](docs/OVERENIE-ZARIADENI.md) | čo overenie zariadenia zaručuje a čo nie, neoverené razenia, záchranný kód, zmeny zariadení |
 | [`docs/LOVABLE-KREDITY.md`](docs/LOVABLE-KREDITY.md) | čo míňa kredity, synchronizácia s GitHubom |
+| [`docs/ZACHRANA-A-NAVRAT.md`](docs/ZACHRANA-A-NAVRAT.md) | návrat k bezpečnému stavu: kód, databáza, záchranný skript k migrácii 0006 |
 | [`access/README.md`](access/README.md), [`access/CHANGELOG.md`](access/CHANGELOG.md) | inštalácia a zmeny dochádzkového systému v Accesse |
 | [`roadmap.md`](roadmap.md) | hotové a otvorené úlohy |
 

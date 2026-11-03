@@ -1,7 +1,7 @@
 # Zneplatnenie razenia (duplicita, omyl)
 
 ## Postup
-1. **Zamestnanec** otvorí *Môj mesiac*, pri razení klikne na malé tlačidlo **zneplatniť** a napíše dôvod (3 až 500 znakov, **bez osobných údajov**, napr. „dvojité razenie“). Žiadosť môže podať aj vedúci za svojho podriadeného. Kým žiadosť nie je schválená, razenie sa počíta a je označené „čaká na zneplatnenie“.
+1. **Zamestnanec** otvorí *Môj mesiac*, pri razení klikne na malé tlačidlo **zneplatniť** a napíše dôvod (3 až 500 znakov, **bez osobných údajov**, napr. „dvojité razenie“). Žiadosť môže podať aj vedúci alebo správca za zamestnanca vo výkaze zamestnanca (Môj tím → Výkaz A4). Kým žiadosť nie je schválená, razenie sa počíta a je označené „čaká na zneplatnenie“.
 2. **Vedúci alebo správca** vidí žiadosť v *Môj tím* → **Žiadosti o zneplatnenie razenia** a klikne na **Zneplatniť razenie** alebo **Zamietnuť**. Schváliť môže len vedúci tohto zamestnanca alebo správca; vedúci si vlastnú žiadosť v zozname nevidí (nemôže si ju schváliť sám), správca áno.
 3. **Schválením** sa razenie označí `voided_at`. Z databázy sa **nemaže** a hash reťaz ostáva nezmenená. Zneplatnené razenie sa nezapočítava do výpočtu dňa, mesiaca a sald; v tabuľke je preškrtnuté.
 4. Na jedno razenie môže byť naraz jediná otvorená alebo schválená žiadosť; zamietnutú možno podať znova.

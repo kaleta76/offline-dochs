@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { loadMonth, MONTHS } from "@/lib/month";
 import { MonthTable } from "@/components/MonthTable";
+import { useVoidRequest } from "@/components/VoidRequest";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/vykaz/$userId/$ym")({
@@ -14,6 +15,8 @@ function Report() {
   const { userId, ym } = Route.useParams();
   const [y = 2026, m = 1] = ym.split("-").map(Number);
   const q = useQuery({ queryKey: ["month", userId, y, m], queryFn: () => loadMonth(userId, y, m) });
+  // vedúci alebo správca môže za zamestnanca požiadať o zneplatnenie duplicitného razenia (rozhoduje sa v Môj tím)
+  const voidRequest = useVoidRequest();
   if (!q.data) return <p className="text-muted-foreground">Načítavam…</p>;
   const d = q.data;
   return (
@@ -30,7 +33,8 @@ function Report() {
         </div>
         <div className="text-right text-lg font-bold">{MONTHS[m - 1]} {y}</div>
       </div>
-      <MonthTable data={d} compact />
+      {voidRequest.panel}
+      <MonthTable data={d} compact onVoid={voidRequest.open} />
       <p className="mt-2 text-xs text-muted-foreground">K = záznam doplnený schválenou korekciou. {d.closedAt ? `Uzavreté ${new Date(d.closedAt).toLocaleDateString("sk-SK")}.` : "Mesiac nie je uzavretý."}</p>
       <div className="mt-16 grid grid-cols-2 gap-12 text-center text-sm">
         <div className="border-t border-foreground pt-1">Podpis zamestnanca</div>

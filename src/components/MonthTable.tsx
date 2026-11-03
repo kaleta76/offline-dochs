@@ -61,7 +61,7 @@ export function MonthTable({
                       {onVoid && !p.voided && !p.voidPending && !data.closedAt && (
                         <button
                           type="button"
-                          className="ml-1 rounded-sm border border-border px-1 text-[10px] text-muted-foreground hover:border-foreground hover:text-foreground"
+                          className="no-print ml-1 rounded-sm border border-border px-1 text-[10px] text-muted-foreground hover:border-foreground hover:text-foreground"
                           aria-label={`Požiadať o zneplatnenie: ${labelOf(p.code, p.direction)} ${hm(p.time)}`}
                           onClick={() => onVoid({ id: p.id, label: labelOf(p.code, p.direction), time: hm(p.time) })}
                         >

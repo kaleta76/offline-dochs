@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { loadMonth, labelOf } from "@/lib/month";
-import { MonthPicker, MonthTable, type VoidTarget } from "@/components/MonthTable";
+import { MonthPicker, MonthTable } from "@/components/MonthTable";
+import { useVoidRequest } from "@/components/VoidRequest";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,23 +45,7 @@ function MyMonth() {
   });
 
   // žiadosť o zneplatnenie razenia (napr. duplicitné razenie); rozhodne vedúci alebo správca
-  const [voidTarget, setVoidTarget] = useState<VoidTarget | null>(null);
-  const [voidReason, setVoidReason] = useState("");
-  const [voidMsg, setVoidMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const requestVoid = useMutation({
-    mutationFn: async () => {
-      if (!voidTarget) throw new Error("Vyberte razenie.");
-      const { error } = await supabase.rpc("request_punch_void", { _punch_id: voidTarget.id, _reason: voidReason.trim() });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      setVoidMsg({ ok: true, text: "Žiadosť o zneplatnenie bola odoslaná vedúcemu. Razenie sa počíta, kým ju neschváli." });
-      setVoidTarget(null);
-      setVoidReason("");
-      qc.invalidateQueries({ queryKey: ["month"] });
-    },
-    onError: (e: Error) => setVoidMsg({ ok: false, text: e.message }),
-  });
+  const voidRequest = useVoidRequest();
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
@@ -72,21 +57,8 @@ function MyMonth() {
         {month.data?.closedAt && <p className="mb-3 rounded-sm bg-muted px-3 py-2 text-sm font-semibold">Mesiac je uzavretý manažérom.</p>}
         {month.isLoading && <p className="text-muted-foreground">Načítavam…</p>}
         {month.error && <p className="text-destructive">Nepodarilo sa načítať (ste offline?).</p>}
-        {voidMsg && <p role={voidMsg.ok ? "status" : "alert"} className={`mb-3 text-sm ${voidMsg.ok ? "" : "text-destructive"}`}>{voidMsg.text}</p>}
-        {voidTarget && (
-          <form
-            className="mb-4 space-y-2 rounded-sm border-2 border-foreground bg-card p-3"
-            onSubmit={(e) => { e.preventDefault(); setVoidMsg(null); requestVoid.mutate(); }}
-          >
-            <p className="text-sm font-bold">Zneplatniť razenie: {voidTarget.label} {voidTarget.time}</p>
-            <Textarea required minLength={3} maxLength={500} placeholder="Dôvod (napr. dvojité razenie)" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} />
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={requestVoid.isPending}>Odoslať žiadosť</Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => { setVoidTarget(null); setVoidReason(""); }}>Zrušiť</Button>
-            </div>
-          </form>
-        )}
-        {month.data && <MonthTable data={month.data} onVoid={(t) => { setVoidMsg(null); setVoidTarget(t); }} />}
+        {voidRequest.panel}
+        {month.data && <MonthTable data={month.data} onVoid={voidRequest.open} />}
       </section>
       <aside className="space-y-6">
         <form

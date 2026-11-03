@@ -2,6 +2,7 @@
 """Testy overovača exportu (stdlib unittest). Spustenie: python3 -I contract/tools/test_verify_export.py"""
 import csv, hashlib, importlib.util, io, os, sys, tempfile, unittest
 
+sys.dont_write_bytecode = True  # do repozitára nepatria __pycache__
 HERE = os.path.dirname(os.path.abspath(__file__))
 GOLDEN = os.path.join(HERE, "..", "examples", "punches_example.csv")
 spec = importlib.util.spec_from_file_location("verify_export", os.path.join(HERE, "verify_export.py"))

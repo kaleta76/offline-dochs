@@ -242,6 +242,32 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          manual_punches: boolean
+          new_devices: boolean
+          user_id: string
+        }
+        Insert: {
+          manual_punches?: boolean
+          new_devices?: boolean
+          user_id: string
+        }
+        Update: {
+          manual_punches?: boolean
+          new_devices?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_codes: {
         Row: {
           calc_type: string
@@ -388,6 +414,44 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      personnel_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          requested_number: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          requested_number: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          requested_number?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personnel_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -554,6 +618,10 @@ export type Database = {
         Args: { _as_backup?: boolean; _id: string }
         Returns: undefined
       }
+      audit_account_event: {
+        Args: { _action: string; _target: string }
+        Returns: undefined
+      }
       calc_settings: {
         Args: never
         Returns: {
@@ -568,6 +636,10 @@ export type Database = {
         Returns: undefined
       }
       decide_correction: {
+        Args: { _approve: boolean; _id: string }
+        Returns: undefined
+      }
+      decide_personnel_request: {
         Args: { _approve: boolean; _id: string }
         Returns: undefined
       }

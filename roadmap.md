@@ -1,4 +1,8 @@
 # Roadmap
+- [ ] Osobné číslo pri registrácii, unikátnosť a schvaľované zmeny
+- [ ] Obnova hesla e-mailom alebo správcom; osobné číslo a dočasný PIN
+- [ ] Voliteľné e-mailové upozornenia vedúcich
+- [ ] Overiť a publikovať nové zmeny na offline-dochs.lovable.app
 - [x] GDPR pseudonymizácia: SAP osobné čísla, bez mien v obrazovkách/exportoch; ochrana čítania identity, čistenie cache, 31 testov
 - [ ] Prihlásené overenie priradenia SAP čísla a exportu — čaká na prihlásenie používateľa v náhľade
 - [ ] Doplniť skutočné SAP osobné čísla pre 6 existujúcich účtov — čaká na údaje od správcu firmy

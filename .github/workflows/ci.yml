@@ -13,8 +13,21 @@ jobs:
       - name: Lint celého projektu (len informatívne)
         run: bun run lint
         continue-on-error: true   # existujúci kód v src/ nie je prettier-čistý (vyše 1 200 formátovacích chýb); blokujúce je len contract/
-      - name: Lint kontraktu (blokujúce)
-        run: bunx eslint contract
+      - name: Lint kontraktu a súborov registrácie (blokujúce)
+        run: >
+          bunx eslint contract
+          src/lib/accounts-core.ts src/lib/accounts-core.test.ts src/lib/accounts.functions.ts
+          src/lib/credentials.ts src/lib/credentials.test.ts
+          src/lib/onboarding-logic.ts src/lib/onboarding-logic.test.ts
+          src/lib/onboarding-rules.ts src/lib/onboarding-rules.test.ts
+          src/lib/registration-code.ts src/components/EmployeeAccess.tsx src/routes/auth.tsx
+      - name: Typová kontrola (blokujúca len pre súbory registrácie)
+        run: |
+          bunx tsc --noEmit -p tsconfig.json > tsc.log 2>&1 || true
+          echo "Počet typových chýb v celom projekte (informatívne): $(grep -c 'error TS' tsc.log || true)"
+          if grep -E '^src/(lib/(accounts-core|accounts\.functions|credentials|onboarding-logic|onboarding-rules|registration-code)|components/EmployeeAccess|routes/auth)' tsc.log; then
+            echo "Typové chyby v súboroch registrácie"; exit 1
+          fi
       - run: bun run test          # vrátane contract/tests (pozri vitest.config.ts)
       - run: bun run build
   contract:

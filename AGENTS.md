@@ -22,6 +22,7 @@
 - Synchronization is scoped to the authenticated owner and deletes local punches only after reading back the exact accepted payload; durable IndexedDB writes resolve on transaction completion — prevents data loss on retries and account switches.
 - Cache profile data by user ID and restore after hydration; cached roles are display hints only, with database RLS authoritative — prevents shared-device leakage.
 - Device verification is decided only by the punches_chain trigger, which hashes the raw device key server-side and discards it; device state changes go through security-definer RPCs that write audit_log — clients can never mark their own punches verified.
+- Registrácia firiem a zamestnancov ide výlučne cez server funkcie v `src/lib/accounts.functions.ts` (logika v `accounts-core.ts`, dokumentácia `docs/REGISTRACIA.md`): firma sa zakladá stálym registračným kódom (v repozitári len odtlačok), zamestnanec dostane jednorazový PIN od správcu, e-mail sa nezbiera. Nevracaj `supabase.auth.signUp`, e-mailové potvrdenie ani ukladanie PIN-u v čitateľnej podobe — prvé by obišlo registračný kód, druhé by vrátilo problém s doručením pošty a osobné údaje.
 
 ## Integrácia s dochádzkovým systémom (Access) – pravidlá pre agenta
 

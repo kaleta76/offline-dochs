@@ -1,0 +1,227 @@
+{
+  "balik": "2.11.0",
+  "vytvorene": "2026-11-03 14:17:03",
+  "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
+  "zrusene": [
+    "modExportLovableConfig",
+    "mod_UI_Tab_AutoOprava"
+  ],
+  "moduly": {
+    "modMesaatnaDochadzka": {
+      "subor": "moduly/modMesaatnaDochadzka.bas",
+      "verzia": "2.7.0",
+      "sha256": "f479725375dfe9ddb35ab12d29bd390a7649dbeb6dad75b0ca84786f421b1233",
+      "obsah_sha256": "9abd0d6dbe9a03477cce1cd95e67ad7f3ed3fe18ea0cea4d37a82fdc75fdb476"
+    },
+    "mod_00_Common": {
+      "subor": "moduly/mod_00_Common.bas",
+      "verzia": "2.7.0",
+      "sha256": "db190121147d2ef1a4f604fabf88f66adecf697fff6233af1b53333679d41adc",
+      "obsah_sha256": "e29090acd85f3c127ae3380dfeeb33e1415c4c902b091d56e57e61cb6b692ef7"
+    },
+    "mod_01_SystemInit": {
+      "subor": "moduly/mod_01_SystemInit.bas",
+      "verzia": "2.9.0",
+      "sha256": "d44655126a88d5c984b4d608d2eebbcb1d3d438962914a8f70d68a95a1e3539c",
+      "obsah_sha256": "9bba3ddddda68e832ab48bf9615137b6dbcf1044d99174f416e371b4340cb60c"
+    },
+    "mod_02_DBFImport": {
+      "subor": "moduly/mod_02_DBFImport.bas",
+      "verzia": "2.6.0",
+      "sha256": "a833ddd299fa1dac70fde93c0119541412f1f3c8ce0f926fadbd1da34eef71df",
+      "obsah_sha256": "972ed90681d15b31d16ffb0d8b3773b561c68e42b907127368333c59fa388fb7"
+    },
+    "mod_02a_DBFReader": {
+      "subor": "moduly/mod_02a_DBFReader.bas",
+      "verzia": "2.5.0",
+      "sha256": "d9407a42e56b02e042e072467730517ccbbb88b9e52fc453b8232ad800166db0",
+      "obsah_sha256": "21976fabbae86e57b2b9228ae3b294d92d60dc6498d35dd1803cacd5fbd028c4"
+    },
+    "mod_03_ADSync": {
+      "subor": "moduly/mod_03_ADSync.bas",
+      "verzia": "2.5.1",
+      "sha256": "71875069d7426ffc24c4293deb3f2b5e411676cd6f092a07786a71a855db2480",
+      "obsah_sha256": "6ec4ae272aa5bbe18f74837e19889fc0645f90b6c689f28a2b699a5692cca0ba"
+    },
+    "mod_04_DataConsolidation": {
+      "subor": "moduly/mod_04_DataConsolidation.bas",
+      "verzia": "2.5.0",
+      "sha256": "511be3bc7459d8a4b80ed0626f1674140b14b0e446f63e9806e55702e921c151",
+      "obsah_sha256": "eff256ae106ad5705e6540f76b7ca606f138cdfe9aae58eb6e9014066f757b10"
+    },
+    "mod_05_UI_AttendanceEditor": {
+      "subor": "moduly/mod_05_UI_AttendanceEditor.bas",
+      "verzia": "2.7.0",
+      "sha256": "dd75a9f57b04a9dfa1f8bda0a4483776cfe24fc87bb160af6c1a7c3632bba516",
+      "obsah_sha256": "19674df1ea70ac06c74ec8f7b74ae504227380505db1f50f933b92d4bd7cd9fe"
+    },
+    "mod_06_AdminTools": {
+      "subor": "moduly/mod_06_AdminTools.bas",
+      "verzia": "2.6.0",
+      "sha256": "3d38bf0da8bdecb44996d32bd5953c2e80cbdc80e4c9b50fb81e88432f577c9f",
+      "obsah_sha256": "28bbe97a079f991c3f3a6ace5e8b10cdb282658e39be6f7d0dcb27fca0c1aa52"
+    },
+    "mod_08_UdalostiDna": {
+      "subor": "moduly/mod_08_UdalostiDna.bas",
+      "verzia": "1.2.0",
+      "sha256": "3af745eb589e6814de0030f67945c883627e1d031b537a567c4140942e3b0b47",
+      "obsah_sha256": "f179ef1831757eb53a1faec81a41c2e9a52e43653bcdb365388a99d488eb7402"
+    },
+    "mod_09_AutoOprava": {
+      "subor": "moduly/mod_09_AutoOprava.bas",
+      "verzia": "1.2.0",
+      "sha256": "99ca2eb8d504d964f87be392751e3b5f9a0697ac98de99e5db6c9004a42e2e7c",
+      "obsah_sha256": "3eafec741f9429312a601a1a583fae2a14d6a51dc627bd18a87c54211067b24f"
+    },
+    "mod_10_Konfiguracia": {
+      "subor": "moduly/mod_10_Konfiguracia.bas",
+      "verzia": "1.0.1",
+      "sha256": "b34cfcc714a14558d2568a00e39ae1975b3f44121718529b0e1786f9356bc950",
+      "obsah_sha256": "50796d8cca0ca98d563cf367849c1da2617a81d402f1155474508ac2d8de5856"
+    },
+    "mod_11_ImportZamestnancov": {
+      "subor": "moduly/mod_11_ImportZamestnancov.bas",
+      "verzia": "1.0.0",
+      "sha256": "55c9d5cad316768142623ce5bde47e42af325861eb94087bbcbce8bb949d3f7f",
+      "obsah_sha256": "fe5eb96393e5a07433b7aa64a911cae8f58b73b1821728f7fb341c865dcf3cc1"
+    },
+    "mod_12_TerminalPriprava": {
+      "subor": "moduly/mod_12_TerminalPriprava.bas",
+      "verzia": "1.1.0",
+      "sha256": "14a3cc8d09b82b49e2cfcc1532b4afe061af5ce99797d449b2879f4a5990bb95",
+      "obsah_sha256": "4a49f86312ffd157db474d761e58ae46fccea48c3e7b41ebb2852a82bc3c8cc4"
+    },
+    "mod_13_Instalacia": {
+      "subor": "moduly/mod_13_Instalacia.bas",
+      "verzia": "1.0.3",
+      "sha256": "c6cb7106cc1c8ddf7d33ffd4e251b418708d3c15fd7102b2fa78852d41720af7",
+      "obsah_sha256": "9a08c1b2a378fee5df34159ed49c7a321bdfa8d503b097fcae53f22618528816"
+    },
+    "mod_14_ImportModelu": {
+      "subor": "moduly/mod_14_ImportModelu.bas",
+      "verzia": "1.1.0",
+      "sha256": "261dd508447d05a9f61265fd3afe5e0541678dda54e84997f9be04df40590267",
+      "obsah_sha256": "ce1ed7df140d14721fb411efce41c55521cc5def1253862044f1d4864d012f1d"
+    },
+    "mod_15_Zamestnanci": {
+      "subor": "moduly/mod_15_Zamestnanci.bas",
+      "verzia": "1.1.0",
+      "sha256": "574fc3f75f30ef6e11c9c4fd935a8f03a0fe92e8f37f06758debed68aff4886c",
+      "obsah_sha256": "e45d4eb1ba98876ef0de9cb2d7e0b1954fa014992a7f74c26e21605cdd123392"
+    },
+    "mod_16_PravidlaPreruseni": {
+      "subor": "moduly/mod_16_PravidlaPreruseni.bas",
+      "verzia": "1.0.0",
+      "sha256": "4503ff0a61b4e34c09fba256dab247f83b2ae8d4a2cbd5f69408ba0f7cbe7181",
+      "obsah_sha256": "54a024683dcd4368e976552cc9b81acf99faa42d83c127747c1ae8184df54e8e"
+    },
+    "mod_17_FondyPravidla": {
+      "subor": "moduly/mod_17_FondyPravidla.bas",
+      "verzia": "1.1.0",
+      "sha256": "075ef8a6614e07b12485b55f7724593f0af74beceb528f2a7190759eb24cf8f9",
+      "obsah_sha256": "d8d65edea83da43efc64d434abae2a49d51e8e3312a7c3bbac855bdcf28f34c6"
+    },
+    "mod_18_Uzavierka": {
+      "subor": "moduly/mod_18_Uzavierka.bas",
+      "verzia": "1.0.0",
+      "sha256": "4058349415cbfb113efb52817efc81ecfc62595d38aa68b47d2863671439a8c4",
+      "obsah_sha256": "99d751432420c9b0abcb6d4b49fec0bcd13516757a051106105bc8d78af37cdb"
+    },
+    "mod_19_TerminalImport": {
+      "subor": "moduly/mod_19_TerminalImport.bas",
+      "verzia": "1.2.0",
+      "sha256": "22bd66bbaac43b893961ed895f5930efe4836f8d5bccb54ed571a43645fc07d3",
+      "obsah_sha256": "5a6efef20ffc45877ddd0e6bdb518e6c739cc497803814b1905c5df163e81bea"
+    },
+    "mod_UI_Core": {
+      "subor": "moduly/mod_UI_Core.bas",
+      "verzia": "2.9.0",
+      "sha256": "896e0a35c09cee30ff4e4b7a1947497aff53150800b66c71f1729b9393bb92e1",
+      "obsah_sha256": "c1d07ea7954f46464a04938c42a8a5fc37bd6567ffd3f68b12d403c6cbedadbc"
+    },
+    "mod_UI_Pomocnik": {
+      "subor": "moduly/mod_UI_Pomocnik.bas",
+      "verzia": "1.2.1",
+      "sha256": "7ae7f24a195673e12b2b28dc5e5f80dac09282dccedf51b88f2aab7b6d6e20ab",
+      "obsah_sha256": "f630c607996c43dbfba450f7faf9b16d8968b25327e03a5b2bb820d2dd3fc3bc"
+    },
+    "mod_UI_PomocnikTexty": {
+      "subor": "moduly/mod_UI_PomocnikTexty.bas",
+      "verzia": "1.2.0",
+      "sha256": "335fe529c38dedaa94b887fd4e3081063b70bc05d3258b9cb8415b40167fe55f",
+      "obsah_sha256": "2f6123e187692cc4ae6fb1c3140d488be82c4299a09625ab5504ddb78807e987"
+    },
+    "mod_UI_Sablony": {
+      "subor": "moduly/mod_UI_Sablony.bas",
+      "verzia": "1.1.0",
+      "sha256": "d6473ccc0af03ad7dbec2fbbde82361e95e3f98cc323cb2211be3b44d59f78ec",
+      "obsah_sha256": "cc623938fcc1edb46778c4cea71a272f7b2efd28b870f617ea3c977828fa49fd"
+    },
+    "mod_UI_Spolocne": {
+      "subor": "moduly/mod_UI_Spolocne.bas",
+      "verzia": "1.2.0",
+      "sha256": "23dabfc22de9d397642f474dd2c173ff9932fcb8fb8e9d84bc3cfff581f22f97",
+      "obsah_sha256": "87186e123f6f08eace1eb51fd06d66a9dc339612a8b124acd685ea17257d75ed"
+    },
+    "mod_UI_Tab_ADSync": {
+      "subor": "moduly/mod_UI_Tab_ADSync.bas",
+      "verzia": "2.8.0",
+      "sha256": "f8f6defd8c0fd9c46c9d7d3f28e3696e7c921a373c02c8641432e07e485ab77b",
+      "obsah_sha256": "9836075c75c08101e9d9b271fe01105c1b8e39cba3252bee0d19daafceede641"
+    },
+    "mod_UI_Tab_Admin": {
+      "subor": "moduly/mod_UI_Tab_Admin.bas",
+      "verzia": "2.8.0",
+      "sha256": "5dd4112e19fb9f48c0a7214b3b18638e97a8e8dfb9050069ea96eb0fb8da6163",
+      "obsah_sha256": "825b2be0744481da0d8c16a0dbb8b2ac6731596a46d88eacda5e3fe4423047e6"
+    },
+    "mod_UI_Tab_Export": {
+      "subor": "moduly/mod_UI_Tab_Export.bas",
+      "verzia": "2.11.0",
+      "sha256": "4b3bba3f33ba979b7dc0f1af9aeb2e5cb346d02c31706a08d41460df503f5118",
+      "obsah_sha256": "025b98efdebc02aa17da9d92bdf70d703a91c8a0d0d7ca489efc0bb385acbe33"
+    },
+    "mod_UI_Tab_Import": {
+      "subor": "moduly/mod_UI_Tab_Import.bas",
+      "verzia": "2.7.0",
+      "sha256": "1812451074e1bdbe6a592d222801e4d74fdd0e13fc0ecb59c29e47f24e634786",
+      "obsah_sha256": "4cb22594a97ce9e78929cc0d659833c96ed418225f965a9e7547740cfbd0f0f7"
+    },
+    "mod_UI_Tab_Konsolidacia": {
+      "subor": "moduly/mod_UI_Tab_Konsolidacia.bas",
+      "verzia": "2.5.1",
+      "sha256": "786fb6f09ec25a04356a871570b68a43ac988eebe46494f4400ac018682dda35",
+      "obsah_sha256": "4198adbbd94a30730f6cef3ef3ee8a493076f4778db4e049a7abb17084750091"
+    },
+    "mod_UI_Tab_Prerusenia": {
+      "subor": "moduly/mod_UI_Tab_Prerusenia.bas",
+      "verzia": "2.8.0",
+      "sha256": "cbde411d70ab73776efa7af138e761103b6a41a8773a10acc019e90a71726524",
+      "obsah_sha256": "9baddf2ea744ba74814877d828c4ae4676e22a1fda30bc7e174775e6a9f8d3f2"
+    },
+    "mod_UI_Tab_Vypocet": {
+      "subor": "moduly/mod_UI_Tab_Vypocet.bas",
+      "verzia": "2.9.0",
+      "sha256": "ff2e7173c97f3fdb6fe89c0614cff5313cc3fb6a7174532ac70f11a1f9bfb154",
+      "obsah_sha256": "393ff4ab8300c767acdf2cb870aa9f5e1a4b8908134ad68062b55397027bfa3f"
+    },
+    "mod_UI_Tab_Zamestnanci": {
+      "subor": "moduly/mod_UI_Tab_Zamestnanci.bas",
+      "verzia": "1.1.0",
+      "sha256": "8ac54ee13c19525f38d7547f9d187aed912bafbede9035958d19f8dbf136d567",
+      "obsah_sha256": "749a951d21b2769374f57daafdbcad982b6a9591bd2f35ed35215afef6971494"
+    },
+    "mod_UI_Uzavierka": {
+      "subor": "moduly/mod_UI_Uzavierka.bas",
+      "verzia": "1.0.0",
+      "sha256": "28c7cb05625be905a58c473e5d3f8103c6853985f35114749d2ecfb0f7a6f476",
+      "obsah_sha256": "118c961eb27bc9cd1dbcca7d2e35c4e912aca06bf703c4dfdcda57fdd129a274"
+    },
+    "mod_UI_ZamKarta": {
+      "subor": "moduly/mod_UI_ZamKarta.bas",
+      "verzia": "1.1.0",
+      "sha256": "f7b32ce08aa90904d503b930a137e6638001e435f4305cba845b7efb0af29581",
+      "obsah_sha256": "0d7521af3235ead6ad540ddbb41374f28988508b3cf9fa8fe1909250aa7c3d2a"
+    }
+  }
+}

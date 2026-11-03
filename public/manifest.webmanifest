@@ -1,6 +1,7 @@
 {
   "name": "Dochádzka",
   "short_name": "Dochádzka",
+  "description": "Terminál dochádzky s offline režimom, bez osobných údajov (len osobné čísla SAP).",
   "start_url": "/terminal",
   "display": "standalone",
   "background_color": "#2b2e35",

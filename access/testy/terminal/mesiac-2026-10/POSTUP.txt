@@ -1,0 +1,52 @@
+TEST NA CELÝ MESIAC (október 2026): terminál a Access, porovnanie sald
+======================================================================
+Údaje sú vymyslené (zamestnanci 9000001 až 9000004). Október je celý v minulosti, takže terminál počíta saldo za všetky dni.
+Obsahuje aj prechod na zimný čas (25. 10.), dve duplicity (9. a 13. 10. u 9000001), otvorený deň (9. 10. u 9000003)
+a deň bez razenia (30. 10. u 9000003).
+
+SÚBORY
+  import_do_terminalu_2026-10.csv   vstup pre Testovací import v administrácii terminála (237 razení)
+  terminal_test_2026-10.csv         tie isté razenia vo formáte exportu z terminála (kontrakt v1) - na test samotného Accessu
+  ocakavane_saldo_2026-10.csv       saldá, ktoré má terminál ukázať (referenčný výpočet)
+  popis_2026-10.json                popis každého dňa
+  porovnaj.py                       porovnanie sald (Python 3, bez doplnkov)
+
+POSTUP A: len Access (bez terminála)
+  1. Použite KÓPIU databázy. Karta 7 Exporty > Samočinný test terminála.
+  2. Vyberte terminal_test_2026-10.csv, ostrý import potvrďte.
+  3. Vznikne terminal_test_report.txt a terminal_test_access_vysledky.csv (v priečinku databázy).
+  4. python3 -I porovnaj.py --terminal ocakavane_saldo_2026-10.csv --access terminal_test_access_vysledky.csv --popis popis_2026-10.json
+
+POSTUP B: celý reťazec terminál -> Access (inú kópiu databázy než v postupe A, alebo najprv nechajte test odstrániť - samočinný test sa na to opýta)
+  1. Terminál, testovacia organizácia, správca: pridajte osobné čísla 9000001 až 9000004 a vydajte PIN-y.
+  2. Terminál, administrácia > Testovacia prevádzka: Zapnúť, vybrať import_do_terminalu_2026-10.csv, Skontrolovať, Importovať.
+  3. Tu istú sekciu použite na Stiahnuť saldá za október 2026 (terminal_saldo_202610.csv).
+  4. Administrácia > Export pre Access: október 2026 (punches_202610.csv).
+  5. Access: Samočinný test terminála so súborom punches_202610.csv (importuje, prepočíta a uloží terminal_test_access_vysledky.csv).
+  6. python3 -I porovnaj.py --terminal terminal_saldo_202610.csv --access terminal_test_access_vysledky.csv --ocakavane ocakavane_saldo_2026-10.csv --popis popis_2026-10.json
+
+Výsledky pošlite: porovnanie_report.txt, porovnanie_rozdiely.csv a terminal_test_report.txt.
+
+ZNEPLATNENIE DUPLICÍT (balík 2.11.0, kontrakt 1.1)
+--------------------------------------------------
+Scenár obsahuje dve duplicity u 9000001: 9. 10. druhý príchod 07:00:11 (punch_id 320) a 13. 10. druhý odchod 15:30:08 (punch_id 328).
+Terminál ich pri výpočte zvláda aj bez zneplatnenia, takže SALDO po zneplatnení sa NEMÁ zmeniť (9. 10. aj 13. 10. ostáva 480 min, saldo +30).
+V Accesse sa môže zmeniť stĺpec anomálie: ak Access pri týchto dňoch pred zneplatnením hlásil anomáliu (napr. dvojité razenie), po zneplatnení ju už nemá hlásiť.
+
+POSTUP C: len Access (bez terminála)
+  1. Najprv postup A (import razení, výsledky v terminal_test_access_vysledky.csv). NIE je potrebné nič mazať.
+  2. Súbory voids_test_2026-10.csv a voids_test_negativne_2026-10.csv dajte do priečinka databázy.
+  3. Karta 7 Exporty > Samočinný test terminála > Nie (zneplatnenia). Vyberte voids_test_2026-10.csv, ostrý import potvrďte.
+  4. Vzniknú terminal_test_access_vysledky_pred_zneplatnenim.csv (stav pred), terminal_test_access_vysledky.csv (stav po) a terminal_test_zneplatnenia_report.txt.
+  5. Očakávanie: report ukáže "použité 2"; v súbore "po" majú dni 2026-10-09 a 2026-10-13 u 9000001 rovnaké saldo ako v súbore "pred" (480 min, +30); anomálie sa môžu zmenšiť (pozri stĺpec anomálie).
+  6. python3 -I porovnaj.py --terminal ocakavane_saldo_2026-10.csv --access terminal_test_access_vysledky.csv --popis popis_2026-10.json  (saldá musia sedieť aj po zneplatnení)
+  7. Negatívny test: karta 7 > Importovať súbor z terminála > voids_test_negativne_2026-10.csv. Očakávanie: punch_id 301 = NEZHODA (zlý hash, nezneplatní sa), punch_id 999 = CAKA (razenie neexistuje).
+     Skontrolujte, že tabuľka TerminalZneplatnenia má tieto dva riadky a razenie 301 ostalo platné.
+
+POSTUP D: celý reťazec terminál -> Access
+  1. Postup B (import do terminála, export punches_202610.csv, import do Accessu, výsledky do porovnania).
+  2. Terminál: Môj tím > Výkaz A4 pre 9000001: pri razení 9. 10. 07:00:11 a 13. 10. 15:30:08 kliknite na "zneplatniť" (dôvod "dvojité razenie").
+     Potom Môj tím > Žiadosti o zneplatnenie razenia > Zneplatniť razenie (správca).
+  3. Terminál: Administrácia > Export pre Access > Zneplatnené razenia (.csv) za október 2026 (voids_202610.csv). Znova stiahnite aj saldá.
+  4. Access: Importovať súbor z terminála > voids_202610.csv (alebo Samočinný test > Nie), prepočet a porovnanie ako v postupe C.
+

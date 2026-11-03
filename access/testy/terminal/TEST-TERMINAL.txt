@@ -1,0 +1,31 @@
+TEST SPOLUPRÁCE ACCESS <-> TERMINÁL (balík 2.10.0)
+===================================================
+Cieľ: overiť, že Access prijme súbor z terminála (pätička SHA-256, hash reťaz), správne prevedie kódy terminála na
+prerušenia a kódy razenia a že denné výsledky sedia s výpočtom terminála. Používajú sa len vymyslení zamestnanci
+9000001 až 9000004 – žiadne skutočné údaje.
+
+Postup (na KÓPII databázy, nie na ostrej)
+1. Nainštalujte balík 2.10.0 (alebo importujte moduly mod_19_TerminalImport a mod_UI_Tab_Export).
+   Konzola sa prestaví sama; ak nie, karta 8 > "Znovu vytvoriť konzolu".
+2. Skopírujte súbor terminal_test_scenare.csv do priečinka, v ktorom je databáza.
+3. Karta 7 Exporty > "Samočinný test terminála (zapíše terminal_test_report.txt)".
+   - Test overí SHA-256 na známych vektoroch, mapovanie kódov, a súbor načíta NANEČISTO (nič nezapíše).
+   - Potom sa opýta, či má urobiť OSTRÝ import testovacích čísel 90000xx a prepočítať mesiac. Odpovedzte Áno.
+4. Vznikne v priečinku databázy:
+   - terminal_test_report.txt              (priebeh a výsledky kontrol)
+   - terminal_test_access_vysledky.csv     (denné výsledky Accessu pre scenáre)
+   Pošlite mi oba súbory. Obsahujú len vymyslené údaje.
+5. Upratanie testovacích údajov: v okne Immediate (Ctrl+G) zadajte
+       ?mod_19_TerminalImport.OdstranTestoveData()
+   Zmaže iba zamestnancov 9000001 až 9000099 a ich razenia, výpočty a frontu. Pred opakovaním testu to spustite.
+
+Mapovanie kódov (tabuľka TerminalMapaKodov, dá sa upraviť priamo v Accesse)
+   WORK -> č. 1 Pracovná doba (príchod 100 / odchod 101)       DOCTOR -> č. 2 Návšteva lekára
+   TRIP -> č. 12 Služobná cesta                                  FAMILY -> č. 16 Ošetrenie člena rodiny (OVERIŤ)
+   LEAVE -> č. 8 Dovolenka                                       SICK -> č. 11 Nemoc
+   PRIV -> č. 13 Ostatné osobné prekážky (OVERIŤ)
+   Odchod bez dôvodu uprostred dňa (WORK/OUT a neskôr WORK/IN) sa vedie ako obed č. 7.
+   Zmena: NastaveniaSystemu, kľúč TerminalOdchodBezDovodu = ODCHOD (potom je to odchod a nový príchod), kľúč TerminalObedCislo.
+
+Referencia terminála: terminal_test_engine_vysledky.csv (výsledky enginu terminála pre rovnaké razenia: fond 7:30,
+prestávka 30 min po 6 h, bez zaokrúhlenia). Rozdiely oproti Accessu sú očakávané a sú predmetom testu.

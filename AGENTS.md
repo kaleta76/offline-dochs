@@ -38,3 +38,4 @@ Terminál odovzdáva razenia lokálnemu dochádzkovému systému. Rozhranie je d
 8. Ak úloha mení export, `punches` alebo `profiles`, spusti `bun run lint`, `bun run test`, `bun run build` a napíš, čo si nemohol overiť.
 9. História sa neprepisuje (žiadny force-push, žiadny rebase publikovaných commitov).
 10. Rob len to, čo úloha žiada. Každý zásah do nesúvisiacich súborov stojí vlastníka kredity.
+11. Priečinok `access/` je dochádzkový systém v Accesse (VBA a inštalátor), vyvíja ho Claude mimo Lovable. Lovable agent ho nemení; súbory v ňom sa nesmú prekonvertovať (inštalátor overuje SHA-256 po bajtoch).

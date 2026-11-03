@@ -2,33 +2,9 @@
 // prevod riadkov z databázy na tvar kontraktu v1. Čisté funkcie bez Supabase a Reactu (dajú sa testovať).
 import { personnelNumberSchema } from "./personnel";
 import { localTime, TIME_ZONE, type PunchDbRow } from "./punch-export";
+import { zoneOffsetMs } from "./zone-time";
 
 export const EXPORT_PAGE_SIZE = 1000; // PostgREST vracia najviac 1000 riadkov naraz
-
-/** Rozdiel (ms) medzi miestnym časom v pásme a UTC v danom okamihu. */
-function zoneOffsetMs(utcMs: number, tz: string): number {
-  const sec = Math.floor(utcMs / 1000) * 1000;
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(sec));
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
-  const asUtc = Date.UTC(
-    get("year"),
-    get("month") - 1,
-    get("day"),
-    get("hour"),
-    get("minute"),
-    get("second"),
-  );
-  return asUtc - sec;
-}
 
 /** Okamih (UTC), v ktorom je v pásme polnoc 1. dňa mesiaca. */
 export function monthStartUtc(year: number, month: number, tz = TIME_ZONE): Date {

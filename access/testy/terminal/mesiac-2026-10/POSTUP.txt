@@ -50,3 +50,32 @@ POSTUP D: celý reťazec terminál -> Access
   3. Terminál: Administrácia > Export pre Access > Zneplatnené razenia (.csv) za október 2026 (voids_202610.csv). Znova stiahnite aj saldá.
   4. Access: Importovať súbor z terminála > voids_202610.csv (alebo Samočinný test > Nie), prepočet a porovnanie ako v postupe C.
 
+
+OVERENIE ZARIADENÍ (balík 2.11.1)
+---------------------------------
+Terminál označuje razenia z neschválených zariadení (device_verification = unverified). Access ich od 2.11.1 ukladá (TerminalInbox.Overenie, ZariadenieID)
+a hlási v reporte importu. Razenia sa počítajú ako doteraz.
+
+SÚBORY
+  overenie_test_2026-10.csv           8 razení: 9000001 len zariadenie A; 9000002 zariadenie A (5. 10.), potom zariadenie B (6. 10.) a jedno neoverené (odchod 6. 10.);
+                                      9000003 dve neoverené razenia (5. 10.)
+  overenie_test_potvrdene_2026-10.csv to isté, ale neoverené razenia vedúci medzitým potvrdil (confirmed; hash reťaz sa nemení)
+  make_overenie.py                    generátor oboch súborov (Python 3, bez doplnkov)
+
+POSTUP E: len Access (bez terminála), použite KÓPIU databázy
+  1. Karta 7 Exporty > Importovať súbor z terminála > overenie_test_2026-10.csv, najprv NANEČISTO.
+     Očakávanie v reporte (poradie zamestnancov podľa súboru):
+       Overenie zariadení: 3 razení je z neschválených zariadení (príznak 'neoverené'), zamestnanci:
+         9000002: 1
+         9000003: 2
+       Zmena zariadenia: v súbore razili z viac než jedného overeného zariadenia ...:
+         9000002: 2 overené zariadenia
+     9000001 sa nesmie objaviť v žiadnom z oboch zoznamov.
+  2. Ten istý súbor naostro. Očakávanie: "Do fronty TerminalInbox: nových 8". V tabuľke TerminalInbox majú 3 razenia Overenie = unverified, 5 razení verified,
+     stĺpec ZariadenieID obsahuje celé ID (d0000000-...-0a alebo -0b) u overených razení. (Neznáme osobné čísla 9000001 až 9000003 sa môžu v SpracujInbox
+     označiť ako CHYBA, ak testovací zamestnanci neexistujú. Na tento test to nevadí.)
+  3. Naostro importujte overenie_test_potvrdene_2026-10.csv. Očakávanie: "nových 0, už existujúcich 8", riadok
+     "Overenie zariadenia sa zmenilo pri 3 už importovaných razeniach" a v reporte "Overenie zariadení: všetky razenia sú z overených zariadení alebo ich potvrdil vedúci."
+     Zoznam "Zmena zariadenia" pre 9000002 sa v tomto reporte stále objaví (v súbore sú naozaj dve overené zariadenia).
+     V TerminalInbox majú tie tri razenia Overenie = confirmed a nič iné sa nezmenilo.
+  4. Upratanie: pri ďalšom spustení Samočinného testu terminála odpovedzte Áno na odstránenie testovacích údajov 90000xx (zmaže aj tieto razenia).

@@ -1,6 +1,6 @@
 {
-  "balik": "2.11.0",
-  "vytvorene": "2026-11-03 14:17:03",
+  "balik": "2.11.1",
+  "vytvorene": "2026-11-03 14:52:09",
   "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
   "zrusene": [
     "modExportLovableConfig",
@@ -87,9 +87,9 @@
     },
     "mod_12_TerminalPriprava": {
       "subor": "moduly/mod_12_TerminalPriprava.bas",
-      "verzia": "1.1.0",
-      "sha256": "14a3cc8d09b82b49e2cfcc1532b4afe061af5ce99797d449b2879f4a5990bb95",
-      "obsah_sha256": "4a49f86312ffd157db474d761e58ae46fccea48c3e7b41ebb2852a82bc3c8cc4"
+      "verzia": "1.2.0",
+      "sha256": "16ef0726dcaf4fd279738086b036473fb2584930a51aa62cb2b9afe0188227de",
+      "obsah_sha256": "faba5a91cbcde76f76468be8dfc976b9a5834e902c31c2f1e1fbeecf19c74e7b"
     },
     "mod_13_Instalacia": {
       "subor": "moduly/mod_13_Instalacia.bas",
@@ -129,9 +129,9 @@
     },
     "mod_19_TerminalImport": {
       "subor": "moduly/mod_19_TerminalImport.bas",
-      "verzia": "1.2.0",
-      "sha256": "22bd66bbaac43b893961ed895f5930efe4836f8d5bccb54ed571a43645fc07d3",
-      "obsah_sha256": "5a6efef20ffc45877ddd0e6bdb518e6c739cc497803814b1905c5df163e81bea"
+      "verzia": "1.3.0",
+      "sha256": "189440782fd3fd07436ba0136864dad16659bb6489821bb8447fbc115d784ed2",
+      "obsah_sha256": "843f25321e8b4eb296d165400b8e28913306dcf7039aec94a8cbe8cbafcb5aab"
     },
     "mod_UI_Core": {
       "subor": "moduly/mod_UI_Core.bas",

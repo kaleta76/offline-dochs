@@ -1,7 +1,10 @@
 Attribute VB_Name = "mod_12_TerminalPriprava"
-'@Verzia 1.1.0
+'@Verzia 1.2.0
 Option Compare Database
 Option Explicit
+
+' Stĺpce Overenie a ZariadenieID v TerminalInbox sa dopĺňajú jednorazovo za reláciu (1.2.0).
+Private mInboxPolia As Boolean
 
 '===============================================================================
 ' MODUL: mod_12_TerminalPriprava
@@ -22,7 +25,8 @@ Option Explicit
 ' ZOZNAM PROCEDÚR A FUNKCIÍ:
 ' ------------------------------------------------------------------------------
 ' - ZabezpecTabulky(db)                        : Vytvorí TerminalInbox a KonfiguraciaVerzie.
-' - PrijmiRazenie(...)                         : Príjem jedného razenia do inboxu.
+' - PrijmiRazenie(...)                         : Príjem jedného razenia do inboxu (aj s príznakom overenia zariadenia a ID zariadenia).
+' - AktualizujOverenie(externeID, overenie)    : Zmení príznak overenia už prijatého razenia (vedúci ho potvrdil v termináli).
 ' - SpracujInbox()                             : Prenos NOVE -> DochadzkaImport; vráti textový report.
 ' - GenerujKonfiguraciuJSON(rok)               : JSON konfigurácia (kódy, pravidlá, sviatky) bez osobných údajov.
 ' - VytvorVerziuKonfiguracie(autor)            : Uloží novú verziu konfigurácie; vráti jej číslo (0 = bez zmeny).
@@ -36,6 +40,13 @@ Public Sub ZabezpecTabulky(ByRef db As DAO.Database)
                    "CasRazenia DATETIME, KodRazenia LONG, Zariadenie TEXT(30), Payload LONGTEXT, Stav TEXT(10), Chyba TEXT(255), DatumSpracovania DATETIME)", dbFailOnError
         db.Execute "CREATE INDEX idxTI_ExterneID ON TerminalInbox (ExterneID)", dbFailOnError
         db.Execute "CREATE INDEX idxTI_Stav ON TerminalInbox (Stav)", dbFailOnError
+        mInboxPolia = False
+    End If
+    If Not mInboxPolia Then
+        ' jeden pokus za reláciu; ak sa pole nepodarí pridať, razenia sa prijímajú aj bez príznaku overenia (pozri PrijmiRazenie)
+        mInboxPolia = True
+        If Not mod_00_Common.PoleExistujeDB(db, "TerminalInbox", "Overenie") Then db.Execute "ALTER TABLE TerminalInbox ADD COLUMN Overenie TEXT(12)", dbFailOnError
+        If Not mod_00_Common.PoleExistujeDB(db, "TerminalInbox", "ZariadenieID") Then db.Execute "ALTER TABLE TerminalInbox ADD COLUMN ZariadenieID TEXT(40)", dbFailOnError
     End If
     If Not mod_00_Common.TabulkaExistujeDB(db, "KonfiguraciaVerzie") Then
         db.Execute "CREATE TABLE KonfiguraciaVerzie (ID AUTOINCREMENT PRIMARY KEY, Verzia LONG, Vytvorene DATETIME, Autor TEXT(50), Obsah LONGTEXT, " & _
@@ -51,7 +62,8 @@ End Sub
 ' Zapíše razenie do inboxu. Vráti ID záznamu, 0 ak ide o duplicitu (rovnaké ExterneID) alebo -1 pri chybe.
 '-------------------------------------------------------------------------------
 Public Function PrijmiRazenie(ByVal strExterneID As String, ByVal strOC As String, ByVal dCas As Date, ByVal lKod As Long, _
-                              Optional ByVal strZariadenie As String = "", Optional ByVal strPayload As String = "") As Long
+                              Optional ByVal strZariadenie As String = "", Optional ByVal strPayload As String = "", _
+                              Optional ByVal strOverenie As String = "", Optional ByVal strZariadenieID As String = "") As Long
     On Error GoTo Chyba
     Dim db As DAO.Database, rs As DAO.Recordset
     Set db = CurrentDb
@@ -68,6 +80,17 @@ Public Function PrijmiRazenie(ByVal strExterneID As String, ByVal strOC As Strin
     rs!KodRazenia = lKod
     rs!Zariadenie = Left$(strZariadenie, 30)
     If Len(strPayload) > 0 Then rs!Payload = strPayload
+    If Len(strOverenie) > 0 Or Len(strZariadenieID) > 0 Then
+        ' stĺpce pribudli v 1.2.0; ak ich nebolo možné pridať, razenie sa prijme aj bez príznaku
+        On Error Resume Next
+        rs!Overenie = Left$(strOverenie, 12)
+        rs!ZariadenieID = Left$(strZariadenieID, 40)
+        If Err.Number <> 0 Then
+            Call mod_00_Common.ZapisLog("mod_12_TerminalPriprava.PrijmiRazenie", "WARN", "Príznak overenia zariadenia sa neuložil: " & Err.Description)
+            Err.Clear
+        End If
+        On Error GoTo Chyba
+    End If
     rs!Stav = "NOVE"
     PrijmiRazenie = rs!ID
     rs.Update
@@ -76,6 +99,31 @@ Public Function PrijmiRazenie(ByVal strExterneID As String, ByVal strOC As Strin
 Chyba:
     Call mod_00_Common.ZapisLog("mod_12_TerminalPriprava.PrijmiRazenie", "ERROR", Err.Description)
     PrijmiRazenie = -1
+End Function
+
+'-------------------------------------------------------------------------------
+' Zmení príznak overenia zariadenia už prijatého razenia (napr. unverified -> confirmed, keď ho vedúci potvrdil v termináli).
+' Samotné razenie ani jeho spracovanie sa nemení. Vráti True, ak sa príznak zmenil.
+'-------------------------------------------------------------------------------
+Public Function AktualizujOverenie(ByVal strExterneID As String, ByVal strOverenie As String) As Boolean
+    On Error GoTo Chyba
+    Dim db As DAO.Database, rs As DAO.Recordset
+    If Len(strExterneID) = 0 Or Len(strOverenie) = 0 Then Exit Function
+    Set db = CurrentDb
+    If Not mod_00_Common.PoleExistujeDB(db, "TerminalInbox", "Overenie") Then Exit Function
+    Set rs = db.OpenRecordset("SELECT ID, Overenie FROM TerminalInbox WHERE ExterneID = " & mod_00_Common.SqlText(strExterneID) & ";", dbOpenDynaset)
+    If Not rs.EOF Then
+        If Nz(rs!Overenie, "") <> Left$(strOverenie, 12) Then
+            rs.Edit
+            rs!Overenie = Left$(strOverenie, 12)
+            rs.Update
+            AktualizujOverenie = True
+        End If
+    End If
+    rs.Close
+    Exit Function
+Chyba:
+    Call mod_00_Common.ZapisLog("mod_12_TerminalPriprava.AktualizujOverenie", "ERROR", Err.Description)
 End Function
 
 '-------------------------------------------------------------------------------

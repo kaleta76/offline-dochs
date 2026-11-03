@@ -25,7 +25,7 @@ u 9000001).
 
 ## Postup A: iba Access (bez terminála)
 
-1. Nainštalovať balík 2.11.0 (priečinok `access/` v tomto repozitári; 2.10.2 stačí, ak zneplatnenia netestujete), otvoriť konzolu, karta 7 Exporty, **Samočinný test terminála**.
+1. Nainštalovať balík 2.11.1 (priečinok `access/` v tomto repozitári; 2.10.2 stačí, ak zneplatnenia a overenie zariadení netestujete), otvoriť konzolu, karta 7 Exporty, **Samočinný test terminála**.
 2. Keď sa opýta na súbor, vybrať `terminal_test_2026-10.csv`; ostrý import potvrdiť (najlepšie na kópii databázy).
 3. Vznikne `terminal_test_report.txt` a `terminal_test_access_vysledky.csv`.
 4. Porovnanie s očakávaným výsledkom enginu:
@@ -69,3 +69,9 @@ nemusí mať), duplicity (9. a 13. 10. u 9000001) a prerušenia, ktoré v Access
 
 Duplicity v scenári (9. 10. a 13. 10. u 9000001) sa dajú zneplatniť a otestovať aj v Accesse. Saldo týchto dní sa po zneplatnení nemá zmeniť.
 Podrobné kroky sú v `access/testy/terminal/mesiac-2026-10/POSTUP.txt` (postup C: len Access, postup D: celý reťazec) a v [`ZNEPLATNENIE-RAZENI.md`](ZNEPLATNENIE-RAZENI.md).
+
+## Postup E: overenie zariadení (balík 2.11.1)
+
+Malý súbor `overenie_test_2026-10.csv` (osem razení, tri z neschválených zariadení, jeden zamestnanec s dvoma overenými zariadeniami) a jeho verzia po potvrdení vedúcim
+overia, že Access príznak ukladá, hlási ho v reporte importu a po potvrdení zmení iba príznak. Kroky a očakávané riadky reportu sú v `POSTUP.txt` (postup E),
+súvislosti v `docs/OVERENIE-ZARIADENI.md`. Ide len o Access, terminál netreba.

@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_19_TerminalImport"
-'@Verzia 1.2.0
+'@Verzia 1.3.0
 Option Compare Database
 Option Explicit
 
@@ -27,6 +27,11 @@ Option Explicit
 '        ZNEPLATNENÉ RAZENIA (kontrakt v1.1, voids_RRRRMM.csv): razenie, ktoré zamestnanec zneplatnil v terminále (napr. duplicita) a vedúci
 '        schválil, sa v Accesse NEMAŽE: riadok DochadzkaImport dostane Platnost = False a DovodNeplatnosti = 'ZNEPLATNENE_V_TERMINALI'.
 '        Zneplatnenia sa ukladajú do TerminalZneplatnenia a použijú sa, až keď je razenie v dochádzke a mesiac nie je uzavretý.
+'
+'        OVERENIE ZARIADENÍ (1.3.0): príznak device_verification (verified / unverified / confirmed) a ID zariadenia sa ukladajú
+'        do TerminalInbox (Overenie, ZariadenieID). Report importu hlási razenia z neschválených zariadení a zamestnancov s viac než
+'        jedným overeným zariadením v súbore. Razenia sa tým nemenia ani nezastavujú, počítajú sa ako doteraz. Ak vedúci neoverené
+'        razenie v termináli potvrdí, pri ďalšom importe sa zmení iba príznak (AktualizujOverenie).
 '
 '        SAMOČINNÝ TEST (SamoTestTerminalu) overí SHA-256 na známych vektoroch, mapovanie kódov, načíta testovací
 '        súbor "nanečisto", na požiadanie ho importuje pre testovacích zamestnancov 90000xx, prepočíta mesiac a
@@ -264,6 +269,84 @@ End Function
 Private Sub Pis(ByRef rep As String, ByVal s As String)
     rep = rep & s & vbCrLf
 End Sub
+
+'-------------------------------------------------------------------------------
+' Overenie zariadení v súbore (1.3.0): koľko razení je z neschválených zariadení (device_verification = unverified)
+' a ktorí zamestnanci razili z viac než jedného overeného zariadenia. Len hlásenie, nič sa nemení ani nezastavuje.
+' Každý riadok výsledku končí vbCrLf.
+'-------------------------------------------------------------------------------
+Private Function PrehladOvereniaZariadeni(ByRef r() As TRazenie, ByVal n As Long) As String
+    Dim neov As Object, zar As Object, i As Long, k As Variant
+    Dim nVsetkoNeov As Long, nZoz As Long, nZar As Long, strNeov As String, strZm As String
+
+    Set neov = CreateObject("Scripting.Dictionary")   ' osobné číslo -> počet neoverených razení
+    Set zar = CreateObject("Scripting.Dictionary")    ' osobné číslo -> "|id|id|" rôzne overené zariadenia
+    For i = 0 To n - 1
+        If Len(r(i).Chyba) = 0 Then
+            If r(i).Overenie = "unverified" Then
+                nVsetkoNeov = nVsetkoNeov + 1
+                If neov.Exists(r(i).Osc) Then
+                    neov(r(i).Osc) = neov(r(i).Osc) + 1
+                Else
+                    neov.Add r(i).Osc, 1
+                End If
+            ElseIf Len(r(i).DeviceID) > 0 Then
+                If zar.Exists(r(i).Osc) Then
+                    If InStr(1, zar(r(i).Osc), "|" & r(i).DeviceID & "|") = 0 Then zar(r(i).Osc) = zar(r(i).Osc) & r(i).DeviceID & "|"
+                Else
+                    zar.Add r(i).Osc, "|" & r(i).DeviceID & "|"
+                End If
+            End If
+        End If
+    Next i
+
+    If nVsetkoNeov = 0 Then
+        strNeov = "Overenie zariadení: všetky razenia sú z overených zariadení alebo ich potvrdil vedúci." & vbCrLf
+    Else
+        strNeov = "Overenie zariadení: " & nVsetkoNeov & " razení je z neschválených zariadení (príznak 'neoverené'), zamestnanci:" & vbCrLf
+        nZoz = 0
+        For Each k In neov.Keys
+            nZoz = nZoz + 1
+            If nZoz <= 10 Then strNeov = strNeov & "  " & k & ": " & neov(k) & vbCrLf
+        Next k
+        If neov.Count > 10 Then strNeov = strNeov & "  ... ďalších " & (neov.Count - 10) & " zamestnancov" & vbCrLf
+        strNeov = strNeov & "  Razenia sa počítajú, kým ich vedúci nepotvrdí v termináli (Môj tím > Zariadenia). Skontrolujte ich pred uzávierkou mesiaca." & vbCrLf
+    End If
+
+    nZoz = 0
+    For Each k In zar.Keys
+        nZar = UBound(Split(zar(k), "|")) - 1       ' "|a|b|" -> 2 zariadenia
+        If nZar > 1 Then
+            nZoz = nZoz + 1
+            If nZoz <= 10 Then strZm = strZm & "  " & k & ": " & nZar & " overené zariadenia" & vbCrLf
+        End If
+    Next k
+    If nZoz > 0 Then
+        strZm = "Zmena zariadenia: v súbore razili z viac než jedného overeného zariadenia (skontrolujte, či ide o zámernú výmenu):" & vbCrLf & strZm
+        If nZoz > 10 Then strZm = strZm & "  ... ďalších " & (nZoz - 10) & " zamestnancov" & vbCrLf
+    End If
+    PrehladOvereniaZariadeni = strNeov & strZm
+End Function
+
+'-------------------------------------------------------------------------------
+' ExterneID razení, ktoré sú vo fronte TerminalInbox označené "unverified" (ak stĺpec Overenie ešte nie je, vráti prázdny zoznam).
+'-------------------------------------------------------------------------------
+Private Function NacitajNeoverene(ByRef db As DAO.Database) As Object
+    Dim d As Object, rs As DAO.Recordset
+    Set d = CreateObject("Scripting.Dictionary")
+    On Error Resume Next
+    If mod_00_Common.PoleExistujeDB(db, "TerminalInbox", "Overenie") Then
+        Set rs = db.OpenRecordset("SELECT ExterneID FROM TerminalInbox WHERE Overenie = 'unverified';", dbOpenSnapshot)
+        If Not rs Is Nothing Then
+            Do While Not rs.EOF
+                d(CStr(rs!ExterneID)) = True
+                rs.MoveNext
+            Loop
+            rs.Close
+        End If
+    End If
+    Set NacitajNeoverene = d
+End Function
 
 Private Function CitajBajty(ByVal strCesta As String, ByRef b() As Byte) As Long
     Dim f As Integer, n As Long
@@ -513,6 +596,7 @@ Public Function ImportujSubor(ByVal strCesta As String, Optional ByVal bNanecist
     Dim kl() As String, ix() As Long, db As DAO.Database, mapa As Object, kodDic As Object, oscDic As Object
     Dim bObed As Boolean, nImp As Long, nDup As Long, nErrIn As Long, lID As Long, strZar As String, dtLok As Date
     Dim colNazvy As Variant, c As Variant, strZn As String
+    Dim unvDic As Object, nOverZm As Long
 
     Pis rep, "Import z terminála: " & strCesta & IIf(bNanecisto, "   [NANEČISTO - nič sa nezapíše]", "")
     If Len(Dir(strCesta)) = 0 Then
@@ -699,6 +783,8 @@ Public Function ImportujSubor(ByVal strCesta As String, Optional ByVal bNanecist
             kolko = kolko + 1
         End If
     Next k
+    ' overenie zariadení: razenia z neschválených zariadení a zamestnanci s viac než jedným overeným zariadením (len hlásenie)
+    rep = rep & PrehladOvereniaZariadeni(r, n)
     If bNanecisto Then
         Pis rep, "Prehľad (poradie: zamestnanec, deň, čas):"
         For k = 0 To n - 1
@@ -715,6 +801,9 @@ Public Function ImportujSubor(ByVal strCesta As String, Optional ByVal bNanecist
 
     ' --- zápis do TerminalInbox + spracovanie ---
     Set oscDic = CreateObject("Scripting.Dictionary")
+    ' razenia, ktoré sú v inboxe označené "unverified": ak ich vedúci medzitým potvrdil, pri opakovanom importe sa zmení iba príznak
+    Call mod_12_TerminalPriprava.ZabezpecTabulky(db)
+    Set unvDic = NacitajNeoverene(db)
     For i = 0 To n - 1
         If Len(r(i).Chyba) = 0 Then
             If Len(r(i).Zdroj) > 0 And r(i).Zdroj = "correction" Then
@@ -724,11 +813,16 @@ Public Function ImportujSubor(ByVal strCesta As String, Optional ByVal bNanecist
             Else
                 strZar = "terminal"
             End If
-            lID = mod_12_TerminalPriprava.PrijmiRazenie(r(i).ExterneID, NajdiOsobneCislo(r(i).Osc, oscDic), r(i).Lokalny, r(i).KodRazenia, strZar, r(i).Riadok)
+            lID = mod_12_TerminalPriprava.PrijmiRazenie(r(i).ExterneID, NajdiOsobneCislo(r(i).Osc, oscDic), r(i).Lokalny, r(i).KodRazenia, strZar, r(i).Riadok, r(i).Overenie, r(i).DeviceID)
             If lID > 0 Then
                 nImp = nImp + 1
             ElseIf lID = 0 Then
                 nDup = nDup + 1
+                If Len(r(i).Overenie) > 0 And r(i).Overenie <> "unverified" Then
+                    If unvDic.Exists(r(i).ExterneID) Then
+                        If mod_12_TerminalPriprava.AktualizujOverenie(r(i).ExterneID, r(i).Overenie) Then nOverZm = nOverZm + 1
+                    End If
+                End If
             Else
                 nErrIn = nErrIn + 1
             End If
@@ -739,6 +833,7 @@ Public Function ImportujSubor(ByVal strCesta As String, Optional ByVal bNanecist
         Call mod_00_Common.SetNastavenie("TerminalPoslednePunchId", CStr(lMaxId), "Najvyššie punch_id z posledného importu z terminála")
     End If
     Pis rep, "Do fronty TerminalInbox: nových " & nImp & ", už existujúcich (external_id) " & nDup
+    If nOverZm > 0 Then Pis rep, "Overenie zariadenia sa zmenilo pri " & nOverZm & " už importovaných razeniach (vedúci ich potvrdil v termináli). Razenie ani výpočet sa nemenia."
     Pis rep, mod_12_TerminalPriprava.SpracujInbox()
     ' zneplatnenia, ktoré čakali na toto razenie (súbor voids_*.csv sa mohol importovať skôr)
     strZn = SpracujZneplatnenia(False)

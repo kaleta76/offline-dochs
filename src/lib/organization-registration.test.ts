@@ -7,6 +7,6 @@ describe('organization registration', () => {
   });
   it('requires a private invitation to join an existing company', () => {
     expect(() => organizationSignupMetadata({ kind: 'employee', invite: '' })).toThrow();
-    expect(organizationSignupMetadata({ kind: 'employee', invite: 'a'.repeat(48) })).toEqual({ invite_code: 'a'.repeat(48) });
+    expect(organizationSignupMetadata({ kind: 'employee', invite: 'a'.repeat(48), number: '00123456' })).toEqual({ invite_code: 'a'.repeat(48), sap_id: '00123456' });
   });
 });

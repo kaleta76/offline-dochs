@@ -16,6 +16,8 @@ export const Route = createFileRoute("/")({
 });
 
 const GITHUB_URL = "https://github.com/kaleta76/offline-dochs";
+const ISSUES_URL = `${GITHUB_URL}/issues`;
+const PAYPAL_URL = "https://www.paypal.me/kaleta7";
 
 const F = [
   { icon: WifiOff, t: "Aj bez siete", d: "Záznam sa uloží v zariadení a odošle sa po pripojení." },
@@ -47,6 +49,19 @@ function Index() {
             GitHub <ExternalLink className="h-4 w-4" aria-hidden="true" />
             <span className="sr-only">(otvorí sa v novom okne)</span>
           </a>
+        </p>
+        <p className="mt-3 max-w-2xl text-sm text-secondary-foreground/70">
+          Projekt vzniká bez dotácie. Ak ho chcete podporiť, môžete poslať dar cez{" "}
+          <a href={PAYPAL_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-bold text-primary underline underline-offset-4">
+            PayPal <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only">(otvorí sa v novom okne)</span>
+          </a>
+          . Na sponzoring, spoluprácu alebo chyby napíšte cez{" "}
+          <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-bold text-primary underline underline-offset-4">
+            Issues na GitHube <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only">(otvorí sa v novom okne)</span>
+          </a>
+          . Zápis je verejný, neuvádzajte v ňom osobné údaje.
         </p>
       </div>
     </div>

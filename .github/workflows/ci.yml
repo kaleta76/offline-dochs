@@ -25,6 +25,8 @@ jobs:
         with: { python-version: "3.12" }
       - name: Overenie zlatého súboru exportu
         run: python3 -I contract/tools/verify_export.py contract/examples/punches_example.csv
+      - name: Testy overovača exportu
+        run: python3 -I contract/tools/test_verify_export.py
   no-secrets:
     runs-on: ubuntu-latest
     steps:

@@ -38,7 +38,7 @@ a schvaľuje ju vlastník repozitára (pozri `.github/CODEOWNERS`).
 
 ### Hash reťaz
 `record_hash = SHA-256( prev_hash | user_uuid | code | direction | client_time_utc(do sekundy, bez Z) | server_time_utc(do sekundy, bez Z) | external_id [| device_id] )`,
-`prev_hash` prvého záznamu používateľa je `GENESIS`. Vzorec je presná kópia databázového triggera `punches_chain`
+`prev_hash` úplne prvého záznamu používateľa je `GENESIS`. Reťaz ide podľa `punch_id`, ale súbor sa filtruje podľa času razenia, preto mesačný a prírastkový súbor obsahuje len jej časť: prvý záznam používateľa v súbore má `prev_hash` staršieho záznamu, ktorý v súbore nie je (nie je to chyba). Vzorec je presná kópia databázového triggera `punches_chain`
 (`drizzle/migrations/0003_device_verification.sql`) a bol overený proti PostgreSQL 16. Overenie: `tools/verify_export.py`.
 
 ## Pravidlá, ktoré musí dodržať Access pri importe (zhrnutie, detail v dokumente `docs/SPOLUPRACA.md`)

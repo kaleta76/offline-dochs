@@ -41,6 +41,8 @@ describe("zoznam zneplatnených razení pre Access – kontrakt v1.1", () => {
   it("pätička obsahuje počet riadkov a SHA-256 tela", async () => {
     const csv = readFileSync(goldenPath, "utf8");
     const at = csv.lastIndexOf("#END;");
-    expect(csv.slice(at)).toBe(`#END;rows=${input.length};sha256=${await sha256Hex(csv.slice(1, at))}\r\n`);
+    expect(csv.slice(at)).toBe(
+      `#END;rows=${input.length};sha256=${await sha256Hex(csv.slice(1, at))}\r\n`,
+    );
   });
 });

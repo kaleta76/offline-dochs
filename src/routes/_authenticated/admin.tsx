@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { loadMonth, MONTHS } from "@/lib/month";
 import { MonthPicker } from "@/components/MonthTable";
+import { AccessExport } from "@/components/AccessExport";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -98,6 +99,8 @@ function Admin() {
           <span className="text-xs text-muted-foreground">Hodiny podľa mzdových druhov za každého zamestnanca.</span>
         </div>
       </section>
+
+      <AccessExport />
 
       <section className={box}>
         <H>Zamestnanci</H>

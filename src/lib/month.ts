@@ -6,7 +6,8 @@ export interface DayRow extends DayResult {
   key: string;
   holiday: string | null;
   weekend: boolean;
-  punches: (PunchLike & { drift: number; source: string })[];
+  /** všetky razenia dňa vrátane zneplatnených (tie sa do výpočtu nezapočítavajú) */
+  punches: (PunchLike & { id: number; drift: number; source: string; voided: boolean; voidPending: boolean })[];
   future: boolean;
 }
 
@@ -17,7 +18,7 @@ export async function loadMonth(userId: string, year: number, month: number) {
   const from = new Date(year, month - 1, 1);
   const to = new Date(year, month, 1);
   const [punches, holidays, settings, profile, closure] = await Promise.all([
-    supabase.from("punches").select("code, direction, client_time, drift_minutes, source")
+    supabase.from("punches").select("id, code, direction, client_time, drift_minutes, source, voided_at")
       .eq("user_id", userId).gte("client_time", from.toISOString()).lt("client_time", to.toISOString()).order("client_time"),
     supabase.from("organization_holidays").select("day, name").gte("day", dayKey(from)).lt("day", dayKey(to)),
     supabase.rpc("calc_settings"),
@@ -27,6 +28,15 @@ export async function loadMonth(userId: string, year: number, month: number) {
   const err = punches.error ?? holidays.error ?? settings.error ?? profile.error;
   if (err) throw err;
   const s = settingsFromRows(settings.data ?? []);
+  // čakajúce žiadosti o zneplatnenie (razenie sa ešte počíta, ale v zozname je označené)
+  const pendingVoid = new Set<number>();
+  const punchIds = (punches.data ?? []).filter((p) => !p.voided_at).map((p) => p.id);
+  if (punchIds.length > 0) {
+    const { data: pend, error: pendError } = await supabase
+      .from("punch_void_requests").select("punch_id").eq("status", "pending").in("punch_id", punchIds);
+    if (pendError) throw pendError;
+    for (const r of pend ?? []) pendingVoid.add(r.punch_id);
+  }
   const fund = Number(profile.data?.daily_fund ?? s.fund);
   const hol = new Map((holidays.data ?? []).map((h) => [h.day, h.name]));
   const now = new Date();
@@ -36,11 +46,11 @@ export async function loadMonth(userId: string, year: number, month: number) {
     const key = dayKey(date);
     const ps = (punches.data ?? [])
       .filter((p) => dayKey(new Date(p.client_time)) === key)
-      .map((p) => ({ code: p.code, direction: p.direction as "IN" | "OUT", time: new Date(p.client_time), drift: p.drift_minutes, source: p.source }));
+      .map((p) => ({ id: p.id, code: p.code, direction: p.direction as "IN" | "OUT", time: new Date(p.client_time), drift: p.drift_minutes, source: p.source, voided: !!p.voided_at, voidPending: pendingVoid.has(p.id) }));
     const weekend = date.getDay() === 0 || date.getDay() === 6;
     const holiday = hol.get(key) ?? null;
     const future = date > now;
-    const r = computeDay({ punches: ps, fundHours: fund, isWorkday: !weekend && !holiday }, s);
+    const r = computeDay({ punches: ps.filter((p) => !p.voided), fundHours: fund, isWorkday: !weekend && !holiday }, s);
     days.push({ ...r, ...(future ? { balanceMin: 0, expectedMin: 0 } : {}), date, key, holiday, weekend, punches: ps, future });
   }
   const sum = (k: keyof DayResult) => days.reduce((a, d) => a + (d[k] as number), 0);
@@ -54,7 +64,7 @@ export async function loadMonth(userId: string, year: number, month: number) {
     totals: { work: sum("workMin"), credit: sum("creditMin"), total: sum("totalMin"), expected: sum("expectedMin"), balance: sum("balanceMin") },
     byCode,
     openDays: days.filter((d) => d.open && !d.future && d.key !== dayKey(now)).length,
-    driftCount: days.reduce((a, d) => a + d.punches.filter((p) => p.source === "terminal" && Math.abs(p.drift) > s.maxDrift).length, 0),
+    driftCount: days.reduce((a, d) => a + d.punches.filter((p) => !p.voided && p.source === "terminal" && Math.abs(p.drift) > s.maxDrift).length, 0),
   };
 }
 export type MonthData = Awaited<ReturnType<typeof loadMonth>>;

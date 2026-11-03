@@ -47,3 +47,29 @@ a schvaľuje ju vlastník repozitára (pozri `.github/CODEOWNERS`).
 * **Mesiac uzavretý v Accesse:** razenie sa nezahodí, ostane v `TerminalInbox` so stavom `UZAVRETY` a spracuje sa po otvorení mesiaca.
 * **Neoverené razenia** (`unverified`) sa importujú, ale Access ich označí na kontrolu; oprava/potvrdenie ide cez vedúceho v terminále.
 * **Prírastok:** Access si pamätá posledné `punch_id` a pri ďalšom importe žiada `punch_id > posledné − 500` (prekrytie); duplicity vyradí `external_id`.
+
+## Súbor `voids_YYYYMM.csv` (kontrakt 1.1, doplnok – formát `punches_*.csv` sa NEMENÍ)
+Zamestnanec môže požiadať o zneplatnenie razenia (napr. duplicitné razenie), vedúci alebo správca žiadosť schváli. Razenie sa v databáze **nemaže** a jeho
+hash reťaz sa nemení (`voided_at` nie je súčasťou `record_hash`). Preto zneplatnené razenie ostáva aj v `punches_*.csv` a Access ho dostane
+v **samostatnom zozname** za rovnaký mesiac (podľa času zneplatneného razenia, nie podľa času schválenia).
+* Formát súboru je rovnaký ako pri razeniach: UTF-8 s BOM, `;`, `CRLF`, hlavička, riadky podľa `punch_id`, pätička `#END;rows=N;sha256=...` (SHA-256 tela bez BOM).
+* Dôvod zneplatnenia sa **neexportuje** (voľný text môže obsahovať osobné údaje); ostáva v terminále v audite.
+
+| stĺpec | typ | význam |
+|---|---|---|
+| `contract_version` | číslo | vždy `1` (zmena 1.1 je spätne kompatibilná, nový je len tento súbor) |
+| `organization_id` | uuid | rovnaká organizácia ako v `punches_*.csv` |
+| `punch_id` | číslo | `punches.id` zneplatneného razenia |
+| `external_id` | uuid | `punches.client_uuid` – podľa neho Access nájde riadok v `DochadzkaImport.ExterneID` |
+| `personnel_number` | text | osobné číslo SAP |
+| `user_uuid` | uuid | pseudonymný účet |
+| `voided_at_utc` | text | kedy bolo zneplatnenie schválené, `RRRR-MM-DDTHH:MM:SSZ` |
+| `record_hash` | hex | hash zneplatneného razenia (Access ním overí, že ide o to isté razenie, ktoré importoval) |
+
+### Pravidlá pre Access
+* **Idempotencia:** zoznam sa môže importovať opakovane; už zneplatnené razenie sa preskočí.
+* **Poradie:** najprv `punches_*.csv`, potom `voids_*.csv` za ten istý mesiac. Ak `external_id` v Accesse ešte nie je, riadok sa nezahodí, ostane v čakaní a použije sa po importe razenia.
+* **Zneplatnenie = `Platnost = False`, `DovodNeplatnosti = 'ZNEPLATNENE_V_TERMINALI'`;** riadok sa nemaže, deň a sald sa prepočítajú.
+* **Nezhoda `record_hash`** (razenie s rovnakým `external_id` má iný hash) = chyba, nezneplatňuje sa, zapíše sa do protokolu.
+* **Uzavretý mesiac v Accesse:** zneplatnenie sa neaplikuje, ostáva v čakaní do otvorenia mesiaca (rovnako ako razenia).
+* Zlatý súbor: `examples/voids_example.csv`, test `tests/void-export.contract.test.ts`, referencia `reference/void-export.ts`.

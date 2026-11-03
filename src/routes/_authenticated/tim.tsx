@@ -49,6 +49,37 @@ function Team() {
     },
   });
 
+  const pendingVoids = useQuery({
+    queryKey: ["pending-voids", uid],
+    enabled: !!uid,
+    queryFn: async () => {
+      if (!uid) throw new Error("Prihlásenie je potrebné.");
+      const { data, error } = await supabase
+        .from("punch_void_requests")
+        .select("*")
+        .eq("status", "pending")
+        .neq("user_id", isAdmin ? "00000000-0000-0000-0000-000000000000" : uid)
+        .order("created_at");
+      if (error) throw error;
+      const rows = data ?? [];
+      const punchIds = rows.map((r) => r.punch_id);
+      const userIds = [...new Set(rows.map((r) => r.user_id))];
+      const { data: pun } = punchIds.length ? await supabase.from("punches").select("id, code, direction, client_time").in("id", punchIds) : { data: [] };
+      const { data: ps } = userIds.length ? await supabase.from("profiles").select("id, sap_id").in("id", userIds) : { data: [] };
+      const punchById = new Map((pun ?? []).map((x) => [x.id, x]));
+      const names = new Map((ps ?? []).map((x) => [x.id, personnelLabel(x)]));
+      return rows.map((r) => ({ ...r, punch: punchById.get(r.punch_id) ?? null, name: names.get(r.user_id) ?? "?" }));
+    },
+  });
+  const decideVoid = useMutation({
+    mutationFn: async ({ id, ok }: { id: string; ok: boolean }) => {
+      const { error } = await supabase.rpc("decide_punch_void", { _id: id, _approve: ok });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries(),
+    onError: (e: Error) => alert(e.message),
+  });
+
   const decide = useMutation({
     mutationFn: async ({ id, ok }: { id: string; ok: boolean }) => {
       const { error } = await supabase.rpc("decide_correction", { _id: id, _approve: ok });
@@ -88,6 +119,26 @@ function Team() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-sm font-bold uppercase tracking-widest">Žiadosti o zneplatnenie razenia</h2>
+        {(pendingVoids.data ?? []).length === 0 && <p className="text-sm text-muted-foreground">Žiadne čakajúce žiadosti.</p>}
+        <ul className="space-y-2">
+          {(pendingVoids.data ?? []).map((v) => (
+            <li key={v.id} className="flex flex-wrap items-center gap-3 rounded-sm border-2 border-foreground bg-card px-3 py-2 text-sm">
+              <span className="font-bold">{v.name}</span>
+              <span>
+                {v.punch ? labelOf(v.punch.code, v.punch.direction) : "razenie"} ·{" "}
+                <span className="num">{v.punch ? new Date(v.punch.client_time).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : ""}</span>
+              </span>
+              <span className="flex-1 text-muted-foreground">„{v.reason}“</span>
+              <Button size="sm" onClick={() => decideVoid.mutate({ id: v.id, ok: true })}>Zneplatniť razenie</Button>
+              <Button size="sm" variant="outline" onClick={() => decideVoid.mutate({ id: v.id, ok: false })}>Zamietnuť</Button>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-xs text-muted-foreground">Zneplatnené razenie ostáva v zázname (nemaže sa), ale nepočíta sa do dochádzky a do Accessu ide v zozname zneplatnených razení.</p>
       </section>
 
       {uid && <DevicesPanel uid={uid} />}

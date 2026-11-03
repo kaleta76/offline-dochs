@@ -2,7 +2,25 @@ import { AlertTriangle } from "lucide-react";
 import { fmtMin } from "@/lib/engine";
 import { hm, labelOf, WEEKDAYS, type MonthData } from "@/lib/month";
 
-export function MonthTable({ data, compact = false }: { data: MonthData; compact?: boolean }) {
+export interface VoidTarget {
+  id: number;
+  label: string;
+  time: string;
+}
+
+/**
+ * Mesačná tabuľka. S `onVoid` sa pri každom razení ukáže odkaz „zneplatniť“ (žiadosť o zneplatnenie, napr. pri duplicite).
+ * Zneplatnené razenia sú preškrtnuté a do výpočtu sa nezapočítavajú.
+ */
+export function MonthTable({
+  data,
+  compact = false,
+  onVoid,
+}: {
+  data: MonthData;
+  compact?: boolean;
+  onVoid?: (target: VoidTarget) => void;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
@@ -27,7 +45,11 @@ export function MonthTable({ data, compact = false }: { data: MonthData; compact
                 <td className="py-1.5 pr-2">
                   {d.holiday && <span className="mr-2 text-xs font-semibold">{d.holiday}</span>}
                   {d.punches.map((p, i) => (
-                    <span key={i} className="mr-2 whitespace-nowrap text-xs">
+                    <span
+                      key={i}
+                      className={`mr-2 whitespace-nowrap text-xs ${p.voided ? "text-muted-foreground line-through" : ""}`}
+                      title={p.voided ? "Razenie je zneplatnené a nepočíta sa" : undefined}
+                    >
                       {labelOf(p.code, p.direction)} <span className="num">{hm(p.time)}</span>
                       {!compact && p.source === "terminal" && Math.abs(p.drift) > data.maxDrift && (
                         <span title={`Odoslané o ${p.drift} min neskôr (offline)`} className="ml-0.5 inline-flex text-warning-foreground">
@@ -35,6 +57,17 @@ export function MonthTable({ data, compact = false }: { data: MonthData; compact
                         </span>
                       )}
                       {p.source === "correction" && <sup className="ml-0.5 font-bold text-primary">K</sup>}
+                      {p.voidPending && <span className="ml-1 font-semibold text-warning-foreground">(čaká na zneplatnenie)</span>}
+                      {onVoid && !p.voided && !p.voidPending && !data.closedAt && (
+                        <button
+                          type="button"
+                          className="ml-1 rounded-sm border border-border px-1 text-[10px] text-muted-foreground hover:border-foreground hover:text-foreground"
+                          aria-label={`Požiadať o zneplatnenie: ${labelOf(p.code, p.direction)} ${hm(p.time)}`}
+                          onClick={() => onVoid({ id: p.id, label: labelOf(p.code, p.direction), time: hm(p.time) })}
+                        >
+                          zneplatniť
+                        </button>
+                      )}
                     </span>
                   ))}
                   {d.open && !d.future && <span className="text-xs font-bold text-destructive">chýba odchod</span>}

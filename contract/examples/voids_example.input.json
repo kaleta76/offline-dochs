@@ -1,0 +1,20 @@
+[
+  {
+    "id": 104,
+    "organization_id": "0b6f2f0e-5a7e-4b8e-9a43-2c1d5e7a9f01",
+    "client_uuid": "a0000000-0000-4000-8000-000000000104",
+    "sap_id": "00123456",
+    "user_id": "6d1c3b84-1111-4a2e-8c11-aaaaaaaaaaa1",
+    "voided_at": "2026-11-03T08:12:45.311+00:00",
+    "record_hash": "14a3dca01ad5fc70c91e8b4e40d770f389b7fbdbec9be3e0dede2535af82164a"
+  },
+  {
+    "id": 108,
+    "organization_id": "0b6f2f0e-5a7e-4b8e-9a43-2c1d5e7a9f01",
+    "client_uuid": "a0000000-0000-4000-8000-000000000108",
+    "sap_id": "1234567",
+    "user_id": "6d1c3b84-2222-4a2e-8c11-bbbbbbbbbbb2",
+    "voided_at": "2026-11-03T08:14:10.002+00:00",
+    "record_hash": "424ecb1f081f7f1549499b4b03893e02564c72cf016cb68fcef08ae212af3a25"
+  }
+]

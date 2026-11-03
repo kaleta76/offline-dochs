@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { loadMonth, labelOf } from "@/lib/month";
 import { MonthPicker, MonthTable } from "@/components/MonthTable";
+import { useVoidRequest } from "@/components/VoidRequest";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +44,9 @@ function MyMonth() {
     onError: (e: Error) => setMsg(e.message.includes("row-level") ? "Mesiac je uzavretý." : e.message),
   });
 
+  // žiadosť o zneplatnenie razenia (napr. duplicitné razenie); rozhodne vedúci alebo správca
+  const voidRequest = useVoidRequest();
+
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
       <section>
@@ -53,7 +57,8 @@ function MyMonth() {
         {month.data?.closedAt && <p className="mb-3 rounded-sm bg-muted px-3 py-2 text-sm font-semibold">Mesiac je uzavretý manažérom.</p>}
         {month.isLoading && <p className="text-muted-foreground">Načítavam…</p>}
         {month.error && <p className="text-destructive">Nepodarilo sa načítať (ste offline?).</p>}
-        {month.data && <MonthTable data={month.data} />}
+        {voidRequest.panel}
+        {month.data && <MonthTable data={month.data} onVoid={voidRequest.open} />}
       </section>
       <aside className="space-y-6">
         <form

@@ -1,5 +1,20 @@
 # Dochádzka – zmeny
 
+## Balík 2.11.1
+Overenie zariadení z terminála: Access príznak ukladá a hlási pri importe.
+- **Súvislosť**: terminál označuje razenia z neschválených zariadení (`device_verification = unverified`). Kontrakt hovorí, že Access ich má označiť na kontrolu,
+  importér však príznak načítal a zahodil. Teraz sa ukladá a hlási. Razenia sa počítajú ako doteraz, import sa pre ne nezastavuje.
+- **`mod_12_TerminalPriprava` 1.2.0**: tabuľka `TerminalInbox` dostane stĺpce `Overenie` (verified / unverified / confirmed) a `ZariadenieID` (celé ID zariadenia);
+  doplnia sa samy v existujúcej databáze (jeden pokus za reláciu, pri neúspechu sa razenia prijímajú aj bez príznaku a zapíše sa varovanie do logu).
+  `PrijmiRazenie` má dva nepovinné parametre navyše (staré volania fungujú). Nová `AktualizujOverenie` zmení iba príznak už prijatého razenia.
+- **`mod_19_TerminalImport` 1.3.0**: report importu (aj nanečisto) uvádza počet a zamestnancov s razeniami z neschválených zariadení a zamestnancov, ktorí razili
+  z viac než jedného overeného zariadenia v súbore (možná výmena zariadenia). Ak vedúci neoverené razenie medzitým potvrdil v termináli, pri opakovanom importe tej istej
+  dávky sa zmení iba príznak (razenie sa nevkladá znova). Nič sa nemaže ani neprepočítava.
+- **Test**: `testy/terminal/mesiac-2026-10/` doplnený o `overenie_test_2026-10.csv`, `overenie_test_potvrdene_2026-10.csv`, `make_overenie.py` a postup E v `POSTUP.txt`.
+  Súbory prešli kontraktovým overovačom (`verify_export.py`).
+- **Čo to nerobí**: neoverené razenie sa v editore dňa nijako nefarbí a nezablokuje uzávierku mesiaca. Hlásenie je v reporte importu a údaj je v tabuľke `TerminalInbox`.
+- **Neoverené v skutočnom Accesse**: celý nový kód (kontrola párovania blokov a odkazov medzi modulmi; spustené nebolo). Pri chybe pošlite text chyby s názvom procedúry.
+
 ## Balík 2.11.0
 Zneplatnené razenia z terminála (kontrakt 1.1, súbor `voids_RRRRMM.csv`).
 - **Súvislosť**: zamestnanec (alebo vedúci / správca vo výkaze) môže v terminále požiadať o zneplatnenie razenia, napr. duplicity; vedúci alebo správca ju

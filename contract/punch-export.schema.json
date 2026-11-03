@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kaleta76/offline-dochs/contract/punch-export.schema.json",
+  "title": "Razenie z terminálu – jeden riadok exportu (kontrakt v1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "organization_id",
+    "punch_id",
+    "external_id",
+    "personnel_number",
+    "code",
+    "direction",
+    "client_time_local",
+    "client_time_utc",
+    "server_time_utc",
+    "drift_minutes",
+    "source",
+    "device_verification",
+    "device_id",
+    "user_uuid",
+    "prev_hash",
+    "record_hash"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": 1
+    },
+    "organization_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "punch_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "external_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "personnel_number": {
+      "type": "string",
+      "pattern": "^[0-9]{7,8}$"
+    },
+    "code": {
+      "enum": [
+        "WORK",
+        "TRIP",
+        "DOCTOR",
+        "FAMILY",
+        "LEAVE",
+        "SICK",
+        "PRIV"
+      ]
+    },
+    "direction": {
+      "enum": [
+        "IN",
+        "OUT"
+      ]
+    },
+    "client_time_local": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"
+    },
+    "client_time_utc": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "server_time_utc": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "drift_minutes": {
+      "type": "integer"
+    },
+    "source": {
+      "enum": [
+        "terminal",
+        "correction"
+      ]
+    },
+    "device_verification": {
+      "enum": [
+        "verified",
+        "unverified",
+        "confirmed"
+      ]
+    },
+    "device_id": {
+      "type": "string",
+      "pattern": "^$|^[0-9a-f-]{36}$"
+    },
+    "user_uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "prev_hash": {
+      "type": "string",
+      "pattern": "^GENESIS$|^[0-9a-f]{64}$"
+    },
+    "record_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

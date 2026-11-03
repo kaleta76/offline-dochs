@@ -22,3 +22,18 @@
 - Synchronization is scoped to the authenticated owner and deletes local punches only after reading back the exact accepted payload; durable IndexedDB writes resolve on transaction completion — prevents data loss on retries and account switches.
 - Cache profile data by user ID and restore after hydration; cached roles are display hints only, with database RLS authoritative — prevents shared-device leakage.
 - Device verification is decided only by the punches_chain trigger, which hashes the raw device key server-side and discards it; device state changes go through security-definer RPCs that write audit_log — clients can never mark their own punches verified.
+
+## Integrácia s dochádzkovým systémom (Access) – pravidlá pre agenta
+
+Terminál odovzdáva razenia lokálnemu dochádzkovému systému. Rozhranie je definované v `contract/` a **nemení sa bez výslovného pokynu vlastníka**. Dokumentácia: `docs/SPOLUPRACA.md`.
+
+1. Pred prácou na exporte, tabuľke `punches`, tabuľke `profiles` alebo mapovaní osobných čísel si prečítaj `contract/README.md` a `docs/SPOLUPRACA.md`.
+2. `contract/` nemeň (ani zlatý súbor), pokiaľ úloha výslovne nehovorí o zmene kontraktu. Ak ho zmena schémy rozbije, **zastav sa a napíš, čo sa rozbije**, neprepisuj test, aby prešiel.
+3. Referenčná implementácia exportu je `contract/reference/punch-export.ts`. Keď sa export zavedie do aplikácie, ide o jej kópiu v `src/lib/punch-export.ts`. Kontraktový test `contract/tests/punch-export.contract.test.ts` musí prechádzať.
+4. Vzorec hash reťaze v `punches_chain` nemeň. Ak je zmena nevyhnutná, ide o novú hlavnú verziu kontraktu.
+5. Cieľový stav (zatiaľ neimplementované, nemeň to bez pokynu): razenie je fakt a terminál ho **vždy prijme**, uzavretie mesiaca rieši lokálny dochádzkový systém. Kým to vlastník výslovne nezadá, platí súčasné správanie (`month_closures`).
+6. Do exportov, logov ani obrazoviek nedávaj mená ani e-maily. Zamestnanec je identifikovaný len osobným číslom SAP.
+7. Nové migrácie opíš v PR: čo mení v `punches`/`profiles` a či to ovplyvní export.
+8. Ak úloha mení export, `punches` alebo `profiles`, spusti `bun run lint`, `bun run test`, `bun run build` a napíš, čo si nemohol overiť.
+9. História sa neprepisuje (žiadny force-push, žiadny rebase publikovaných commitov).
+10. Rob len to, čo úloha žiada. Každý zásah do nesúvisiacich súborov stojí vlastníka kredity.

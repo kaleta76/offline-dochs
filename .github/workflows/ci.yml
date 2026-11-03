@@ -1,0 +1,51 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run test          # vrátane contract/tests (pozri vitest.config.ts)
+      - run: bun run build
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Overenie zlatého súboru exportu
+        run: python3 -I contract/tools/verify_export.py contract/examples/punches_example.csv
+  no-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Kontrola súborov .env (smú obsahovať len verejné hodnoty)
+        run: |
+          python3 -I - <<'PY'
+          import base64, json, re, subprocess, sys
+          bad = False
+          for f in subprocess.check_output(["git", "ls-files"], text=True).splitlines():
+              if not re.search(r"(^|/)\.env(\.|$)", f) or f.endswith(".example"):
+                  continue
+              txt = open(f, encoding="utf-8").read()
+              for m in re.finditer(r"eyJ[\w-]+\.([\w-]+)\.[\w-]+", txt):
+                  pad = m.group(1) + "=" * (-len(m.group(1)) % 4)
+                  role = json.loads(base64.urlsafe_b64decode(pad)).get("role")
+                  if role != "anon":
+                      print(f"CHYBA: {f} obsahuje JWT s rolou {role}"); bad = True
+              for line in txt.splitlines():
+                  key = line.split("=", 1)[0].strip()
+                  if key and not key.startswith("#") and not re.fullmatch(r"(VITE_)?SUPABASE_(URL|PUBLISHABLE_KEY|PROJECT_ID)", key):
+                      print(f"CHYBA: {f} obsahuje neočakávaný kľúč {key}"); bad = True
+              print(f"POZNÁMKA: {f} je v gite (obsahuje len verejné hodnoty). Odporúča sa ho z gitu odstrániť, ale najprv overte, že to Lovable znesie.")
+          sys.exit(1 if bad else 0)
+          PY
+      - name: Hľadanie tajných hodnôt v kóde
+        run: |
+          if git grep -nE 'service_role|BEGIN (RSA |EC )?PRIVATE KEY' -- . ':!drizzle' ':!contract' ':!docs' ':!prompts' ':!.github' ':!src/integrations' ':!.lovable'; then echo "Podozrivá tajná hodnota"; exit 1; fi

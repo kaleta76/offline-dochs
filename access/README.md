@@ -22,6 +22,10 @@ Prehľad celého projektu je v [koreňovom README](../README.md).
 
 Nový ZIP balíka (pre ďalší počítač) vytvoríte v priečinku `access/` príkazom `python tools/zostav_balik.py --zip`.
 
+## Vydania (GitHub Releases)
+Hotový ZIP inštalátora so súborom `SHA256SUMS.txt` nájdete v sekcii **Releases** repozitára. Vydanie pripravuje vlastník jedným kliknutím (workflow *Vydanie balíka Access (koncept)*),
+postup, overenie stiahnutia a voliteľné priloženie hotovej databázy `.accdb` sú v [`../docs/VYDANIA-ACCESS.md`](../docs/VYDANIA-ACCESS.md). Databáza sa do vydania nepridáva automaticky, vytvorí ju inštalátor na vašom počítači.
+
 ## Čo tu zámerne nie je
 Modul komunikácie so snímačmi SKE cez sériový port sa vo verejnom repozitári zatiaľ nezverejňuje (rozhodnutie vlastníka). `manifest.json` ho preto neobsahuje a **inštalátor ho nijako neodstraňuje**
 z databázy, v ktorej už je. Ostatné moduly ho nepotrebujú. Súbor `moduly/mod_07_SKE.bas` je v `.gitignore` tohto priečinka, aby sa pri kopírovaní nového balíka sem omylom nepridal.

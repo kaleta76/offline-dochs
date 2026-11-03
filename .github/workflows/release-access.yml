@@ -1,0 +1,79 @@
+name: Vydanie balíka Access (koncept)
+
+# Spúšťa sa iba ručne: Actions > "Vydanie balíka Access (koncept)" > Run workflow (vetva main).
+# Vytvorí KONCEPT vydania (draft) s ZIP-om inštalátora a súborom SHA256SUMS.txt. Nič nezverejní:
+# koncept si skontrolujete na GitHube v sekcii Releases a zverejníte ho sami tlačidlom Publish release.
+# Databázu .accdb workflow nevytvára (inštalátor potrebuje Windows a Microsoft Access); ak ju chcete priložiť, postup je v docs/VYDANIA-ACCESS.md.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-access
+  cancel-in-progress: false
+
+jobs:
+  koncept:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Overenie balíka (kontrolné súčty, zakázané súbory, verzie)
+        run: |
+          python3 -I tools/test_over_access_balik.py
+          python3 -I tools/over_access_balik.py
+
+      - name: Verzia a názov vydania
+        id: v
+        run: |
+          VER="$(python3 -I tools/over_access_balik.py --verzia)"
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          echo "tag=access-v$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Zastavenie, ak vydanie alebo značka už existuje
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          if gh release list --limit 200 --json tagName --jq '.[].tagName' | grep -Fxq "$TAG"; then
+            echo "::error::Vydanie $TAG už existuje (aj koncept). Zvýšte verziu balíka alebo vydanie najprv zmažte na GitHube."; exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::Značka $TAG už existuje. Zvýšte verziu balíka."; exit 1
+          fi
+
+      - name: ZIP inštalátora a kontrolné súčty
+        env:
+          VER: ${{ steps.v.outputs.ver }}
+        run: |
+          mkdir -p dist
+          # Obsah priečinka access/ presne tak, ako je v repozitári (access/.gitattributes: bez konverzie koncov riadkov, inštalátor overuje SHA-256 modulov po bajtoch).
+          git archive --format=zip --prefix=Dochadzka-Instalator/ -o "dist/Dochadzka-Instalator-$VER.zip" HEAD:access
+          # Rozbalený ZIP musí prejsť tou istou kontrolou ako zdrojový priečinok.
+          mkdir dist/rozbalene
+          python3 -I -m zipfile -e "dist/Dochadzka-Instalator-$VER.zip" dist/rozbalene
+          python3 -I tools/over_access_balik.py --koren dist/rozbalene/Dochadzka-Instalator
+          rm -rf dist/rozbalene
+          (cd dist && sha256sum "Dochadzka-Instalator-$VER.zip" > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          python3 -I tools/over_access_balik.py --poznamky dist/poznamky.md
+
+      - name: Vytvorenie konceptu vydania
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VER: ${{ steps.v.outputs.ver }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --draft \
+            --target "$GITHUB_SHA" \
+            --title "Dochádzkový systém (Access) $VER" \
+            --notes-file dist/poznamky.md \
+            "dist/Dochadzka-Instalator-$VER.zip" \
+            dist/SHA256SUMS.txt
+          echo "### Koncept vydania $TAG je pripravený" >> "$GITHUB_STEP_SUMMARY"
+          echo "Otvorte repozitár > Releases, skontrolujte text a prílohy a zverejnite ho tlačidlom **Publish release**." >> "$GITHUB_STEP_SUMMARY"

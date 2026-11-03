@@ -8,6 +8,7 @@ import { loadMonth, MONTHS } from "@/lib/month";
 import { MonthPicker } from "@/components/MonthTable";
 import { AccessExport } from "@/components/AccessExport";
 import { EmployeeAccess } from "@/components/EmployeeAccess";
+import { TestImport } from "@/components/TestImport";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -102,6 +103,8 @@ function Admin() {
       </section>
 
       <AccessExport />
+
+      <TestImport />
 
       <EmployeeAccess />
 

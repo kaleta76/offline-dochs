@@ -6,10 +6,15 @@ import { computeDay, settingsFromRows, type PunchLike } from "../../src/lib/engi
 import { buildBalanceCsv, type BalanceDay } from "../../src/lib/test-import";
 
 const [popisPath, outPath, yearArg, monthArg] = process.argv.slice(2);
-if (!popisPath || !outPath || !yearArg || !monthArg) throw new Error("Použitie: referencne_saldo.ts popis.json vystup.csv RRRR MM");
+if (!popisPath || !outPath || !yearArg || !monthArg)
+  throw new Error("Použitie: referencne_saldo.ts popis.json vystup.csv RRRR MM");
 const year = Number(yearArg);
 const month = Number(monthArg);
-const scen = JSON.parse(readFileSync(popisPath, "utf8")) as { osc: string; den: string; razenia: [string, string, string][] }[];
+const scen = JSON.parse(readFileSync(popisPath, "utf8")) as {
+  osc: string;
+  den: string;
+  razenia: [string, string, string][];
+}[];
 const s = settingsFromRows([]);
 const HOLIDAYS = new Set<string>(); // v októbri 2026 nie je štátny sviatok
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -32,9 +37,18 @@ for (const osc of persons) {
     const holiday = HOLIDAYS.has(key);
     const r = computeDay({ punches, fundHours: s.fund, isWorkday: !weekend && !holiday }, s);
     days.push({
-      sap: osc, key, weekend, holiday,
-      expectedMin: r.expectedMin, totalMin: r.totalMin, balanceMin: r.balanceMin,
-      workMin: r.workMin, creditMin: r.creditMin, breakMin: r.breakMin, open: r.open, byCode: r.byCode,
+      sap: osc,
+      key,
+      weekend,
+      holiday,
+      expectedMin: r.expectedMin,
+      totalMin: r.totalMin,
+      balanceMin: r.balanceMin,
+      workMin: r.workMin,
+      creditMin: r.creditMin,
+      breakMin: r.breakMin,
+      open: r.open,
+      byCode: r.byCode,
     });
   }
 }

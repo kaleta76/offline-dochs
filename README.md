@@ -107,3 +107,10 @@ Projekt je **prototyp v testovacej prevádzke**. Súčasti, ktoré som neoveril 
 
 Repozitár je **verejný**. Nepatria doň mená zamestnancov, e-maily, heslá, tajné serverové kľúče ani databázy `.accdb`. Súbor `.env` obsahuje len verejné hodnoty (adresa a verejný kľúč backendu);
 CI to kontroluje. Testovacie údaje (osobné čísla 9000001 až 9000099) sú vymyslené.
+
+## Podpora a kontakt
+
+Projekt vzniká bez dotácie a vo voľnom čase. Ak ho chcete podporiť, môžete poslať dar cez [PayPal](https://www.paypal.me/kaleta7) (tlačidlo **Sponsor** v hornej časti repozitára vedie na ten istý odkaz).
+Dar nezakladá nárok na funkcie, podporu ani záruku. Aplikácia je prototyp v testovacej prevádzke.
+
+Na sponzoring, spoluprácu, nápady alebo chyby napíšte cez [Issues](https://github.com/kaleta76/offline-dochs/issues). Zápis je verejný, preto v ňom neuvádzajte osobné údaje, skutočné osobné čísla ani prístupové údaje.

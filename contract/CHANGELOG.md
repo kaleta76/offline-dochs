@@ -23,6 +23,6 @@
   Nadmnožina schémy 1 (všetky kľúče ostávajú). Zamestnanec je len osobné číslo.
 * Schéma `config-export.schema.json`, zlatý súbor `examples/config_example.json` (+ vymyslený vstup `config_example.input.json`), referenčný výpočet plánu
   `tools/build_config_example.py`, overovač `tools/verify_config.py` a testy `tools/test_verify_config.py`.
-* Access: balík 2.12.0 (`mod_20_KonfiguraciaExport`). Terminál zatiaľ konfiguráciu neprijíma; návrh je v `docs/KONFIGURACIA-Z-ACCESSU.md` a `prompts/06-konfiguracia-z-accessu.md`.
+* Access: balík 2.12.0 (`mod_20_KonfiguraciaExport`). Terminál zatiaľ konfiguráciu neprijíma; návrh a zadanie pre aplikačnú časť sú v `docs/KONFIGURACIA-Z-ACCESSU.md`.
 * Schválenie vlastníkom repozitára je potrebné (zmena `contract/`).
 

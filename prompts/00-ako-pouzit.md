@@ -10,4 +10,3 @@ Prompty sú určené pre Lovable agenta (vkladáte ich do chatu projektu v Lovab
 | 03 | `03-bezpecnost.md` | `.env`, registrácia organizácií, voliteľný e-mail | možno (nastavenie Auth) |
 | 04 | `04-integracny-rezim.md` | Vypnutie uzávierky v terminále, popisky „orientačné“ | áno (jedno nastavenie) |
 | 05 | `05-https-pull-volitelne.md` | Voliteľne: čítací endpoint s tokenom | áno (tabuľka tokenov) |
-| 06 | `06-konfiguracia-z-accessu.md` | Prijatie konfigurácie a výpočtového plánu z Accessu, výpočet podľa nej | áno (plán, verzie konfigurácie) |

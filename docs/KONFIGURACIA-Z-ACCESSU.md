@@ -2,7 +2,7 @@
 
 Otázka vlastníka (4. 11. 2026): *prerušenia, ich parametre a všetko potrebné pre výpočet by sa malo dať exportovať z Accessu; je na to pripravený dátový model?*
 
-**Odpoveď: nebol.** Tento dokument opisuje, čo chýbalo, čo sa pripravilo (kontrakt 1.2.0, balík Access 2.12.0, zadanie pre agenta v Lovable),
+**Odpoveď: nebol.** Tento dokument opisuje, čo chýbalo, čo sa pripravilo (kontrakt 1.2.0, balík Access 2.12.0, zadanie pre aplikačnú časť),
 aké rozdiely vo výpočte treba rozhodnúť a v akom poradí to nasadiť. Je to **príprava**: terminál konfiguráciu zatiaľ neprijíma.
 
 Zistenia pochádzajú **z čítania kódu** (Access: `mod_08`, `mod_12`, `mod_16`, `mod_17`, `mod_15`; terminál: `src/lib/engine.ts`). Nič z toho nebolo spustené v živom Accesse.
@@ -70,8 +70,9 @@ Niektoré kódy v mapovaní sú v Accesse označené „overiť“ (`FAMILY` →
   44 testov, krok v CI. Zmenu kontraktu schvaľuje vlastník repozitára.
 * **Access 2.12.0** (`access/`): modul `mod_20_KonfiguraciaExport`, tlačidlá „Vytvoriť verziu konfigurácie prerušení pre terminál“ a „Exportovať konfiguráciu a testovacie dáta (JSON)“ zapisujú nový súbor (popisy tlačidiel sa nemenia). Výpočet dňa sa nemení.
   *Neoverené v skutočnom Accesse.*
-* **Zadanie pre agenta v Lovable** (`prompts/06-konfiguracia-z-accessu.md`): prijatie a uloženie konfigurácie, výpočet podľa nej, zobrazenie stavu plánu. Schému databázy tu
-  **zámerne nezverejňujeme podrobne**: prompt opisuje, čo terminál musí vedieť a zaručiť, a návrh tabuliek a politík vypracuje agent v `drizzle/`.
+* **Zadanie pre aplikačnú časť** (kapitola 9): prijatie konfigurácie, výpočet podľa nej, zobrazenie stavu plánu. Implementuje ho Claude v samostatnom PR, agent Lovable sa na tom nepodieľa.
+* **Databázová časť** je súkromný SQL balík (kontrola pred, migrácia, kontrola po, návrat, postup), ktorý spúšťa vlastník ručne v SQL editore. Nie je v repozitári, lebo schému databázy
+  zámerne nezverejňujeme podrobne. Ostatné kapitoly opisujú, čo terminál musí vedieť a zaručiť, nie ako sú tabuľky navrhnuté.
 
 ## 6. Postup nasadenia
 
@@ -80,7 +81,7 @@ Niektoré kódy v mapovaní sú v Accesse označené „overiť“ (`FAMILY` →
 3. Skontrolovať súbor: `python3 -I contract/tools/verify_config.py dochs_config.json` (kontroluje typy dní voči kalendáru, sviatky, počty, odkazy a že v súbore nie sú osobné údaje).
    Súbor neposielať ďalej, kým overovač nehlási „V poriadku“.
 4. Potvrdiť riadky `terminal_code_map` (rozhodnutie o `FAMILY`, `PRIV`).
-5. Vložiť prompt 06 agentovi v Lovable a po jeho dokončení **importovať súbor v termináli** (správca organizácie).
+5. Vlastník spustí súkromný SQL balík databázovej časti (kontrola pred, migrácia, kontrola po). Potom Claude pripraví PR s kódom aplikácie (kapitola 9). Po jeho zlúčení a Publish **importujte súbor v termináli** (správca organizácie).
 6. **Test zhody**: scenár október 2026 (`docs/TESTOVANIE-S-ACCESSOM.md`) s importovanou konfiguráciou. Terminál a Access majú vyjsť rovnako v `fond_min` aj `saldo_min`;
    rozdiely sa riešia podľa tabuľky v kapitole 3.
 7. Až potom ostrá prevádzka. Do uzavretia mesiaca v Accesse ostáva saldo v termináli **orientačné**.
@@ -91,9 +92,42 @@ Niektoré kódy v mapovaní sú v Accesse označené „overiť“ (`FAMILY` →
 * Hodnoty pre skutočné údaje (počet zamestnancov, veľkosť súboru, čas exportu). Odhad: 100 zamestnancov a 3 mesiace sú desiatky kilobajtov.
 * Že `calc` vystihuje všetky prípady v skutočných údajoch (napr. prerušenie, ktoré sa v Accesse počíta inak než v `mod_08.TrvanieIntervalu`).
 * Správanie terminálu: import a výpočet podľa konfigurácie ešte nie sú napísané.
+* Databázová časť (súkromný balík) je otestovaná len v lokálnom PostgreSQL s napodobeninou Supabase. V skutočnom Lovable Cloud sa zatiaľ nespúšťala.
 
 ## 8. Ďalšie kroky (nie sú súčasťou tejto prípravy)
 
 * Referenčný výpočet dňa v TypeScripte podľa `mod_08.SpracujDen` s overením proti skutočným výstupom Accessu (zlatý súbor z reálneho mesiaca).
 * Automatický prenos konfigurácie (HTTPS, prompt 05) po mesiaci bezproblémového súborového prenosu.
 * Zobrazenie upozornení z pravidiel prerušení v termináli.
+* PR s aplikačnou časťou (kapitola 9): až keď vlastník schváli kontrakt 1.2.0, spustí databázovú časť a overí prvý súbor z Accessu 2.12.0.
+
+## 9. Zadanie pre aplikačnú časť
+
+Pripraví Claude v samostatnom PR (nie agent Lovable), až keď vlastník schváli kontrakt 1.2.0, spustí databázovú časť (kapitola 5) a overí prvý súbor `dochs_config.json` z Accessu 2.12.0.
+Platia `AGENTS.md` (sekcia o integrácii s Accessom) a `docs/SPOLUPRACA.md`. Návrh tabuliek tu nie je, je súčasťou súkromného SQL balíka.
+
+**Čo má terminál vedieť** (bez osobných údajov, zamestnanec je len osobné číslo):
+* verziu konfigurácie organizácie (`config_version`) a jej obsah; vždy platí **najnovšia prijatá verzia**, staršia sa neprijme;
+* číselník prerušení vrátane výkladu `calc` (`WORK`, `LUNCH`, `COUNTED`), mapovanie kódov terminála na prerušenia Accessu a pravidlá (`rules`, hranica celodennej prekážky, okno práce, automatický obed);
+* **plán zamestnanca na každý deň** mesiaca (`day_types`, `expected_min`, `employment_pct`) pre mesiace okna `period`;
+* pravidlá prerušení po mesiacoch (`templates`) sa len uložia, upozornenia z nich zatiaľ nezobrazovať.
+
+**Prijatie (import)**:
+* smie ho spraviť len správca vlastnej organizácie, cez server funkciu, ktorá volá databázovú funkciu pod prihlásením správcu (RLS, nie service role). Nahrá sa súbor `dochs_config.json` (alebo vložený text) a obrazovka ukáže **náhľad bez zápisu**: verziu, okno, počty zamestnancov a mesiacov, počet odstránených mesiacov, osobné čísla bez účtu v termináli, upozornenia;
+* validácia v aplikácii je rovnaká ako `contract/tools/verify_config.py` (čistá funkcia v `src/lib` s testami; zlatý súbor `contract/examples/config_example.json` je vstup testu a `contract/tools/test_verify_config.py` ukazuje, čo má odmietnuť): `schema_version` 2, povolené len známe kľúče, **žiadne osobné údaje**, typ dňa zodpovedá dňu v týždni a sviatkom, fond je 0 v nepracovné dni, správne počty dní, `counts`, odkazy na prerušenia, fondy a šablóny. Databáza tú istú kontrolu opakuje, preto je aplikačná kontrola len pohodlie pre správcu;
+* zápis je **atómový, všetko alebo nič**; pri chybe ostáva platná predchádzajúca konfigurácia. Do auditu sa zapíše kto, kedy, verzia a počty (nie obsah);
+* osobné čísla bez účtu v termináli sa uložia (plán pre budúceho zamestnanca), ale v prehľadoch sa nezobrazujú;
+* opakovaný import tej istej verzie nič nezmení; plán jedného zamestnanca a mesiaca sa nahrádza celý, nikdy po dňoch.
+
+**Výpočet (`src/lib/engine.ts`, jediné miesto s dochádzkovou matematikou)**: ak má zamestnanec na daný deň plán z Accessu, počíta sa **tak, ako Access** (referencia `access/moduly/mod_08_UdalostiDna.bas`: `SpracujDen`, `TrvanieIntervalu`, `SumarDna`):
+* práca (č. 1) sa oreže oknom práce; obed (č. 7) sa počíta skutočným trvaním; každé iné prerušenie skutočným trvaním, a ak trvá `full_day_obstacle_min` a viac, započíta sa `expected_min` dňa (`calc` rozhoduje, nie pevný zoznam kódov);
+* automatický obed sa odpočíta celý (`auto_lunch_deduct_min`), keď je zapnutý, deň má fond, práca presiahne `auto_lunch_trigger_min` a v dni nebol obed;
+* rovnaký kód a smer do `duplicate_punch_window_min` sa ignoruje; dopĺňanie do fondu a zaokrúhľovanie príchodu a odchodu sa pri dni s plánom **nepoužíva**;
+* denné saldo = odpracované + započítané prekážky − `expected_min`; deň bez plánu (mesiac mimo okna, osobné číslo bez plánu) sa **nepočíta po starom potichu**, ale ukáže sa ako „bez plánu z Accessu, nepotvrdené“;
+* neznáma hodnota `calc` alebo neznámy kód terminála = saldo dňa nepotvrdené a upozornenie pre správcu, nie odhad.
+
+Kódy razení terminála sa menia na prerušenia cez `terminal_code_map`. Existujúce testy `engine.test.ts` ostávajú pre dni bez plánu; pribudnú testy pre deň s plánom (lekár s návratom a bez návratu, služobná cesta, dovolenka, celodenná prekážka, obed, duplicita, otvorený deň).
+
+**Obrazovky**: v administrácii sekcia „Konfigurácia z Accessu“ (import s náhľadom, aktuálna verzia, okno, kedy a kto naposledy importoval, počet zamestnancov bez plánu); v prehľadoch salda označenie „orientačné“ (podľa integrovaného režimu) a „bez plánu z Accessu“ tam, kde plán chýba. Nikde sa nezobrazuje ID organizácie ani technické údaje. Texty z číselníkov (názvy prerušení, sviatkov, fondov) sa zobrazujú len ako text.
+
+**Hotovo, keď**: kontraktový test s `config_example.json` je zelený; scenár október 2026 (`docs/TESTOVANIE-S-ACCESSOM.md`, postup B) s importovanou konfiguráciou dá v `fond_min` aj `saldo_min` rovnaké hodnoty ako Access (`contract/scenare/porovnaj.py`); rozdiely, ktoré ostanú, sú vypísané s dôvodom. Prejdú `bun run lint`, `bun run test`, `bun run build` a bezpečnostné kontroly z `AGENTS.md`.

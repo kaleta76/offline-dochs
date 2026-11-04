@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { loadMonth, labelOf } from "@/lib/month";
+import { loadMonth, labelOf, hm } from "@/lib/month";
 import { unverifiedSummary } from "@/lib/device-trace";
 import { fmtMin } from "@/lib/engine";
+import { presenceOf, summarizePresence, type Presence } from "@/lib/presence";
 import { MonthPicker } from "@/components/MonthTable";
 import { Button } from "@/components/ui/button";
 import { DevicesPanel } from "@/components/DevicesPanel";
@@ -15,6 +16,16 @@ export const Route = createFileRoute("/_authenticated/tim")({
   head: () => ({ meta: [{ title: "Môj tím – Dochádzka" }, { name: "description", content: "Schvaľovanie korekcií a uzávierka mesiaca." }, { property: "og:title", content: "Môj tím – Dochádzka" }, { property: "og:description", content: "Schvaľovanie korekcií a uzávierka mesiaca." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: Team,
 });
+
+/** Stav zamestnanca teraz; undefined = ešte sa nenačítalo. Text nesie význam, farba je len doplnok. */
+function PresenceBadge({ presence }: { presence: Presence | undefined }) {
+  if (!presence) return <span className="text-xs text-muted-foreground">…</span>;
+  const at = presence.since ? hm(presence.since) : "";
+  if (presence.state === "none") return <span className="text-xs text-muted-foreground">bez razenia</span>;
+  if (presence.state === "in") return <span className="whitespace-nowrap rounded-sm bg-success px-2 py-1 text-xs font-bold text-success-foreground">Prítomný · od {at}</span>;
+  if (presence.state === "away") return <span className="whitespace-nowrap rounded-sm bg-warning px-2 py-1 text-xs font-bold text-warning-foreground">{labelOf(presence.code ?? "", "OUT")} · od {at}</span>;
+  return <span className="whitespace-nowrap rounded-sm bg-muted px-2 py-1 text-xs font-bold">Odišiel · {at}</span>;
+}
 
 function Team() {
   const { session, roles } = useAuth();
@@ -36,6 +47,33 @@ function Team() {
       return Promise.all((data ?? []).map(async (p) => ({ p, m: await loadMonth(p.id, ym.y, ym.m) })));
     },
   });
+
+  // Kto je teraz v práci: dnešné razenia tímu (rovnaké oprávnenia ako Prehľad mesiaca). Čas sa berie pri každom načítaní,
+  // aby stránka nechaná otvorenú cez polnoc nezostala na včerajšku. Obnovuje sa každú minútu.
+  const teamIds = (team.data ?? []).map(({ p }) => p.id);
+  const presence = useQuery({
+    queryKey: ["presence", teamIds.join(",")],
+    enabled: teamIds.length > 0,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const { data, error } = await supabase
+        .from("punches")
+        .select("user_id, code, direction, client_time, voided_at")
+        .in("user_id", teamIds)
+        .gte("client_time", start.toISOString())
+        .order("client_time");
+      if (error) throw error;
+      const byUser = new Map<string, Presence>();
+      for (const id of teamIds) {
+        const own = (data ?? []).filter((r) => r.user_id === id);
+        byUser.set(id, presenceOf(own.map((r) => ({ code: r.code, direction: r.direction as "IN" | "OUT", time: new Date(r.client_time), voided: !!r.voided_at }))));
+      }
+      return byUser;
+    },
+  });
+  const presenceSummary = presence.data ? summarizePresence([...presence.data.values()]) : null;
 
   const pending = useQuery({
     queryKey: ["pending-corr", uid],
@@ -146,13 +184,23 @@ function Team() {
 
       <section>
         <h2 className="mb-2 text-sm font-bold uppercase tracking-widest">Prehľad mesiaca</h2>
+        {presenceSummary && (
+          <div role="status" className="mb-3 text-sm">
+            <span className="font-bold">Teraz v práci: {presenceSummary.in} z {presenceSummary.total}</span>
+            {presenceSummary.away > 0 && <> · mimo pracoviska {presenceSummary.away}</>}
+            {presenceSummary.out > 0 && <> · odišlo {presenceSummary.out}</>}
+            {presenceSummary.none > 0 && <> · dnes bez razenia {presenceSummary.none}</>}
+            <span className="block text-xs text-muted-foreground">Stĺpec Teraz platí pre dnešok bez ohľadu na zvolený mesiac. Berie len razenia, ktoré už dorazili na server (razenia z offline terminálov sa ukážu po synchronizácii). Obnovuje sa každú minútu.</span>
+          </div>
+        )}
+        {presence.isError && <p className="mb-3 text-sm text-muted-foreground">Stav „Teraz“ sa nepodarilo načítať (ste offline?).</p>}
         {team.isLoading && <p className="text-muted-foreground">Načítavam…</p>}
         {team.data?.length === 0 && <p className="text-sm text-muted-foreground">Nemáte priradených zamestnancov. Správca ich priradí v sekcii Správa.</p>}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b-2 border-foreground text-left text-xs uppercase tracking-wider">
-                <th className="py-2">Zamestnanec</th><th className="py-2 text-right">Spolu</th><th className="py-2 text-right">Saldo</th>
+                <th className="py-2">Zamestnanec</th><th className="py-2">Teraz</th><th className="py-2 text-right">Spolu</th><th className="py-2 text-right">Saldo</th>
                 <th className="py-2 text-center">Chýba odchod</th><th className="py-2 text-center">Offline odchýlky</th><th className="py-2 text-center">Neoverené</th><th className="py-2 text-right">Akcie</th>
               </tr>
             </thead>
@@ -160,6 +208,7 @@ function Team() {
               {(team.data ?? []).map(({ p, m }) => (
                 <tr key={p.id} className="border-b border-border">
                   <td className="py-2"><div className="font-semibold">{personnelLabel(p)}</div><div className="text-xs text-muted-foreground">{p.department}</div></td>
+                  <td className="py-2"><PresenceBadge presence={presence.data?.get(p.id)} /></td>
                   <td className="num py-2 text-right">{fmtMin(m.totals.total)}</td>
                   <td className={`num py-2 text-right ${m.totals.balance < 0 ? "text-destructive" : "text-success"}`}>{fmtMin(m.totals.balance)}</td>
                   <td className={`py-2 text-center font-bold ${m.openDays ? "text-destructive" : ""}`}>{m.openDays}</td>

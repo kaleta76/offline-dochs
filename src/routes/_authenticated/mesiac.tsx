@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { loadMonth, labelOf } from "@/lib/month";
+import { personnelLabel } from "@/lib/personnel";
 import { MonthPicker, MonthTable } from "@/components/MonthTable";
 import { useVoidRequest } from "@/components/VoidRequest";
 import { Button } from "@/components/ui/button";
@@ -19,12 +20,33 @@ const TYPES = ["WORK:IN", "WORK:OUT", "DOCTOR:OUT", "FAMILY:OUT", "TRIP:OUT", "P
 const STATUS: Record<string, string> = { pending: "čaká", approved: "schválená", rejected: "zamietnutá" };
 
 function MyMonth() {
-  const { session } = useAuth();
+  const { session, roles } = useAuth();
   const uid = session?.user.id;
+  const isAdmin = roles.includes("admin");
+  const isMgr = isAdmin || roles.includes("manager");
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
   const qc = useQueryClient();
-  const month = useQuery({ queryKey: ["month", uid, ym.y, ym.m], enabled: !!uid, queryFn: () => loadMonth(uid!, ym.y, ym.m) });
+
+  // Vedúci (správca všetkých) si môže pozrieť mesiac svojho podriadeného; zoznam je rovnaký ako v Môj tím, o prístupe rozhoduje databáza.
+  const [subject, setSubject] = useState<string | null>(null);
+  const people = useQuery({
+    queryKey: ["month-people", uid, isAdmin],
+    enabled: !!uid && isMgr,
+    queryFn: async () => {
+      if (!uid) throw new Error("Prihlásenie je potrebné.");
+      let q = supabase.from("profiles").select("id, sap_id, department").order("sap_id");
+      if (!isAdmin) q = q.eq("manager_id", uid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []).filter((x) => x.id !== uid);
+    },
+  });
+  const subjectProfile = subject ? (people.data ?? []).find((x) => x.id === subject) ?? null : null;
+  const viewId = subjectProfile ? subjectProfile.id : uid;
+  const own = viewId === uid;
+
+  const month = useQuery({ queryKey: ["month", viewId, ym.y, ym.m], enabled: !!viewId, queryFn: () => loadMonth(viewId!, ym.y, ym.m) });
   const corr = useQuery({
     queryKey: ["corr", uid],
     enabled: !!uid,
@@ -48,19 +70,39 @@ function MyMonth() {
   const voidRequest = useVoidRequest();
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
+    <div className={`grid gap-8 ${own ? "lg:grid-cols-[1fr_300px]" : ""}`}>
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-black uppercase">Môj mesiac</h1>
+          {isMgr && (people.data ?? []).length > 0 && (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-xs font-bold uppercase tracking-widest">Zamestnanec</span>
+              <select
+                className="h-9 rounded-sm border border-input bg-background px-2 text-sm"
+                value={subjectProfile?.id ?? ""}
+                onChange={(e) => setSubject(e.target.value || null)}
+              >
+                <option value="">Ja</option>
+                {(people.data ?? []).map((x) => (
+                  <option key={x.id} value={x.id}>{personnelLabel(x)}{x.department ? ` · ${x.department}` : ""}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <MonthPicker ym={ym} onChange={setYm} />
         </div>
+        {!own && subjectProfile && (
+          <p className="mb-3 rounded-sm bg-muted px-3 py-2 text-sm font-semibold">
+            Prezeráte mesiac zamestnanca {personnelLabel(subjectProfile)}. Korekcie a uzávierku mesiaca riešite v Môj tím.
+          </p>
+        )}
         {month.data?.closedAt && <p className="mb-3 rounded-sm bg-muted px-3 py-2 text-sm font-semibold">Mesiac je uzavretý manažérom.</p>}
         {month.isLoading && <p className="text-muted-foreground">Načítavam…</p>}
         {month.error && <p className="text-destructive">Nepodarilo sa načítať (ste offline?).</p>}
         {voidRequest.panel}
         {month.data && <MonthTable data={month.data} onVoid={voidRequest.open} />}
       </section>
-      <aside className="space-y-6">
+      {own && <aside className="space-y-6">
         <form
           className="space-y-3 rounded-sm border-2 border-foreground bg-card p-4"
           onSubmit={(e) => { e.preventDefault(); setMsg(null); submit.mutate(); }}
@@ -88,7 +130,7 @@ function MyMonth() {
             ))}
           </ul>
         </div>
-      </aside>
+      </aside>}
     </div>
   );
 }

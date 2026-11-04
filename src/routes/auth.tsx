@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,12 @@ import {
   recoverAdmin,
   registerOrganization,
 } from "@/lib/accounts.functions";
+import {
+  browserStorage,
+  forgetNumber,
+  readRememberedNumber,
+  rememberNumber,
+} from "@/lib/remembered-number";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -85,6 +91,11 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [issued, setIssued] = useState<Issued | null>(null);
   const [copied, setCopied] = useState(false);
+  // Osobné číslo zapamätané v tomto prehliadači (len číslo, nikdy heslo): ďalšie prihlásenie vyžaduje len heslo.
+  const [savedNumber, setSavedNumber] = useState("");
+  const [remember, setRemember] = useState(true);
+  const numberRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -92,7 +103,21 @@ function AuthPage() {
     });
     const saved = readOrgCode();
     if (saved) setF((prev) => ({ ...prev, orgCode: saved }));
+    const number = readRememberedNumber(browserStorage());
+    if (number) {
+      setSavedNumber(number);
+      setF((prev) => ({ ...prev, number }));
+      // číslo je predvyplnené, stačí napísať heslo
+      setTimeout(() => passwordRef.current?.focus(), 0);
+    }
   }, [navigate]);
+
+  function otherNumber() {
+    forgetNumber(browserStorage());
+    setSavedNumber("");
+    setF((prev) => ({ ...prev, number: "", password: "" }));
+    setTimeout(() => numberRef.current?.focus(), 0);
+  }
 
   function go(next: Mode) {
     setMode(next);
@@ -138,6 +163,7 @@ function AuthPage() {
         if (!r.ok) setMsg(r.error);
         else if (await startSession(r)) {
           rememberOrgCode(f.orgCode);
+          rememberNumber(browserStorage(), f.number, remember);
           navigate({ to: "/terminal" });
         } else setMsg("Prihlásenie sa nepodarilo. Skúste to znova.");
       } else if (mode === "pin") {
@@ -145,12 +171,15 @@ function AuthPage() {
           data: { orgCode: f.orgCode, number: f.number, pin: f.pin, password: f.password },
         });
         if (!r.ok) setMsg(r.error);
-        else if (await startSession(r)) {
+        else {
+          // heslo je nastavené (aj keď sa reláciu nepodarilo začať), číslo si prehliadač zapamätá
           rememberOrgCode(f.orgCode);
-          navigate({ to: "/terminal" });
-        } else {
-          go("employee");
-          setMsg("Heslo je nastavené. Prihláste sa osobným číslom a novým heslom.");
+          rememberNumber(browserStorage(), f.number, remember);
+          if (await startSession(r)) navigate({ to: "/terminal" });
+          else {
+            go("employee");
+            setMsg("Heslo je nastavené. Prihláste sa osobným číslom a novým heslom.");
+          }
         }
       } else if (mode === "register") {
         const r = await registerOrganization({
@@ -165,6 +194,7 @@ function AuthPage() {
         if (!r.ok) setMsg(r.error);
         else {
           rememberOrgCode(r.organizationCode);
+          rememberNumber(browserStorage(), f.number, remember);
           setF((prev) => ({ ...prev, orgCode: r.organizationCode, password: "", password2: "" }));
           setIssued({
             kind: "register",
@@ -296,6 +326,7 @@ function AuthPage() {
 
         {needsNumber && (
           <Input
+            ref={numberRef}
             required
             inputMode="numeric"
             pattern="[0-9]{7,8}"
@@ -305,6 +336,14 @@ function AuthPage() {
             value={f.number}
             onChange={(e) => setF({ ...f, number: e.target.value.trim() })}
           />
+        )}
+        {mode === "employee" && savedNumber !== "" && f.number === savedNumber && (
+          <p className="text-xs text-muted-foreground">
+            Osobné číslo máte zapamätané v tomto prehliadači, stačí heslo.{" "}
+            <button type="button" className="underline" onClick={otherNumber}>
+              Nie ste to vy? Zadať iné číslo
+            </button>
+          </p>
         )}
 
         {mode === "in" && (
@@ -341,6 +380,7 @@ function AuthPage() {
         )}
 
         <Input
+          ref={passwordRef}
           required
           type="password"
           minLength={newPassword ? 12 : 1}
@@ -361,6 +401,21 @@ function AuthPage() {
             value={f.password2}
             onChange={(e) => setF({ ...f, password2: e.target.value })}
           />
+        )}
+
+        {(mode === "employee" || mode === "pin" || mode === "register") && (
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
+            <span>
+              Zapamätať si osobné číslo v tomto prehliadači (heslo sa neukladá). Na spoločnom
+              počítači túto voľbu vypnite.
+            </span>
+          </label>
         )}
 
         {mode === "register" && (

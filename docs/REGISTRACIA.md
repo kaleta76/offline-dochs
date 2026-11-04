@@ -40,6 +40,8 @@ V administrácii je sekcia **Prístup zamestnancov**:
 
 Odkaz pre zamestnancov má tvar `…/auth?o=KÓD`, kód organizácie sa tak predvyplní.
 
+**Zapamätané osobné číslo.** Po úspešnom prihlásení, prvom prihlásení s PIN-om alebo registrácii organizácie si prehliadač zapamätá osobné číslo (`localStorage`, kľúč `personnel-number`, `src/lib/remembered-number.ts`). Pri ďalšom prihlásení je číslo predvyplnené, kurzor stojí v poli hesla a stačí heslo. Pod číslom je odkaz „Nie ste to vy? Zadať iné číslo“ (zapamätané číslo zmaže). Zapamätanie sa dá vypnúť zaškrtávacím poľom pod heslom; po prihlásení s vypnutou voľbou sa už zapamätané číslo zmaže. Číslo ostáva len v tomto prehliadači a na server sa neposiela. **Heslo ani PIN sa neukladajú.** Na spoločnom počítači treba voľbu vypnúť, inak by sa ďalšej osobe predvyplnilo cudzie číslo (číslo je pseudonym, nie tajomstvo, ale je to osobný identifikátor).
+
 ## 3. Obnova hesla správcu
 
 - Ak je správcov viac, jeden vydá druhému nový PIN (ako pri zamestnancovi, ale cez „Obnoviť“ nemožno obnoviť seba).
@@ -52,6 +54,7 @@ Odkaz pre zamestnancov má tvar `…/auth?o=KÓD`, kód organizácie sa tak pred
 - **Heslo**: po 8 chybných pokusoch sa účet na 15 minút zamkne. Obnovovací kód: 5 pokusov, zámok 1 hodina. Zámok vie niekto zneužiť na dočasné zablokovanie cudzieho účtu (číslo je pseudonym, nie tajomstvo); správca vtedy vydá nový PIN.
 - **Reset** zruší všetky relácie používateľa (pôvodná funkcia predávala ID namiesto tokenu, takže relácie nerušila).
 - Chyby pri prihlásení sú rovnaké pre neznámu firmu aj neznáme číslo.
+- Prehliadač si pamätá len osobné číslo (nie heslo), pozri časť Zamestnanci. Heslo si môže uložiť správca hesiel prehliadača podľa nastavenia používateľa, aplikácia ho nikam neukladá.
 - Audit (`audit_log`): `organization_registered`, `organization_terms_accepted`, `employee_provisioned`, `employee_password_reset`, `employee_enrollment_completed`, `admin_recovered`.
 - Žiadny e-mail, meno ani telefón sa neukladá. Syntetický e-mail účtu (`…@accounts.invalid`) je len interný identifikátor.
 

@@ -50,8 +50,10 @@ komunikácia so snímačmi SKE cez sériový port (tento modul nie je vo verejno
 | Cesta | Obsah |
 |---|---|
 | `src/` | terminál: React + TanStack Start, výpočtový motor `src/lib/engine.ts`, offline fronta, export pre Access |
-| `drizzle/migrations/` | migrácie databázy terminála `0000`–`0005` (aplikuje ich Lovable) |
-| `docs/migracie/` | migrácie, ktoré sa ešte spúšťajú cez chat v Lovable (teraz `0006` zneplatnenie razení) |
+| `drizzle/migrations/` | migrácie databázy terminála `0000`–`0006` (aplikuje ich Lovable) |
+| `docs/migracie/` | texty migrácií a záchranné skripty (`0006` zneplatnenie razení je spustená, `0007` zrušenie testovacej organizácie čaká na spustenie) |
+| `docs/zaloha/` | SQL na snapshot databázy pred zásahom, na porovnanie po ňom a `stav_databazy.sql` (dotaz len na čítanie: aktuálny stav databázy pre Claude) |
+| `tools/` | kontroly balíka Access a zálohy databázy, `tools/sql_test/` = lokálny test SQL migrácií na PostgreSQL |
 | `contract/` | **kontrakt terminál ⇄ Access**: popis, zlaté súbory, referenčná implementácia, testy, overovač, testovacie scenáre. Mení sa iba cez PR so schválením vlastníka |
 | `access/` | dochádzkový systém v Accesse: inštalátor, moduly VBA, testy |
 | `docs/` | spolupráca, registrácia, kredity v Lovable, testovanie, zneplatnenie razení |
@@ -91,7 +93,9 @@ CI na GitHube (`.github/workflows/ci.yml`) spúšťa po každom PR a pushi do `m
 | [`docs/REGISTRACIA.md`](docs/REGISTRACIA.md) | registrácia firiem a zamestnancov bez e-mailu |
 | [`docs/OVERENIE-ZARIADENI.md`](docs/OVERENIE-ZARIADENI.md) | čo overenie zariadenia zaručuje a čo nie, neoverené razenia, záchranný kód, zmeny zariadení |
 | [`docs/LOVABLE-KREDITY.md`](docs/LOVABLE-KREDITY.md) | čo míňa kredity, synchronizácia s GitHubom |
-| [`docs/ZACHRANA-A-NAVRAT.md`](docs/ZACHRANA-A-NAVRAT.md) | návrat k bezpečnému stavu: kód, databáza, záchranný skript k migrácii 0006 |
+| [`docs/ZACHRANA-A-NAVRAT.md`](docs/ZACHRANA-A-NAVRAT.md) | návrat k bezpečnému stavu: kód, databáza, záchranné skripty k migráciám 0006 a 0007 |
+| [`docs/ZALOHA-DATABAZY.md`](docs/ZALOHA-DATABAZY.md) | záloha a návrat databázy v Lovable Cloud: Export, overenie súboru, snapshot pred zásahom, výpis aktuálneho stavu |
+| [`docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md`](docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md) | označenie a zrušenie testovacej organizácie správcom, ručné zrušenie |
 | [`access/README.md`](access/README.md), [`access/CHANGELOG.md`](access/CHANGELOG.md) | inštalácia a zmeny dochádzkového systému v Accesse |
 | [`roadmap.md`](roadmap.md) | hotové a otvorené úlohy |
 
@@ -101,7 +105,7 @@ Projekt je **prototyp v testovacej prevádzke**. Súčasti, ktoré som neoveril 
 
 * Kód VBA v Accesse sa nedá spustiť mimo Accessu; overené sú iba lint, modely algoritmov a kontrakt na zlatých súboroch.
 * Test, že **terminál a Access vyjdú v saldách rovnako** (scenár október 2026), ešte nebol spustený v živom prostredí.
-* Zneplatnenie razení (PR #6) vyžaduje migráciu `docs/migracie/0006_zneplatnenie_razeni.sql` v databáze; bez nej nefungujú obrazovky, ktoré čítajú mesiac.
+* Migrácia `0006` (zneplatnenie razení) je v databáze spustená od 3. 11. 2026. Migrácia `docs/migracie/0007_zrusenie_testovacej_organizacie.sql` (zrušenie testovacej organizácie) je overená lokálne na PostgreSQL, na ostrej databáze ešte nie.
 * Mapovanie niektorých kódov terminála na prerušenia Accessu (služobná cesta, súkromné prerušenie, ošetrenie člena rodiny) čaká na rozhodnutie vlastníka (`contract/code-mapping.csv`).
 
 ## Bezpečnosť a súkromie

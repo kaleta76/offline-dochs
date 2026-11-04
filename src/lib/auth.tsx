@@ -10,9 +10,12 @@ interface AuthCtx {
   ready: boolean;
   roles: Role[];
   profile: { id: string; sap_id: string | null; department: string | null; daily_fund: number; organization_id: string | null } | null;
-  organization: { id: string; name: string } | null;
+  organization: { id: string; name: string; is_test?: boolean } | null;
+  /** Správa o chybe, ak sa údaje o účte (roly, profil, organizácia) nepodarilo načítať; inak null. */
+  meError: string | null;
+  refetchMe: () => void;
 }
-const Ctx = createContext<AuthCtx>({ session: null, ready: false, roles: [], profile: null, organization: null });
+const Ctx = createContext<AuthCtx>({ session: null, ready: false, roles: [], profile: null, organization: null, meError: null, refetchMe: () => undefined });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -32,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCached(sanitizeProfileCache(JSON.parse(localStorage.getItem(`me-cache:${uid}`) ?? 'null')));
     } catch { /* unavailable storage */ }
   }, [uid]);
-  const { data } = useQuery({
+  const { data, error: meFailure, refetch } = useQuery({
     queryKey: ["me", uid],
     enabled: !!uid,
     queryFn: async () => {
@@ -44,13 +47,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (r.error || p.error) throw r.error ?? p.error;
       const org = await supabase.from('organizations').select('id, name').maybeSingle();
       if (org.error) throw org.error;
-      const v = { roles: (r.data ?? []).map((x) => x.role as Role), profile: p.data, organization: org.data };
+      // Príznak testovacej organizácie je nepovinný: ak stĺpec v databáze ešte nie je (migrácia 0007), účet sa načíta aj tak.
+      const flag = org.data ? await supabase.from('organizations').select('is_test').maybeSingle() : null;
+      const organization = org.data ? { ...org.data, ...(flag && !flag.error && flag.data ? { is_test: flag.data.is_test } : {}) } : null;
+      const v = { roles: (r.data ?? []).map((x) => x.role as Role), profile: p.data, organization };
       localStorage.setItem(`me-cache:${uid}`, JSON.stringify(v));
       return v;
     },
   });
   return (
-    <Ctx.Provider value={{ session, ready, roles: data?.roles ?? (cached && cached.profile?.id === uid ? cached.roles : []), profile: data?.profile ?? (cached && cached.profile?.id === uid ? cached.profile : null), organization: data?.organization ?? (cached?.profile?.id === uid ? cached?.organization ?? null : null) }}>
+    <Ctx.Provider value={{ session, ready, roles: data?.roles ?? (cached && cached.profile?.id === uid ? cached.roles : []), profile: data?.profile ?? (cached && cached.profile?.id === uid ? cached.profile : null), organization: data?.organization ?? (cached?.profile?.id === uid ? cached?.organization ?? null : null), meError: meFailure ? ((meFailure as { message?: string }).message ?? "neznáma chyba") : null, refetchMe: () => { void refetch(); } }}>
       {children}
     </Ctx.Provider>
   );

@@ -5,9 +5,10 @@ import { Clock, CalendarDays, Users, Settings, LogOut, Wifi, WifiOff, CloudUploa
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useQueue } from "@/lib/offline-queue";
+import { backendHost, isNetworkError } from "@/lib/connection";
 
 export function AppShell() {
-  const { roles, profile, session, organization } = useAuth();
+  const { roles, profile, session, organization, meError, refetchMe } = useAuth();
   const { items, online } = useQueue(session?.user.id);
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -51,6 +52,7 @@ export function AppShell() {
           <div className="flex flex-col gap-1">
             <span className="text-lg font-black uppercase tracking-tight">Dochádzka</span>
             <span className="max-w-64 break-words text-xs text-secondary-foreground/60">{organization?.name}</span>
+            {organization?.is_test && <span className="w-fit rounded-sm bg-warning px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-warning-foreground">Testovacia organizácia</span>}
           </div>
           <nav className="flex flex-1 flex-wrap gap-1">
             {nav.filter((n) => n.show).map((n) => (
@@ -73,6 +75,18 @@ export function AppShell() {
           </div>
         </div>
       </header>
+      {meError && online && (
+        <div role="alert" className="no-print border-b-2 border-destructive bg-card px-4 py-2 text-sm">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1">
+            <span>
+              {isNetworkError(meError)
+                ? <>Údaje o účte sa nepodarilo načítať, preto môžu chýbať ponuky (napríklad Správa). Prehliadač sa nevie spojiť s databázou <strong className="num">{backendHost(import.meta.env.VITE_SUPABASE_URL) || "aplikácie"}</strong>. Skontrolujte pripojenie; v práci môže túto adresu blokovať firewall alebo proxy.</>
+                : <>Údaje o účte sa nepodarilo načítať ({meError}), preto môžu chýbať ponuky (napríklad Správa).</>}
+            </span>
+            <button type="button" onClick={refetchMe} className="font-bold underline underline-offset-4">Skúsiť znova</button>
+          </div>
+        </div>
+      )}
       <main className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>

@@ -399,18 +399,21 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          is_test: boolean
           name: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_test?: boolean
           name: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_test?: boolean
           name?: string
         }
         Relationships: []
@@ -697,6 +700,10 @@ export type Database = {
         Args: { _approve: boolean; _id: string }
         Returns: undefined
       }
+      delete_test_organization: {
+        Args: { _confirm_name: string }
+        Returns: Json
+      }
       device_manager_ok: { Args: { _user: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -711,6 +718,7 @@ export type Database = {
       my_organization: { Args: never; Returns: string }
       new_pairing_code: { Args: never; Returns: string }
       new_recovery_code: { Args: never; Returns: string }
+      purge_organization: { Args: { _org: string }; Returns: Json }
       recover_device: {
         Args: {
           _new_token_hash: string
@@ -738,6 +746,8 @@ export type Database = {
       }
       rotate_organization_invite: { Args: never; Returns: string }
       same_organization: { Args: { _user: string }; Returns: boolean }
+      set_organization_test: { Args: { _is_test: boolean }; Returns: undefined }
+      test_organization_summary: { Args: never; Returns: Json }
     }
     Enums: {
       app_role: "employee" | "manager" | "admin"

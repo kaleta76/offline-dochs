@@ -13,7 +13,7 @@
 * Importovať treba v tomto poradí: najprv `punches_RRRRMM.csv`, potom `voids_RRRRMM.csv`.
 
 ## Nasadenie (poradie je dôležité)
-1. **Najprv migrácia** `docs/migracie/0006_zneplatnenie_razeni.sql` (v Lovable chate: „Spusti migráciu zo súboru docs/migracie/0006_zneplatnenie_razeni.sql presne tak, ako je, nič nemeň.“ – približne 1 kredit; viď `LOVABLE-KREDITY.md`).
+1. **Najprv migrácia** (v databáze je spustená od 3. 11. 2026) `docs/migracie/0006_zneplatnenie_razeni.sql` (v Lovable chate: „Spusti migráciu zo súboru docs/migracie/0006_zneplatnenie_razeni.sql presne tak, ako je, nič nemeň.“ – približne 1 kredit; viď `LOVABLE-KREDITY.md`).
 2. Potom zlúčiť PR a **Publish**. Kód bez migrácie spadne pri načítaní mesiaca (chýbajú stĺpce `voided_at`, `void_request_id`).
 3. Migrácia je aditívna (nové stĺpce a tabuľka, bez mazania dát). Funkcia `punches own insert` sa upravuje tak, aby zamestnanec nemohol vložiť už „zneplatnené“ razenie.
 

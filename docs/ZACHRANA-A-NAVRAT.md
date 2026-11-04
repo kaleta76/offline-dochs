@@ -42,6 +42,12 @@ Spustenie v Lovable chate: „Spusti migráciu zo súboru docs/migracie/0006_spa
 **Overené:** skript prešiel na lokálnom PostgreSQL 16 so zjednodušenými kópiami pomocných funkcií: po ňom zmizli stĺpce, tabuľka aj obe funkcie, text pravidla vkladania je rovnaký ako pred migráciou 0006, razenia a záznamy `audit_log` ostali, zamestnanec môže razenie vložiť a druhé spustenie nič nezmení.
 **Neoverené:** beh na ostrej databáze Lovable Cloud.
 
+### Migrácia 0007 späť
+
+Skript [`migracie/0007_spat_zachranny.sql`](migracie/0007_spat_zachranny.sql) zruší funkcie `set_organization_test`, `test_organization_summary`, `purge_organization` a `delete_test_organization`, vráti pôvodnú funkciu `guard_last_admin` a zmaže stĺpec `organizations.is_test`. Údaje organizácií sa nemenia. **Už zrušené testovacie organizácie sa týmto neobnovia**, vráti ich len záloha ([`ZALOHA-DATABAZY.md`](ZALOHA-DATABAZY.md)).
+Kód od PR s touto migráciou volá funkcie len z obrazovky Správa → Testovacia organizácia a stĺpec `is_test` číta nepovinne, preto sa po skripte ostatné obrazovky nezmenia. Spustenie: SQL editor v Lovable Cloud, alebo v chate *„Spusti migráciu zo súboru docs/migracie/0007_spat_zachranny.sql presne tak, ako je, nič nemeň.“*
+**Overené:** na lokálnom PostgreSQL 16 (spustený dvakrát, po ňom platí pôvodná ochrana posledného správcu). **Neoverené:** beh na ostrej databáze Lovable Cloud.
+
 ### Zálohy databázy
 
-Nie je overené, či Lovable Cloud robí zálohy databázy ani ako sa z nich obnovuje. Kým sú v databáze len testovacie údaje, nie je to riziko. Pred zapísaním reálnych osobných čísel to treba zistiť u Lovable.
+Lovable Cloud robí denné zálohy databázy (približne 14 dní) a ponúka Export celej databázy. Postup, overenie stiahnutého súboru a poistka pred ručným zásahom: [`ZALOHA-DATABAZY.md`](ZALOHA-DATABAZY.md). Kým sú v databáze len testovacie údaje, strata nie je riziko. Pred zapísaním reálnych osobných čísel treba u Lovable overiť, kde sa zálohy ukladajú a kto k nim má prístup.

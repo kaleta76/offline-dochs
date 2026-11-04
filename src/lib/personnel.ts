@@ -14,7 +14,7 @@ const cachedProfileSchema = z.object({
     id: z.string(), sap_id: z.string().nullable().optional().transform(v => personnelNumberSchema.safeParse(v).success ? v ?? null : null),
     department: z.string().nullable(), daily_fund: z.number(), organization_id: z.string().nullable(),
   }).nullable(),
-  organization: z.object({ id: z.string(), name: z.string() }).nullable(),
+  organization: z.object({ id: z.string(), name: z.string(), is_test: z.boolean().optional() }).nullable(),
 });
 
 // Strip old identity fields without deleting offline punches, device keys or the sign-in session.

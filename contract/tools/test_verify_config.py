@@ -254,6 +254,81 @@ class Chyby(unittest.TestCase):
         self.doc["terminal_code_map"].append({"code": "WORK", "interruption": 1})
         self.assertHas(self.doc, "kód 'WORK' je dvakrát")
 
+    # --- tlačidlá terminála (kontrakt 1.3.0)
+    def _it(self, code):
+        return next(i for i in self.doc["interruptions"] if i["code"] == code)
+
+    def test_tlacidla_zlateho_suboru_su_v_poriadku(self):
+        podla_poradia = sorted((i for i in self.doc["interruptions"] if i.get("terminal_button")),
+                               key=lambda i: i["terminal_order"])
+        self.assertEqual([i["terminal_label"] for i in podla_poradia],
+                         ["Lekár", "Sprievod", "Služobná cesta", "Služobné vzdialenie"])
+
+    def test_tlacidlo_nie_je_pravdivostna_hodnota(self):
+        self._it(2)["terminal_button"] = "ano"
+        self.assertHas(self.doc, "terminal_button nie je true/false")
+
+    def test_text_tlacidla_prazdny_dlhy_alebo_s_medzerami(self):
+        for zly in ("", "x" * 25, " Lekár", "Lekár ", "Le\tkár", 5):
+            self.doc = golden()
+            self._it(2)["terminal_label"] = zly
+            self.assertHas(self.doc, "terminal_label musí byť text 1 až 24 znakov")
+
+    def test_poradie_mimo_rozsahu(self):
+        for zle in (0, 100, "1", True):
+            self.doc = golden()
+            self._it(2)["terminal_order"] = zle
+            self.assertHas(self.doc, "terminal_order musí byť celé číslo 1 až 99")
+
+    def test_text_a_poradie_bez_tlacidla(self):
+        self._it(8)["terminal_label"] = "Dovolenka"
+        self.assertHas(self.doc, "patria len prerušeniu s terminal_button = true")
+        self.doc = golden()
+        self._it(8)["terminal_order"] = 5
+        self.assertHas(self.doc, "patria len prerušeniu s terminal_button = true")
+
+    def test_praca_a_obed_nemaju_tlacidlo(self):
+        self._it(1)["terminal_button"] = True
+        self.assertHas(self.doc, "práca (č. 1) a obed (č. 7) nemajú vlastné tlačidlo")
+        self.doc = golden()
+        self._it(7)["terminal_button"] = True
+        self.assertHas(self.doc, "práca (č. 1) a obed (č. 7) nemajú vlastné tlačidlo")
+
+    def test_tlacidlo_bez_kodu_v_mapovani(self):
+        self.doc["terminal_code_map"] = [m for m in self.doc["terminal_code_map"] if m["code"] != "ERRAND"]
+        self.assertHas(self.doc, "prerušenie 4: tlačidlo potrebuje práve jeden kód v terminal_code_map (je ich 0)")
+
+    def test_tlacidlo_s_dvoma_kodmi_v_mapovani(self):
+        self.doc["terminal_code_map"].append({"code": "ERRAND2", "interruption": 4})
+        self.assertHas(self.doc, "prerušenie 4: tlačidlo potrebuje práve jeden kód v terminal_code_map (je ich 2)")
+
+    def test_dve_tlacidla_s_rovnakym_textom(self):
+        self._it(4)["terminal_label"] = "LEKÁR"
+        self.assertHas(self.doc, "majú tlačidlo s rovnakým textom")
+
+    def test_bez_textu_sa_pouzije_nazov_a_ten_sa_porovnava(self):
+        del self._it(4)["terminal_label"]          # text tlačidla = name "Služobné vzdialenie"
+        errs, _ = vc.check(self.doc)
+        self.assertEqual(errs, [])
+        self._it(12)["terminal_label"] = "Služobné vzdialenie"
+        self.assertHas(self.doc, "majú tlačidlo s rovnakým textom")
+
+    def test_prilis_vela_tlacidiel(self):
+        for n in range(20, 33):
+            self.doc["interruptions"].append({
+                "code": n, "name": f"Iné {n}", "short_name": f"I{n}", "start_punch_code": 0, "end_punch_code": 0,
+                "is_work": False, "is_lunch": False, "auto_end_of_shift": False, "calc": "COUNTED",
+                "terminal_button": True, "terminal_label": f"Iné {n}", "terminal_order": 50})
+            self.doc["terminal_code_map"].append({"code": f"X{n}", "interruption": n})
+        self.assertHas(self.doc, "tlačidiel pre terminál je 17, najviac 12")
+
+    def test_subor_bez_tlacidiel_je_stale_platny(self):
+        for it in self.doc["interruptions"]:
+            for k in ("terminal_button", "terminal_label", "terminal_order"):
+                it.pop(k, None)
+        errs, warns = vc.check(self.doc)
+        self.assertEqual((errs, warns), ([], []))
+
     def test_pravidlo_pre_neexistujuce_preruseni(self):
         self.doc["templates"][0]["months"][0]["rules"][0]["interruption"] = 77
         self.assertHas(self.doc, "neexistujúce prerušenie 77")

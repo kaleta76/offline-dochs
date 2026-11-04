@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Overenie súboru dochs_config.json (konfigurácia a výpočtový plán z Accessu, kontrakt 1.2.0, schema_version 2).
+"""Overenie súboru dochs_config.json (konfigurácia a výpočtový plán z Accessu, kontrakt 1.2.0 a 1.3.0, schema_version 2).
 
 Použitie:  python3 -I verify_config.py dochs_config.json [--strict]
 
@@ -8,6 +8,7 @@ Kontroly (chyby ukončia program kódom 1; --strict zmení aj upozornenia na chy
   2. Žiadne osobné údaje: zamestnanec má len kľúče personnel_number a months, mesiac len povolené kľúče.
   3. Číselníky: prerušenia (jedinečné čísla, calc WORK iba pre č. 1, LUNCH iba pre č. 7), kódy razení (odkazujú na existujúce
      prerušenie, smer Z/K zodpovedá začiatku/koncu prerušenia), mapovanie kódov terminála, sviatky (platné dátumy, bez duplicít).
+     Tlačidlá terminála (1.3.0, voliteľné): terminal_button / terminal_label / terminal_order, pozri README.md.
   4. Plán: každý mesiac zamestnanca leží v okne period, dni majú správny počet (28 až 31 podľa kalendára),
      2. písmeno typu dňa zodpovedá skutočnému dňu v týždni, sviatok z číselníka má 1. písmeno S,
      fond je 0 v dňoch, ktoré nie sú pracovné (V, S), a nepresahuje 1440 minút.
@@ -28,7 +29,9 @@ RULES_REQ = ["work_window_start_min", "work_window_end_min", "full_day_obstacle_
              "auto_lunch_deduct_min", "auto_lunch_enabled", "duplicate_punch_window_min", "default_daily_fund_min",
              "auto_repair_mode"]
 INT_REQ = ["code", "name", "short_name", "start_punch_code", "end_punch_code", "is_work", "is_lunch", "auto_end_of_shift", "calc"]
-INT_OPT = ["counts_to_fund", "counts_to_work", "deducts_leave"]
+INT_OPT = ["counts_to_fund", "counts_to_work", "deducts_leave", "terminal_button", "terminal_label", "terminal_order"]
+MAX_BUTTONS = 12
+MAX_LABEL = 24
 CALC = {"WORK", "LUNCH", "COUNTED"}
 EMP_KEYS = {"personnel_number", "months"}
 MON_KEYS = {"month", "employment_pct", "fund_id", "template_id", "calendar_id", "day_types", "expected_min"}
@@ -131,6 +134,17 @@ def check(doc, strict=False):
                 E(f"prerušenie {c}: calc LUNCH patrí práve prerušeniu č. 7")
             if it.get("is_work") != (c == 1) or it.get("is_lunch") != (c == 7):
                 E(f"prerušenie {c}: is_work/is_lunch nesedí s číslom prerušenia")
+            if "terminal_button" in it and not isinstance(it["terminal_button"], bool):
+                E(f"prerušenie {c}: terminal_button nie je true/false")
+            if "terminal_label" in it:
+                lab = it["terminal_label"]
+                if not (isinstance(lab, str) and 1 <= len(lab) <= MAX_LABEL and lab == lab.strip()
+                        and all(ord(ch) >= 32 for ch in lab)):
+                    E(f"prerušenie {c}: terminal_label musí byť text 1 až {MAX_LABEL} znakov bez medzier na kraji")
+            if "terminal_order" in it and not (is_int(it["terminal_order"]) and 1 <= it["terminal_order"] <= 99):
+                E(f"prerušenie {c}: terminal_order musí byť celé číslo 1 až 99")
+            if it.get("terminal_button") is not True and ("terminal_label" in it or "terminal_order" in it):
+                E(f"prerušenie {c}: terminal_label a terminal_order patria len prerušeniu s terminal_button = true")
         if 1 not in ints:
             E("v zozname prerušení chýba č. 1 (pracovná doba)")
 
@@ -178,6 +192,31 @@ def check(doc, strict=False):
                 E(f"terminal_code_map: kód '{m['code']}' odkazuje na neexistujúce prerušenie {m['interruption']!r}")
         if "WORK" not in seen_codes:
             W("terminal_code_map: chýba kód WORK")
+
+    # --- tlačidlá terminála (1.3.0): príznak patrí prerušeniu, ktoré má práve jeden kód terminála
+    codes_of = {}
+    if isinstance(doc["terminal_code_map"], list):
+        for m in doc["terminal_code_map"]:
+            if isinstance(m, dict) and is_int(m.get("interruption")):
+                codes_of.setdefault(m["interruption"], []).append(m.get("code"))
+    buttons, seen_text = [], {}
+    for c, it in ints.items():
+        if it.get("terminal_button") is not True:
+            continue
+        buttons.append(c)
+        if c in (1, 7):
+            E(f"prerušenie {c}: práca (č. 1) a obed (č. 7) nemajú vlastné tlačidlo, terminál má Príchod a Odchod")
+        n = len(codes_of.get(c, []))
+        if n != 1:
+            E(f"prerušenie {c}: tlačidlo potrebuje práve jeden kód v terminal_code_map (je ich {n})")
+        text = it.get("terminal_label") if isinstance(it.get("terminal_label"), str) else it.get("name")
+        if isinstance(text, str):
+            key = text.casefold()
+            if key in seen_text:
+                E(f"prerušenia {seen_text[key]} a {c} majú tlačidlo s rovnakým textom '{text}'")
+            seen_text.setdefault(key, c)
+    if len(buttons) > MAX_BUTTONS:
+        E(f"tlačidiel pre terminál je {len(buttons)}, najviac {MAX_BUTTONS}")
 
     # --- sviatky
     hol = set()

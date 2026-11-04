@@ -168,6 +168,110 @@ describe("pravidlá a prerušenia", () => {
   });
 });
 
+describe("tlačidlá terminálu (kontrakt 1.3.0)", () => {
+  const it_ = (d: Doc, code: number): Doc => d.interruptions.find((i: Doc) => i.code === code);
+  /** Niektorá z chýb obsahuje text (pri viacerých chybách nezáleží na poradí). */
+  const hasError = (mutate: (d: Doc) => void, part: string) => {
+    const d = golden();
+    mutate(d);
+    const errs = check(d).errors;
+    expect(
+      errs.some((e) => e.includes(part)),
+      `hľadané '${part}' nie je v ${JSON.stringify(errs)}`,
+    ).toBe(true);
+  };
+
+  it("zlatý súbor má štyri tlačidlá v poradí Lekár, Sprievod, Služobná cesta, Služobné vzdialenie", () => {
+    const d = golden();
+    expect(check(d, true).errors).toEqual([]);
+    const labels = (d.interruptions as Doc[])
+      .filter((i) => i.terminal_button)
+      .sort((a, b) => a.terminal_order - b.terminal_order)
+      .map((i) => i.terminal_label);
+    expect(labels).toEqual(["Lekár", "Sprievod", "Služobná cesta", "Služobné vzdialenie"]);
+  });
+  it("súbor bez tlačidiel je stále platný", () => {
+    const d = golden();
+    for (const i of d.interruptions as Doc[]) {
+      delete i.terminal_button;
+      delete i.terminal_label;
+      delete i.terminal_order;
+    }
+    const r = check(d, true);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+  it("príznak nie je pravdivostná hodnota", () => {
+    hasError((d) => (it_(d, 2).terminal_button = "ano"), "terminal_button nie je true/false");
+  });
+  it("text tlačidla: prázdny, dlhý, s medzerami na kraji, so zlým typom", () => {
+    for (const zly of ["", "x".repeat(25), " Lekár", "Lekár ", "Le\tkár", 5]) {
+      hasError((d) => (it_(d, 2).terminal_label = zly), "terminal_label musí byť text 1 až 24 znakov");
+    }
+  });
+  it("poradie mimo rozsahu alebo zlého typu", () => {
+    for (const zle of [0, 100, "1", true, 1.5]) {
+      hasError((d) => (it_(d, 2).terminal_order = zle), "terminal_order musí byť celé číslo 1 až 99");
+    }
+  });
+  it("text a poradie patria len prerušeniu s tlačidlom", () => {
+    hasError((d) => (it_(d, 8).terminal_label = "Dovolenka"), "patria len prerušeniu s terminal_button = true");
+    hasError((d) => (it_(d, 8).terminal_order = 5), "patria len prerušeniu s terminal_button = true");
+    hasError(
+      (d) => {
+        it_(d, 2).terminal_button = false;
+      },
+      "patria len prerušeniu s terminal_button = true",
+    );
+  });
+  it("práca a obed nemajú vlastné tlačidlo", () => {
+    hasError((d) => (it_(d, 1).terminal_button = true), "nemajú vlastné tlačidlo");
+    hasError((d) => (it_(d, 7).terminal_button = true), "nemajú vlastné tlačidlo");
+  });
+  it("tlačidlo potrebuje práve jeden kód terminála", () => {
+    hasError(
+      (d) => (d.terminal_code_map = d.terminal_code_map.filter((m: Doc) => m.code !== "ERRAND")),
+      "prerušenie 4: tlačidlo potrebuje práve jeden kód v terminal_code_map (je ich 0)",
+    );
+    hasError(
+      (d) => d.terminal_code_map.push({ code: "ERRAND2", interruption: 4 }),
+      "prerušenie 4: tlačidlo potrebuje práve jeden kód v terminal_code_map (je ich 2)",
+    );
+  });
+  it("dve tlačidlá s rovnakým textom (bez ohľadu na veľkosť písmen); bez textu platí názov", () => {
+    hasError((d) => (it_(d, 4).terminal_label = "LEKÁR"), "majú tlačidlo s rovnakým textom");
+    hasError((d) => {
+      delete it_(d, 4).terminal_label;
+      delete it_(d, 4).terminal_order;
+      it_(d, 12).terminal_label = "Služobné vzdialenie";
+    }, "majú tlačidlo s rovnakým textom");
+    const d = golden();
+    delete it_(d, 4).terminal_label; // text tlačidla je potom name „Služobné vzdialenie“
+    expect(check(d).errors).toEqual([]);
+  });
+  it("najviac 12 tlačidiel", () => {
+    hasError((d) => {
+      for (let n = 20; n < 33; n++) {
+        d.interruptions.push({
+          code: n,
+          name: `Iné ${n}`,
+          short_name: `I${n}`,
+          start_punch_code: 0,
+          end_punch_code: 0,
+          is_work: false,
+          is_lunch: false,
+          auto_end_of_shift: false,
+          calc: "COUNTED",
+          terminal_button: true,
+          terminal_label: `Iné ${n}`,
+          terminal_order: 50,
+        });
+        d.terminal_code_map.push({ code: `X${n}`, interruption: n });
+      }
+    }, "tlačidiel pre terminál je 17, najviac 12");
+  });
+});
+
 describe("kódy razení, mapovanie, sviatky", () => {
   it("kód razenia odkazuje na neexistujúce prerušenie", () => {
     rejects((d) => (d.punch_codes[0].interruption = 99), "neexistujúce prerušenie 99");

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/kaleta76/offline-dochs/contract/config-export.schema.json",
-  "title": "dochs_config.json – konfigurácia a výpočtový plán z Accessu pre terminál (kontrakt 1.2.0, schema_version 2)",
+  "title": "dochs_config.json – konfigurácia a výpočtový plán z Accessu pre terminál (kontrakt 1.2.0 a 1.3.0, schema_version 2)",
   "description": "Smer Access -> terminál. Access je systém, ktorý rozhoduje (fondy, kalendáre, sviatky, úväzky, pravidlá); terminál len preberá hotové výsledky a podľa nich počíta saldo. Súbor NESMIE obsahovať osobné údaje: zamestnanec je len osobné číslo. Nadmnožina schema_version 1 (všetky kľúče verzie 1 ostávajú). Sémantiku a krížové kontroly (dĺžky polí, typ dňa vs. dátum, odkazy) overuje contract/tools/verify_config.py.",
   "type": "object",
   "required": ["schema_version", "config_version", "rok", "rules", "interruptions", "punch_codes", "holidays",
@@ -50,7 +50,10 @@
           },
           "counts_to_fund": { "type": "boolean", "description": "informatívne (CiselnikPreruseni.ZapocitavatDoFondu), výpočet dňa ho zatiaľ nepoužíva" },
           "counts_to_work": { "type": "boolean", "description": "informatívne (ZapocitavatDoPrace)" },
-          "deducts_leave": { "type": "boolean", "description": "informatívne (OdpocitavatZDovolenky)" }
+          "deducts_leave": { "type": "boolean", "description": "informatívne (OdpocitavatZDovolenky)" },
+          "terminal_button": { "type": "boolean", "description": "kontrakt 1.3.0: true = prerušenie má na obrazovke terminálu vlastné tlačidlo (odchod s týmto dôvodom; návrat je Príchod). Neplatí pre č. 1 a č. 7. Prerušenie s true potrebuje práve jeden kód v terminal_code_map. Access kľúč vynechá, ak nie je nastavený." },
+          "terminal_label": { "type": "string", "minLength": 1, "maxLength": 24, "description": "kontrakt 1.3.0: text tlačidla (celý názov alebo skratka, ako ju určí Access); bez neho sa použije name. Len spolu s terminal_button = true." },
+          "terminal_order": { "type": "integer", "minimum": 1, "maximum": 99, "description": "kontrakt 1.3.0: poradie tlačidla na obrazovke (od najmenšieho); pri rovnakom čísle rozhoduje číslo prerušenia. Len spolu s terminal_button = true." }
         },
         "additionalProperties": false
       }

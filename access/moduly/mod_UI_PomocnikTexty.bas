@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_PomocnikTexty"
-'@Verzia 1.2.0
+'@Verzia 1.2.1
 Option Compare Database
 Option Explicit
 
@@ -256,7 +256,7 @@ Private Sub SeedPrerusenia()
     Call NovaKarta("PRERUSENIA", 5, "Prerušenia", "Prerušenia a nastavenia", _
         "Číselník prerušení, kódy razení terminálu, parametre výpočtu a časový profil strediska.", True)
     Riadok "UCEL", "Čo karta robí", "Jednorazové nastavenie pravidiel, podľa ktorých sa pípnutia vyhodnocujú: číselník prerušení (obed, lekár, služobná cesta ...), kódy razení terminálu, parametre výpočtu a časový profil strediska (pružný čas)."
-    Riadok "KROK", "Predvolená konfigurácia", "Pri prvom použití kliknite na INICIALIZOVAŤ PREDVOLENÚ KONFIGURÁCIU. Doplní len to, čo chýba, a nič neprepíše. Riadok pod tlačidlom ukazuje počet prerušení a kódov razení."
+    Riadok "KROK", "Predvolená konfigurácia", "Pri prvom použití kliknite na INICIALIZOVAŤ PREDVOLENÚ KONFIGURÁCIU. Doplní len to, čo chýba, a nič neprepíše. V databáze bez fondov vytvorí aj pracovný fond 7:30, šablónu pravidiel bez kontroly a kalendár a priradí ich zamestnancom bez priradenia (fondy zo staršej databázy najprv preneste na karte 1). Riadok pod tlačidlom ukazuje počet prerušení a kódov razení."
     Riadok "KROK", "Číselník prerušení", "V zozname vyberte prerušenie a upravte Číslo, Názov, Skratku, Kód začiatku a Kód konca (kódy, ktoré pípne terminál). Nové vytvoríte tlačidlom Nové, uložíte tlačidlom Uložiť a odstránite tlačidlom Zmazať."
     Riadok "MOZNOST", "Auto-ukončenie prerušenia", "Políčko Pri chýbajúcom návrate ukončiť do konca smeny určuje, že auto-oprava ukončí prerušenie bez návratu do konca fondu (ako odhad na schválenie)."
     Riadok "KROK", "Parametre výpočtu", "V časti 2 nastavte okno práce (od {-} do), dĺžku obeda a limit práce, od ktorého sa obed odpočíta, ak nebol pípnutý. Uložte tlačidlom Uložiť parametre."

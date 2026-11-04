@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_Tab_Prerusenia"
-'@Verzia 2.8.0
+'@Verzia 2.9.0
 Option Compare Database
 Option Explicit
 
@@ -290,15 +290,25 @@ ChybaHandler:
 End Function
 
 Public Function InicializujKonfiguraciuUI() As Boolean
-    Dim n As Long
-    If MsgBox("Doplniť predvolenú konfiguráciu (prerušenia a kódy razení, pravidlá anomálií, parametre výpočtu, štátne sviatky SR)?" & vbCrLf & vbCrLf & _
-              "Existujúce záznamy sa NEMENIA, doplnia sa len chýbajúce.", vbYesNo + vbQuestion, "Predvolená konfigurácia") <> vbYes Then Exit Function
+    Dim n As Long, nF As Long, strF As String
+    If MsgBox("Doplniť predvolenú konfiguráciu?" & vbCrLf & vbCrLf & _
+              "- prerušenia a kódy razení, pravidlá anomálií, parametre výpočtu, štátne sviatky SR," & vbCrLf & _
+              "- pracovný fond (denný fond 7:30), šablónu pravidiel bez kontroly a kalendár, ak ešte žiadne nie sú, a ich priradenie zamestnancom, ktorí nemajú žiadne priradenie." & vbCrLf & vbCrLf & _
+              "Existujúce záznamy sa NEMENIA, doplnia sa len chýbajúce." & vbCrLf & vbCrLf & _
+              "Ak chcete preniesť fondy a priradenia zo staršej databázy (karta 1, tlačidlo 5), urobte to PRED týmto krokom.", _
+              vbYesNo + vbQuestion, "Predvolená konfigurácia") <> vbYes Then Exit Function
     n = mod_10_Konfiguracia.InicializujPredvolenuKonfiguraciu(True)
     If n >= 0 Then
-        MsgBox "Konfigurácia je pripravená. Pridaných záznamov: " & n & vbCrLf & vbCrLf & mod_10_Konfiguracia.StavKonfiguracie(), vbInformation, "Predvolená konfigurácia"
+        nF = mod_10_Konfiguracia.InicializujPracovneNastavenia(strF)
+        If nF < 0 Then
+            MsgBox "Prerušenia, kódy a parametre sú pripravené, ale pracovný fond sa nepodarilo doplniť:" & vbCrLf & vbCrLf & strF & vbCrLf & vbCrLf & _
+                   "Podrobnosti sú v logu (záložka Audit & Admin).", vbExclamation, "Predvolená konfigurácia"
+        Else
+            MsgBox "Konfigurácia je pripravená. Pridaných záznamov: " & (n + nF) & vbCrLf & vbCrLf & strF & vbCrLf & mod_10_Konfiguracia.StavKonfiguracie(), vbInformation, "Predvolená konfigurácia"
+        End If
         Call InitDefaults(Forms!frmHlavnaKonzola)
         Call mod_UI_Pomocnik.OznacCinnost("PRERUSENIA")
-        InicializujKonfiguraciuUI = True
+        InicializujKonfiguraciuUI = (nF >= 0)
     Else
         MsgBox "Inicializácia zlyhala - podrobnosti sú v logu (záložka Audit & Admin).", vbExclamation, "Predvolená konfigurácia"
     End If

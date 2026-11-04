@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_17_FondyPravidla"
-'@Verzia 1.1.0
+'@Verzia 1.2.0
 Option Compare Database
 Option Explicit
 
@@ -35,6 +35,7 @@ Option Explicit
 ' - ZoznamPredvoliePravidielVL / PredvolbaPravidla(kod, d) : Predvolené hodnoty pravidla prerušenia (obed, krátke prerušenie ...).
 ' - SqlZamestnanciVyber / TextPouzivajucich(typ, kod, rok, mes) : Zoznam zamestnancov pre skok; text okna Kto používa.
 ' - NovyFondZPredvolby(nazov, predvolba, rok, mes, chyba) : Nový fond z predvoľby, jedna verzia od mesiaca.
+' - DoplnPredvolenyFondASablonu(sprava)     : Predvolený fond, šablóna bez kontroly a kalendár v prázdnej databáze + priradenie zamestnancom bez priradenia.
 '===============================================================================
 
 '-------------------------------------------------------------------------------
@@ -718,4 +719,165 @@ Public Function NovyFondZPredvolby(ByVal strNazov As String, ByVal lPredvolba As
 Chyba:
     strChyba = "Nový fond sa nepodarilo vytvoriť: " & Err.Description
     Call mod_00_Common.ZapisLog("mod_17_FondyPravidla.NovyFondZPredvolby", "ERROR", Err.Description)
+End Function
+
+'===============================================================================
+' PREDVOLENÝ FOND, ŠABLÓNA A KALENDÁR (tlačidlo INICIALIZOVAŤ PREDVOLENÚ KONFIGURÁCIU)
+'===============================================================================
+
+'-------------------------------------------------------------------------------
+' Mesiac, od ktorého platia predvolené nastavenia: mesiac najstaršieho razenia, ak je starší ako január aktuálneho roka,
+' inak január aktuálneho roka. Pre staršie mesiace platí najstaršia verzia (pozri PlatnaVerzia), mesiac teda výpočet nemení.
+'-------------------------------------------------------------------------------
+Private Sub ZaciatokPredvolenychNastaveni(ByRef iRok As Integer, ByRef iMes As Integer)
+    Dim v As Variant
+    iRok = Year(Date)
+    iMes = 1
+    On Error Resume Next
+    If mod_00_Common.TabulkaExistuje("DochadzkaImport") Then
+        v = DMin("Datum", "DochadzkaImport")
+        If Not IsNull(v) Then
+            If CDate(v) < DateSerial(iRok, 1, 1) And Year(CDate(v)) >= 1990 Then
+                iRok = Year(CDate(v))
+                iMes = Month(CDate(v))
+            End If
+        End If
+    End If
+    Err.Clear
+End Sub
+
+'-------------------------------------------------------------------------------
+' Doplní predvolený pracovný fond (pružný, denný fond z nastavenia PredvolenyFondMin = 7:30, bez časového okna), šablónu pravidiel
+' prerušení bez kontroly a kalendár (pracovné dni Po-Pi + štátne sviatky) a priradí ich zamestnancom, ktorí nemajú žiadne priradenie.
+' Nič sa neprepisuje: fond vznikne len v databáze bez fondov, šablóna len bez šablón, kalendár len bez kalendárov; priradenie dostanú
+' len zamestnanci bez riadku v ZamestnanciFondy. Ak fondy, šablóny alebo kalendáre už sú, použije sa ten s číslom 1, ak existuje.
+' Priradenie je rovnaké, aké výpočet použije pre zamestnanca bez priradenia (fond, šablóna a kalendár č. 1, doterajší úväzok),
+' výsledky výpočtu sa teda nemenia; nastavenie je len viditeľné a vyberie sa do exportu pre terminál.
+' Vráti počet pridaných záznamov (fond + šablóna + kalendár + priradenia), -1 pri chybe. strSprava = prehľad pre používateľa.
+'-------------------------------------------------------------------------------
+Public Function DoplnPredvolenyFondASablonu(ByRef strSprava As String) As Long
+    On Error GoTo Chyba
+    Dim db As DAO.Database, d As Object, rs As DAO.Recordset, rsA As DAO.Recordset, v As Variant
+    Dim iRok As Integer, iMes As Integer, n As Long, nZam As Long, bVytvorene As Boolean
+    Dim lFond As Long, lSab As Long, lKal As Long, lDenny As Long, strErr As String, strOC As String
+
+    strSprava = ""
+    Set db = CurrentDb
+    For Each v In Array("PracovneFondy", "ParametrePreruseni", "Kalendare", "ZamestnanciFondy", "Zamestnanci")
+        If Not mod_00_Common.TabulkaExistujeDB(db, CStr(v)) Then
+            strSprava = "Chýba tabuľka " & CStr(v) & " - najprv spustite inicializáciu databázy."
+            DoplnPredvolenyFondASablonu = -1
+            Exit Function
+        End If
+    Next v
+    Call mod_15_Zamestnanci.ZabezpecModel(db)
+    Call ZaciatokPredvolenychNastaveni(iRok, iMes)
+
+    ' pracovný fond
+    If Nz(DCount("*", "PracovneFondy"), 0) = 0 Then
+        lDenny = CLng(Val(mod_00_Common.GetNastavenie("PredvolenyFondMin", "450")))
+        If lDenny <= 0 Or lDenny > 1440 Then lDenny = 450
+        Set d = CreateObject("Scripting.Dictionary")
+        d("Nazov") = "Pracovný fond " & MinutyNaText(lDenny) & " (predvolený)"
+        d("Typ") = 2: d("Denny") = lDenny: d("Mesacny") = 0: d("PodlaDna") = False
+        lFond = mod_15_Zamestnanci.NasledneCislo("PracovneFondy", "Cislo", "ZamestnanciFondy", "PracFondKod")
+        strErr = UlozFond(lFond, iRok, iMes, d)
+        If Len(strErr) > 0 Then strSprava = strErr: DoplnPredvolenyFondASablonu = -1: Exit Function
+        n = n + 1
+        bVytvorene = True
+        strSprava = strSprava & "Pracovný fond č. " & lFond & " '" & CStr(d("Nazov")) & "': pružný, denný fond " & MinutyNaText(lDenny) & ", bez časového okna, od " & iMes & "/" & iRok & "." & vbCrLf
+    Else
+        If Nz(DCount("*", "PracovneFondy", "Cislo = 1"), 0) > 0 Then lFond = 1
+        strSprava = strSprava & "Pracovné fondy už existujú - nemenili sa." & vbCrLf
+    End If
+
+    ' šablóna pravidiel prerušení (jedno vypnuté pravidlo, aby šablóna existovala; pravidlá sa tak nekontrolujú)
+    If Nz(DCount("*", "ParametrePreruseni"), 0) = 0 Then
+        Set d = CreateObject("Scripting.Dictionary")
+        Call PredvolbaPravidla(1, d)
+        d("Nazov") = "Pracovná doba"
+        lSab = mod_15_Zamestnanci.NasledneCislo("ParametrePreruseni", "Sablona", "ZamestnanciFondy", "ParPrerKod")
+        strErr = UlozPravidlo(lSab, 1, iRok, iMes, d)
+        If Len(strErr) > 0 Then strSprava = strSprava & strErr: DoplnPredvolenyFondASablonu = -1: Exit Function
+        db.Execute "UPDATE ParametrePreruseni SET NazovSablony = 'Základná (bez kontroly)' WHERE Sablona = " & lSab & ";", dbFailOnError
+        n = n + 1
+        bVytvorene = True
+        strSprava = strSprava & "Šablóna pravidiel prerušení č. " & lSab & " 'Základná (bez kontroly)': pravidlá prerušení sa nekontrolujú." & vbCrLf
+    Else
+        If Nz(DCount("*", "ParametrePreruseni", "Sablona = 1"), 0) > 0 Then lSab = 1
+        strSprava = strSprava & "Šablóny pravidiel už existujú - nemenili sa." & vbCrLf
+    End If
+
+    ' kalendár: bez vlastných dní, platí pracovný týždeň Po-Pi a štátne sviatky z tabuľky Sviatky
+    If Nz(DCount("*", "Kalendare"), 0) = 0 Then
+        lKal = mod_15_Zamestnanci.NasledneCislo("Kalendare", "Cislo", "ZamestnanciFondy", "KalendarKod")
+        Set rs = db.OpenRecordset("SELECT * FROM Kalendare WHERE 1 = 0;", dbOpenDynaset)
+        rs.AddNew
+        Call NulujNovyRiadok(rs)
+        rs!Cislo = lKal
+        rs!Rok = iRok
+        rs!Mesiac = iMes
+        rs!Nazov = "Pracovné dni Po-Pi, sviatky SR"
+        rs.Update
+        rs.Close
+        n = n + 1
+        bVytvorene = True
+        strSprava = strSprava & "Kalendár č. " & lKal & " 'Pracovné dni Po-Pi, sviatky SR'." & vbCrLf
+    Else
+        If Nz(DCount("*", "Kalendare", "Cislo = 1"), 0) > 0 Then lKal = 1
+        strSprava = strSprava & "Kalendáre už existujú - nemenili sa." & vbCrLf
+    End If
+
+    ' priradenie zamestnancom, ktorí nemajú žiadne
+    If lFond > 0 And lSab > 0 And lKal > 0 Then
+        Set rs = db.OpenRecordset("SELECT DISTINCT Z.OsobneCislo FROM Zamestnanci AS Z LEFT JOIN ZamestnanciFondy AS F ON Z.OsobneCislo = F.OsobneCislo " & _
+                                  "WHERE Z.OsobneCislo Is Not Null AND F.OsobneCislo Is Null;", dbOpenSnapshot)
+        Set rsA = db.OpenRecordset("SELECT * FROM ZamestnanciFondy WHERE 1 = 0;", dbOpenDynaset)
+        Do While Not rs.EOF
+            strOC = Trim$(CStr(Nz(rs!OsobneCislo, "")))
+            If Len(strOC) > 0 Then
+                rsA.AddNew
+                rsA!OsobneCislo = strOC
+                rsA!Rok = iRok
+                rsA!Mesiac = iMes
+                rsA!PracFondKod = lFond
+                rsA!ParPrerKod = lSab
+                rsA!KalendarKod = lKal
+                rsA!ParDochKod = 1
+                On Error Resume Next
+                rsA.Fields("UvazokPercent").Value = mod_15_Zamestnanci.UvazokZamestnanca(db, strOC)
+                Err.Clear
+                On Error GoTo Chyba
+                rsA.Update
+                nZam = nZam + 1
+            End If
+            rs.MoveNext
+        Loop
+        rsA.Close
+        rs.Close
+        If nZam > 0 Then
+            strSprava = strSprava & "Priradené zamestnancom bez priradenia: " & nZam & " (fond " & lFond & ", šablóna " & lSab & ", kalendár " & lKal & ", od " & iMes & "/" & iRok & ")." & vbCrLf
+        Else
+            strSprava = strSprava & "Všetci zamestnanci už majú priradenie." & vbCrLf
+        End If
+    Else
+        strSprava = strSprava & "Priradenie zamestnancom sa nerobilo: fond, šablóna a kalendár č. 1 nie sú všetky v databáze (priraďte ručne na karte Zamestnanci)." & vbCrLf
+    End If
+
+    n = n + nZam
+    If n > 0 Then
+        Call mod_15_Zamestnanci.Zam_ZrusCache
+        Call mod_08_UdalostiDna.ObnovParametre
+        Call mod_18_Uzavierka.OznacNastaveniaLokalne
+    End If
+    If bVytvorene Then
+        Call mod_00_Common.SetNastavenie("PredvolenePracovneNastavenia", Format$(Now, "yyyy-mm-dd hh:nn"), "Predvolený fond, šablóna alebo kalendár vytvorené tlačidlom INICIALIZOVAŤ PREDVOLENÚ KONFIGURÁCIU (import zo staršej databázy ich zmieša s importovanými)")
+    End If
+    Call mod_00_Common.ZapisLog("mod_17_FondyPravidla.DoplnPredvolenyFondASablonu", "INFO", "Pridaných záznamov: " & n, strSprava)
+    DoplnPredvolenyFondASablonu = n
+    Exit Function
+Chyba:
+    strSprava = strSprava & "CHYBA: " & Err.Description
+    Call mod_00_Common.ZapisLog("mod_17_FondyPravidla.DoplnPredvolenyFondASablonu", "ERROR", Err.Description, strSprava)
+    DoplnPredvolenyFondASablonu = -1
 End Function

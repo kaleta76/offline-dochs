@@ -1,5 +1,28 @@
 # Dochádzka – zmeny
 
+## Balík 2.13.0
+Tlačidlo INICIALIZOVAŤ PREDVOLENÚ KONFIGURÁCIU (karta 5) vytvorí aj pracovný fond, šablónu pravidiel a kalendár a priradí ich zamestnancom.
+- **Súvislosť**: v novej prázdnej databáze (nainštalovanej bez importu zo staršej) neboli žiadne fondy, šablóny ani kalendáre, takže dialóg „Priradiť fond, pravidlá a úväzok označeným…“
+  nemal čo ponúknuť („Nie je čo zmeniť“) a karta Zamestnanci ukazovala „1 - (chyba v číselníku)“. Výpočet pritom fungoval: zamestnanec bez priradenia dostane fond, šablónu a kalendár č. 1
+  a pri chýbajúcom fonde denný fond 450 min. Nastavenie bolo len neviditeľné a v exporte pre terminál bez názvu fondu.
+- **`mod_17_FondyPravidla` 1.2.0**: nová `DoplnPredvolenyFondASablonu`. Nič neprepisuje:
+  - pracovný fond vznikne len v databáze bez fondov (pružný, denný fond z nastavenia `PredvolenyFondMin`, predvolene 7:30, bez časového okna),
+  - šablóna „Základná (bez kontroly)“ (jedno vypnuté pravidlo pre prácu, aby šablóna existovala; pravidlá prerušení sa nekontrolujú) len v databáze bez šablón,
+  - kalendár „Pracovné dni Po-Pi, sviatky SR“ (bez vlastných dní, platí pracovný týždeň a tabuľka sviatkov) len v databáze bez kalendárov,
+  - priradenie (fond, šablóna a kalendár č. 1, doterajší úväzok) dostanú len zamestnanci bez akéhokoľvek priradenia. Je to to isté, čo výpočet pre nich používal aj bez riadku,
+    **výsledky výpočtu sa nemenia**; nastavenie je len viditeľné a exportuje sa s názvom,
+  - platnosť začína mesiacom najstaršieho razenia (ak je starší ako január aktuálneho roka), inak januárom aktuálneho roka; staršie mesiace aj tak berú najstaršiu verziu,
+  - opakované kliknutie doplní len nových zamestnancov bez priradenia.
+- **`mod_10_Konfiguracia` 1.1.0**: `InicializujPracovneNastavenia` (obálka); `StavKonfiguracie` ukazuje aj počet šablón, kalendárov, zamestnancov s priradením a parametre výpočtu
+  (okno práce, obed). `InicializujPredvolenuKonfiguraciu`, ktorú volá inštalátor, sa **nemení**: fond sa tam zámerne nevytvára, lebo inštalátor importuje zo staršej databázy a fond č. 1
+  by sa zmiešal s fondom č. 1 zo starej databázy.
+- **`mod_UI_Tab_Prerusenia` 2.9.0**: tlačidlo po potvrdení doplní konfiguráciu a pracovné nastavenia a vypíše, čo sa vytvorilo.
+- **`mod_UI_Tab_Import` 2.8.0**: import zo staršej databázy upozorní (predvolené Nie), ak v tejto databáze už vznikol predvolený fond, šablóna alebo kalendár: fond č. 1 zo starej databázy
+  sa zmieša s predvoleným a priradenia z inicializácie môžu prekryť priradenia zo starej databázy. **Poradie**: najprv import zo starej databázy, potom INICIALIZOVAŤ.
+- **`mod_UI_PomocnikTexty` 1.2.1**: pomocník karty 5 opisuje nové správanie.
+- **Čo to nerieši**: predvolený fond platí pre všetkých rovnako (100 % úväzok). Zamestnanci s iným fondom, úväzkom alebo kalendárom sa nastavia ručne („Priradiť…“) alebo prenesú zo starej databázy.
+- **Neoverené v skutočnom Accesse**: nový kód prešiel `tools/kontrola_vba.py` (0 nálezov), ale nespúšťal sa. Pri chybe pošlite text hlásenia s názvom procedúry.
+
 ## Balík 2.12.1
 Oprava chyby kompilácie v module konfigurácie pre terminál (balík 2.12.0 sa v Accesse nedal skompilovať).
 - **Chyba**: Ladenie > Kompilovať hlásilo `Compile error: Expected array` v `mod_20_KonfiguraciaExport`, procedúra `SekciaSablony`.

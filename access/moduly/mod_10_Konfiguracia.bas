@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_10_Konfiguracia"
-'@Verzia 1.0.1
+'@Verzia 1.1.0
 Option Compare Database
 Option Explicit
 
@@ -12,6 +12,7 @@ Option Explicit
 ' ZOZNAM PROCEDÚR A FUNKCIÍ:
 ' ------------------------------------------------------------------------------
 ' - InicializujPredvolenuKonfiguraciu(bTicho)  : Dopln všetko, čo chýba; vráti počet pridaných záznamov.
+' - InicializujPracovneNastavenia(sprava)     : Predvolený pracovný fond, šablóna bez kontroly, kalendár a priradenie zamestnancom (iba z tlačidla, nie z inštalátora).
 ' - ZabezpecStlpceKonfiguracie(db)             : Doplní nové stĺpce (AutoKoniecDoKoncaSmeny, Sviatky.Rok).
 ' - PridajSviatkyRokov(db, rokOd, rokDo)       : Pohyblivé sviatky (Veľká noc) na zvolené roky.
 ' - VelkaNoc(rok)                              : Dátum Veľkonočnej nedele.
@@ -268,6 +269,16 @@ Chyba:
 End Function
 
 '-------------------------------------------------------------------------------
+' Pracovné nastavenia pre prázdnu databázu: pracovný fond (denný fond z PredvolenyFondMin), šablóna pravidiel bez kontroly,
+' kalendár Po-Pi so štátnymi sviatkami a ich priradenie zamestnancom bez priradenia. Nič existujúce sa nemení.
+' Zámerne sa nevolá z InicializujPredvolenuKonfiguraciu, ktorú používa inštalátor PRED importom zo staršej databázy:
+' fond č. 1 by sa zmiešal s fondom č. 1 zo starej databázy a prekryl jej priradenia. Vráti počet pridaných záznamov (-1 pri chybe).
+'-------------------------------------------------------------------------------
+Public Function InicializujPracovneNastavenia(ByRef strSprava As String) As Long
+    InicializujPracovneNastavenia = mod_17_FondyPravidla.DoplnPredvolenyFondASablonu(strSprava)
+End Function
+
+'-------------------------------------------------------------------------------
 ' Zmení jeden kľúč v texte Parametre pravidla ("A=1; B=2"); ak kľúč chýba, pridá ho.
 '-------------------------------------------------------------------------------
 Public Function NastavParameterPravidla(ByVal strKod As String, ByVal strKluc As String, ByVal strHodnota As String) As Boolean
@@ -441,6 +452,26 @@ Public Function StavKonfiguracie() As String
         "Pravidlá anomálií: " & DCount("*", "CiselnikPravidielAnomalii") & vbCrLf & _
         "Sviatky (riadkov): " & DCount("*", "Sviatky") & vbCrLf & _
         "Zamestnanci: " & DCount("*", "Zamestnanci") & vbCrLf & _
-        "Pracovné fondy: " & DCount("*", "PracovneFondy") & " (bez fondu sa používa " & mod_00_Common.GetNastavenie("PredvolenyFondMin", "450") & " min/deň)"
+        "Pracovné fondy: " & PocetRozdielnych("PracovneFondy", "Cislo") & " (bez fondu sa používa " & mod_00_Common.GetNastavenie("PredvolenyFondMin", "450") & " min/deň)" & vbCrLf & _
+        "Šablóny pravidiel prerušení: " & PocetRozdielnych("ParametrePreruseni", "Sablona") & vbCrLf & _
+        "Kalendáre: " & PocetRozdielnych("Kalendare", "Cislo") & vbCrLf & _
+        "Zamestnanci s priradením fondu: " & PocetRozdielnych("ZamestnanciFondy", "OsobneCislo") & " z " & DCount("*", "Zamestnanci") & vbCrLf & _
+        "Okno práce: " & mod_17_FondyPravidla.MinutyNaText(mod_08_UdalostiDna.PrmOknoOd()) & " - " & mod_17_FondyPravidla.MinutyNaText(mod_08_UdalostiDna.PrmOknoDo()) & _
+        ", obed " & mod_08_UdalostiDna.PrmObedMin() & " min po " & mod_08_UdalostiDna.PrmObedLimit() & " min práce bez pípnutého obeda"
     StavKonfiguracie = s
+End Function
+
+'-------------------------------------------------------------------------------
+' Počet rôznych hodnôt stĺpca v tabuľke (pri chybe alebo chýbajúcej tabuľke 0).
+'-------------------------------------------------------------------------------
+Private Function PocetRozdielnych(ByVal strTab As String, ByVal strPole As String) As Long
+    Dim rs As DAO.Recordset
+    On Error GoTo Chyba
+    If Not mod_00_Common.TabulkaExistuje(strTab) Then Exit Function
+    Set rs = CurrentDb.OpenRecordset("SELECT Count(*) AS N FROM (SELECT DISTINCT [" & strPole & "] FROM [" & strTab & "] WHERE [" & strPole & "] Is Not Null) AS T;", dbOpenSnapshot)
+    If Not rs.EOF Then PocetRozdielnych = CLng(Nz(rs!N, 0))
+    rs.Close
+    Exit Function
+Chyba:
+    PocetRozdielnych = 0
 End Function

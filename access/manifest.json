@@ -1,6 +1,6 @@
 {
-  "balik": "2.12.0",
-  "vytvorene": "2026-11-04 12:48:14",
+  "balik": "2.12.1",
+  "vytvorene": "2026-11-04 16:10:31",
   "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
   "zrusene": [
     "modExportLovableConfig",
@@ -135,9 +135,9 @@
     },
     "mod_20_KonfiguraciaExport": {
       "subor": "moduly/mod_20_KonfiguraciaExport.bas",
-      "verzia": "1.0.0",
-      "sha256": "f73926985fc9e5f6ac13289e351cc6fcf451958467fadd835d8b8d06758913b3",
-      "obsah_sha256": "b1ee4c24a33ddde7b7301745caa1b8e30d375ff2e8e289ebfd701ffe6f5210d6"
+      "verzia": "1.0.1",
+      "sha256": "3e0a2eeeffb675e84bac8a0d2e73ef9850b71f59b4e3fea6c9b90e9f218a71cd",
+      "obsah_sha256": "b3b45e9a4d78a199b8353942d1624fd9080b1b382708d6a450be0977de8bccea"
     },
     "mod_UI_Core": {
       "subor": "moduly/mod_UI_Core.bas",

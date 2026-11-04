@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_20_KonfiguraciaExport"
-'@Verzia 1.0.0
+'@Verzia 1.0.1
 Option Compare Database
 Option Explicit
 
@@ -444,7 +444,7 @@ End Function
 
 ' Šablóny pravidiel prerušení použité zamestnancami; pravidlá sú vyhodnotené pre každý mesiac okna rovnako ako pri kontrole dňa.
 Private Function SekciaSablony(ByRef db As DAO.Database, ByVal dicSab As Object, ByRef lMes() As Long, ByVal nMes As Long, ByVal dicPrer As Object) As String
-    Dim v As Variant, kl As Variant, i As Long, j As Long, q As Long, s As String, strNazov As String, vN As Variant
+    Dim v As Variant, kl As Variant, i As Long, iMes As Long, q As Long, s As String, strNazov As String, vN As Variant
     Dim rul As Object, x As Object, c As Long, a As Long
     s = "  ""templates"": [" & vbCrLf
     v = KluceUsporiadane(dicSab)
@@ -456,10 +456,10 @@ Private Function SekciaSablony(ByRef db As DAO.Database, ByVal dicSab As Object,
         End If
         If i > LBound(v) Then s = s & "," & vbCrLf
         s = s & "    {" & vbCrLf & "      ""id"": " & CLng(v(i)) & ", ""name"": " & J(strNazov) & "," & vbCrLf & "      ""months"": [" & vbCrLf
-        For j = 1 To nMes
-            Set rul = mod_16_PravidlaPreruseni.PravidlaSablonyPreMesiac(db, CLng(v(i)), CLng(lMes(j) \ 100) * 12 + (lMes(j) Mod 100))
-            If j > 1 Then s = s & "," & vbCrLf
-            s = s & "        { ""month"": " & J(MesText(lMes(j))) & ", ""rules"": ["
+        For iMes = 1 To nMes
+            Set rul = mod_16_PravidlaPreruseni.PravidlaSablonyPreMesiac(db, CLng(v(i)), CLng(lMes(iMes) \ 100) * 12 + (lMes(iMes) Mod 100))
+            If iMes > 1 Then s = s & "," & vbCrLf
+            s = s & "        { ""month"": " & J(MesText(lMes(iMes))) & ", ""rules"": ["
             kl = KluceUsporiadane(rul)
             q = 0
             For a = LBound(kl) To UBound(kl)
@@ -475,7 +475,7 @@ Private Function SekciaSablony(ByRef db As DAO.Database, ByVal dicSab As Object,
                 End If
             Next a
             s = s & IIf(q > 0, vbCrLf & "          ", "") & "] }"
-        Next j
+        Next iMes
         s = s & vbCrLf & "      ]" & vbCrLf & "    }"
     Next i
     s = s & vbCrLf & "  ]"

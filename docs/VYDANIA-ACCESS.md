@@ -87,3 +87,8 @@ Spúšťa sa z koreňa repozitára: `python3 -I tools/over_access_balik.py` (vyp
 
 Po úprave modulu spustite v priečinku `access/` príkaz `python tools/zostav_balik.py` (skontroluje verzie a prepíše `manifest.json`).
 Ďalšie parametre: `--verzia` vypíše verziu, `--poznamky SUBOR` zapíše text vydania. Testy: `python3 -I tools/test_over_access_balik.py`.
+
+## Čo kontroluje `tools/kontrola_vba.py`
+
+Access hlási chyby kompilácie až pri Ladenie > Kompilovať, a vždy len prvú. Skript `python3 -I tools/kontrola_vba.py` (z koreňa repozitára, CI ho spúšťa pri každom pull requeste) preto vopred prejde všetky moduly v `access/moduly/` a hľadá najčastejšie príčiny: lokálnu premennú s rovnakým menom ako funkcia, ktorú tá istá procedúra volá (VBA nerozlišuje veľkosť písmen, takto vznikla chyba `Expected array` v balíku 2.12.0), nedeklarované premenné pri `Option Explicit`, volanie neexistujúceho alebo súkromného člena modulu, zlý počet argumentov, nezhodu typu pri odovzdaní `ByRef` a nespárované bloky `If` / `For` / `Do` / `With` / `Select`. Nahlási aj možné chyby ako varovania (`--varovania`). Kód 1 = nájdená chyba. Nič nemení. Testy: `python3 -I tools/test_kontrola_vba.py`.
+Je to pomôcka, nie kompilátor: typy výrazov a členy objektov DAO ani Access nekontroluje, takže skutočné Ladenie > Kompilovať po inštalácii ostáva v postupe.

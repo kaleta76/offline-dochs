@@ -1,5 +1,17 @@
 # Dochádzka – zmeny
 
+## Balík 2.12.1
+Oprava chyby kompilácie v module konfigurácie pre terminál (balík 2.12.0 sa v Accesse nedal skompilovať).
+- **Chyba**: Ladenie > Kompilovať hlásilo `Compile error: Expected array` v `mod_20_KonfiguraciaExport`, procedúra `SekciaSablony`.
+  Príčina: premenná cyklu `j` a pomocná funkcia modulu `J()` (zápis textu do JSON) majú pre VBA rovnaké meno (veľkosť písmen sa nerozlišuje),
+  premenná funkciu zatieni a `J(strNazov)` sa chápe ako indexovanie poľa.
+- **`mod_20_KonfiguraciaExport` 1.0.1**: premenná cyklu v `SekciaSablony` sa volá `iMes`. Nič iné sa nemení, výstup je rovnaký.
+- **Ručná oprava bez nového balíka**: v `SekciaSablony` premenovať `j` na `iMes` (6 riadkov: deklarácia v `Dim`, `For`, tri riadky v tele cyklu a `Next`).
+- **Kontrola v repozitári**: `tools/kontrola_vba.py` (CI ju spúšťa pri každej zmene) hľadá túto chybu a príbuzné: zatienenie funkcie lokálnou premennou,
+  nedeklarované premenné, volanie neexistujúceho alebo súkromného člena modulu, zlý počet argumentov, nezhodu typu pri ByRef a nespárované bloky.
+  Všetkých 37 modulov balíka 2.12.1 prechádza bez nálezu. Nie je to náhrada kompilácie v Accesse (typy výrazov a členy objektov DAO nekontroluje).
+- **Neoverené v skutočnom Accesse**: samotná oprava (kompilácia ani export sa tu nespúšťali). Pri ďalšej chybe pošlite snímku okna s názvom procedúry.
+
 ## Balík 2.12.0
 Konfigurácia pre terminál s výpočtovým plánom (kontrakt 1.2.0, `dochs_config.json` v schéme 2).
 - **Súvislosť**: dovtedajší export niesol len číselník prerušení, kódy razení a sviatky. Terminál tak nemohol počítať saldo rovnako ako Access

@@ -11,6 +11,8 @@ Postup pred každým ručným zásahom do databázy (mazanie testovacej organiz�
 5. **Porovnanie** so snapshotom: `docs/zaloha/porovnaj_so_snapshotom.sql`. Zmeniť sa smú len tabuľky, v ktorých ste zasahovali.
 6. Keď je všetko v poriadku, **zmažte snapshot** (kap. 4). Súbor z Exportu si nechajte.
 
+Samostatne od zálohy: ak má Claude vedieť, **ako databáza vyzerá práve teraz**, spustite dotaz zo kapitoly 7 (`docs/zaloha/stav_databazy.sql`) a výsledok priložte do chatu.
+
 ## 1. Čo Lovable Cloud poskytuje
 
 Podľa dokumentácie Lovable ([Database backups](https://docs.lovable.dev/features/database-backups), stav k 4. 11. 2026):
@@ -110,10 +112,36 @@ Zrušená organizácia (migrácia 0007) sa dá obnoviť výlučne bodmi 2 a 3.
 - Odporúčanie: pred každým ručným zásahom nový Export; staršie ponechať aspoň tri a jednu pred každým vydaním. Pravidelné zálohy dnes robí iba Lovable (14 dní).
 - Pred zapísaním **reálnych** osobných čísel do ostrej organizácie overte u Lovable, kde sa zálohy ukladajú a kto k nim má prístup (otvorená úloha z `docs/ZACHRANA-A-NAVRAT.md`).
 
+## 7. Aktuálny stav databázy pre Claude
+
+Claude nemá prístup do databázy v Lovable Cloud (kap. 1), takže o aktuálnych dátach nevie nič, kým mu ich neukážete. Najjednoduchší spôsob je dotaz `docs/zaloha/stav_databazy.sql`: jeden SELECT, ktorý **len číta**, nič nezapisuje ani nevytvára a trvá sekundy.
+
+1. Na GitHube otvorte `docs/zaloha/stav_databazy.sql` → **Raw** → skopírujte celý obsah.
+2. V Lovable Cloud otvorte SQL editor, vložte a spustite (nič nezmení, netreba zálohu).
+3. Výsledok uložte ako **CSV** (rovnako ako pri iných dotazoch) a priložte do chatu.
+
+Výsledok má stĺpce `sekcia`, `polozka`, `hodnota` a obsahuje:
+
+| Sekcia | Čo ukazuje |
+|---|---|
+| `00_prostredie` | čas, verzia servera, ako sa dotaz prihlásil, či vidí `auth.users` |
+| `01_migracie` | ktoré zmeny (0003 až 0007) databáza naozaj obsahuje; nie čo je v repozitári |
+| `02_tabulky` | každá tabuľka: počet riadkov, zapnuté RLS, počet pravidiel |
+| `03_stlpce`, `04_funkcie`, `05_spustace`, `06_pravidla_rls` | štruktúra: stĺpce a typy, funkcie (oprávnenie a práva EXECUTE pre anon/authenticated), spúšťače, pravidlá RLS |
+| `07_organizacie` | každá organizácia: identifikátor, názov, `is_test`, počet účtov, správcov, razení, zariadení, posledné razenie |
+| `08_razenia`, `09_audit` | počty razení (celkom, neoverené, zneplatnené, po mesiacoch) a názvy akcií v audite s počtami |
+| `10_kontroly` | súvislosti: profily bez roly, razenia bez hashu, organizácia bez správcu, účty bez profilu a opačne. `OK` alebo `POZOR n` |
+
+**Čo vo výsledku nie je:** mená, e-maily, osobné čísla, odtlačky hesiel, tokeny zariadení, obsah razení ani podrobnosti auditu. **Čo v ňom je:** názvy a identifikátory organizácií a názvy stĺpcov. Do chatu ho poslať môžete, do verejného repozitára nepatrí.
+
+Kedy ho spustiť: **pred zásahom do databázy a po ňom**, po každej migrácii a vždy, keď sa pýtate „čo je teraz v databáze“. Ak editor nemá právo čítať `auth.users`, dotaz nespadne, uvedie „bez práva“ a príslušné kontroly vynechá.
+
 ## Čo je overené a čo nie
 
 Overené (lokálny PostgreSQL 16 s napodobeninou Supabase, `tools/sql_test/run.sh`): snapshot aj porovnanie prebehli, kópie majú rovnaké počty riadkov, rovnaký obsah `profiles`, zapnuté RLS a anon/authenticated k nim nemajú prístup.
 
 **Skutočný export z Lovable (4. 11. 2026, `offline-dochs_261104.backup.zip`, 0,5 MB):** skript ho prečítal, všetkých 16 očakávaných tabuliek má údaje, `month_closures`, `punch_void_requests`, `personnel_requests` a `notification_preferences` sú prázdne. Nezávisle som údaje rozbalil (zstd) a spočítal riadky v jednotlivých tabuľkách: prázdne tabuľky sa zhodujú, `auth.users` a `profiles` majú rovnaký počet záznamov. Skript `over_zalohu.py` má testy (`tools/test_over_zalohu.py`: archívy 1.14, 1.15 a 1.16 zložené bajt po bajte, poškodený, useknutý a neúplný gzip, prázdne tabuľky, zip) a bol porovnaný s výpismi `pg_dump` 16 vo všetkých kompresiách (gzip, bez, zstd, lz4, výpis cez rúru): počty riadkov sa zhodujú s `COUNT(*)`, zoznam tabuliek so zoznamom z `pg_restore --list`.
+
+**Dotaz `stav_databazy.sql`** má automatické testy (`tools/sql_test/stav_pred_0007.sql`, `stav_po_0007.sql`; spúšťa ich `tools/sql_test/run.sh` spolu s `0007_priprava.sql`): beží v transakcii READ ONLY, výstup neobsahuje e-maily ani osobné čísla, počty sedia s priamym počítaním, kontrola súvislostí vie hlásiť `POZOR`, beží pred aj po migrácii 0007 aj po zrušení organizácie a pri používateľovi bez práva na schému `auth`. **Neoverené:** správanie v skutočnom SQL editore Lovable (limit počtu riadkov a veľkosti výsledku, tlačidlo exportu).
 
 **Neoverené:** skutočná obnova exportu do databázy (potrebuje `pg_restore` 17+, ktorý tu nebol k dispozícii); archívy s kompresiou lz4 a archívy zapísané do rúry skript číta len čiastočne (zoznam tabuliek áno, prázdnosť a počty nie); či Lovable SQL editor povolí zápis (`CREATE SCHEMA`); ako dlho trvá Export na väčšej databáze; obnova cez „Restore to this backup“ (nevyskúšaná, popis je z dokumentácie Lovable).

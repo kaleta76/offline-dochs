@@ -10,6 +10,10 @@ ROOT=$(cd "$HERE/../.." && pwd)
 BIN=$(dirname "$(ls /usr/lib/postgresql/*/bin/initdb | sort -V | tail -1)")
 WORK=$(mktemp -d)
 PORT=${PGTEST_PORT:-54329}
+# Testy, ktoré potrebujú samotný skript ako text (stav_databazy.sql), ho načítajú cez `cat "$ZALOHA_DIR/..."`. psql beží pod používateľom
+# postgres, ktorý nemusí vidieť priečinok repozitára, preto sa skripty skopírujú do pracovného priečinka čitateľného pre všetkých.
+mkdir -p "$WORK/zaloha" && cp "$ROOT"/docs/zaloha/*.sql "$WORK/zaloha/" && chmod -R a+rX "$WORK"
+export ZALOHA_DIR="$WORK/zaloha"
 if [ "$(id -u)" = 0 ]; then
   chown postgres "$WORK"
   as_pg() { su postgres -s /bin/bash -c "$1"; }

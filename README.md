@@ -52,7 +52,7 @@ komunikácia so snímačmi SKE cez sériový port (tento modul nie je vo verejno
 | `src/` | terminál: React + TanStack Start, výpočtový motor `src/lib/engine.ts`, offline fronta, export pre Access |
 | `drizzle/migrations/` | migrácie databázy terminála `0000`–`0006` (aplikuje ich Lovable) |
 | `docs/migracie/` | texty migrácií a záchranné skripty (`0006` zneplatnenie razení je spustená, `0007` zrušenie testovacej organizácie čaká na spustenie) |
-| `docs/zaloha/` | SQL na snapshot databázy pred zásahom a na porovnanie po ňom |
+| `docs/zaloha/` | SQL na snapshot databázy pred zásahom, na porovnanie po ňom a `stav_databazy.sql` (dotaz len na čítanie: aktuálny stav databázy pre Claude) |
 | `tools/` | kontroly balíka Access a zálohy databázy, `tools/sql_test/` = lokálny test SQL migrácií na PostgreSQL |
 | `contract/` | **kontrakt terminál ⇄ Access**: popis, zlaté súbory, referenčná implementácia, testy, overovač, testovacie scenáre. Mení sa iba cez PR so schválením vlastníka |
 | `access/` | dochádzkový systém v Accesse: inštalátor, moduly VBA, testy |
@@ -94,7 +94,7 @@ CI na GitHube (`.github/workflows/ci.yml`) spúšťa po každom PR a pushi do `m
 | [`docs/OVERENIE-ZARIADENI.md`](docs/OVERENIE-ZARIADENI.md) | čo overenie zariadenia zaručuje a čo nie, neoverené razenia, záchranný kód, zmeny zariadení |
 | [`docs/LOVABLE-KREDITY.md`](docs/LOVABLE-KREDITY.md) | čo míňa kredity, synchronizácia s GitHubom |
 | [`docs/ZACHRANA-A-NAVRAT.md`](docs/ZACHRANA-A-NAVRAT.md) | návrat k bezpečnému stavu: kód, databáza, záchranné skripty k migráciám 0006 a 0007 |
-| [`docs/ZALOHA-DATABAZY.md`](docs/ZALOHA-DATABAZY.md) | záloha a návrat databázy v Lovable Cloud: Export, overenie súboru, snapshot pred zásahom |
+| [`docs/ZALOHA-DATABAZY.md`](docs/ZALOHA-DATABAZY.md) | záloha a návrat databázy v Lovable Cloud: Export, overenie súboru, snapshot pred zásahom, výpis aktuálneho stavu |
 | [`docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md`](docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md) | označenie a zrušenie testovacej organizácie správcom, ručné zrušenie |
 | [`access/README.md`](access/README.md), [`access/CHANGELOG.md`](access/CHANGELOG.md) | inštalácia a zmeny dochádzkového systému v Accesse |
 | [`roadmap.md`](roadmap.md) | hotové a otvorené úlohy |

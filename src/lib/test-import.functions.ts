@@ -6,6 +6,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { localTime, TIME_ZONE } from "./punch-export";
 import {
   MAX_TEST_CSV_CHARS,
+  existingInOrganization,
   TEST_DEVICE,
   TEST_MODE_KEY,
   parseTestCsv,
@@ -154,17 +155,24 @@ export const importTestPunches = createServerFn({ method: "POST" })
       }
     }
 
+    // identifikátor s organizáciou sa zapisuje; starý (bez organizácie) sa len rozpoznáva, ak patrí účtu tejto organizácie
     const rows = await Promise.all(
-      parsed.rows.map(async (r) => ({ ...r, uuid: await testPunchUuid(r), user: profiles.get(r.sap) })),
+      parsed.rows.map(async (r) => ({
+        ...r,
+        uuid: await testPunchUuid(r, organization),
+        legacyUuid: await testPunchUuid(r),
+        user: profiles.get(r.sap),
+      })),
     );
+    const orgUsers = new Set(profiles.values());
     const existing = new Set<string>();
-    for (let i = 0; i < rows.length; i += 100) {
-      const chunk = rows.slice(i, i + 100).map((r) => r.uuid);
-      const { data: found, error } = await admin.from("punches").select("client_uuid").in("client_uuid", chunk);
+    for (let i = 0; i < rows.length; i += 50) {
+      const chunk = rows.slice(i, i + 50).flatMap((r) => [r.uuid, r.legacyUuid]);
+      const { data: found, error } = await admin.from("punches").select("client_uuid, user_id").in("client_uuid", chunk);
       if (error) throw new Error("Existujúce razenia sa nepodarilo skontrolovať.");
-      for (const f of found ?? []) existing.add(f.client_uuid);
+      for (const id of existingInOrganization(found ?? [], orgUsers)) existing.add(id);
     }
-    const fresh = rows.filter((r) => r.user && !existing.has(r.uuid));
+    const fresh = rows.filter((r) => r.user && !existing.has(r.uuid) && !existing.has(r.legacyUuid));
 
     const perPerson = new Map<string, { sap: string; count: number; first: string; last: string }>();
     for (const r of rows) {

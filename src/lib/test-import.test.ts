@@ -3,6 +3,7 @@ import { sha256Hex } from "./punch-export";
 import {
   BALANCE_HEADER,
   buildBalanceCsv,
+  existingInOrganization,
   MAX_TEST_ROWS,
   parseTestCsv,
   testPunchUuid,
@@ -77,6 +78,31 @@ describe("testPunchUuid", () => {
     const a = await testPunchUuid(row);
     expect(a === (await testPunchUuid({ ...row, direction: "OUT" }))).toBe(false);
     expect(a === (await testPunchUuid({ ...row, utc: new Date("2026-11-02T06:00:13Z") }))).toBe(false);
+  });
+  it("s organizáciou je stály, líši sa medzi organizáciami aj od pôvodného tvaru bez organizácie", async () => {
+    const org1 = "00000000-0000-4000-8000-0000000000a1";
+    const org2 = "00000000-0000-4000-8000-0000000000a2";
+    const a = await testPunchUuid(row, org1);
+    expect(a).toBe(await testPunchUuid(row, org1));
+    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(a === (await testPunchUuid(row, org2))).toBe(false);
+    expect(a === (await testPunchUuid(row))).toBe(false);
+  });
+});
+
+describe("existingInOrganization", () => {
+  const mine = "11111111-1111-4111-8111-111111111111";
+  const other = "22222222-2222-4222-8222-222222222222";
+  const found = [
+    { client_uuid: "u-moje", user_id: mine },
+    { client_uuid: "u-cudzie", user_id: other },
+  ];
+  it("započíta len razenia účtov tejto organizácie", () => {
+    expect([...existingInOrganization(found, new Set([mine]))]).toEqual(["u-moje"]);
+  });
+  it("razenie rovnakého človeka v inej organizácii import neblokuje", () => {
+    expect(existingInOrganization([found[1]!], new Set([mine])).size).toBe(0);
+    expect(existingInOrganization([], new Set([mine])).size).toBe(0);
   });
 });
 

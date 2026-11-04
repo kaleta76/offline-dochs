@@ -45,7 +45,7 @@ Terminál dnes počíta inak než Access. Po zavedení konfigurácie sa má riad
 | Iné prerušenie než práca a obed (lekár, služobná cesta, osobné prekážky, …) | započíta sa skutočné trvanie; od hranice celodennej prekážky (predvolene 6 h) sa započíta denný fond dňa | lekár a rodina sa kreditujú, služobná cesta ako práca; **súkromné prerušenie sa nezapočíta** |
 | Doplnenie do fondu, keď deň končí lekárom, rodinou alebo služobnou cestou | **žiadne** | dopĺňa do fondu |
 | Okno práce | práca sa oreže na okno (predvolene 6:00 až 17:00) | bez okna |
-| Obed | automaticky sa odpočíta celých 30 min, ak práca presiahne 6 h a v dni nebol obed (č. 7) | odpočíta najviac 30 min a len prebytok nad 6 h (6 h 10 min práce = 10 min) |
+| Obed | automaticky sa odpočíta celých 30 min, ak práca presiahne 6 h a v dni nebol obed (č. 7) | ak zamestnanec obed vyrazil (Odchod bez dôvodu a neskôr Príchod), automatický odpočet sa nerobí (rovnako ako v Accesse); inak odpočíta najviac 30 min a len prebytok nad 6 h (6 h 10 min práce = 10 min). Zostáva rozdiel: Access odpočíta celých 30 min a hranicu 6 h meria len z práce (bez služobnej cesty) |
 | Zaokrúhlenie príchodu a odchodu | v tomto výpočte nie | nastavenia `ZAOKRUHLENIE_*` |
 | Duplicitné razenie | rovnaký kód a smer do 10 min sa ignoruje (anomália) | nerieši |
 | Párovanie razení | stavový automat dňa (`mod_08.SpracujDen`): príchod, odchod, prerušenie, návrat, paralelné prerušenia, otvorené prerušenie, automatický koniec prerušenia | jednoduché páry IN/OUT |

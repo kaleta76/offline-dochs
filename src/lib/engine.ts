@@ -65,6 +65,8 @@ export function computeDay(input: DayInput, s: EngineSettings): DayResult {
   if (last && last.direction === "OUT" && last.code === "WORK") last.time = floorTo(last.time, s.roundOutMin);
 
   let workMin = 0, creditMin = 0, privMin = 0, open = false;
+  // A plain departure followed by a later arrival (no reason given) is a lunch break the employee punched out for.
+  let lunchPunched = false;
   for (let i = 0; i < ps.length; i++) {
     const cur = ps[i]!;
     const next = ps[i + 1];
@@ -73,15 +75,17 @@ export function computeDay(input: DayInput, s: EngineSettings): DayResult {
       if (dur === null) open = true;
       else { workMin += dur; add("WORK", dur); }
     } else if (dur !== null) {
+      if (cur.code === "WORK" && next?.direction === "IN") lunchPunched = true;
       if (cur.code === "TRIP") { workMin += dur; add("TRIP", dur); }
       else if (CREDIT_CODES.has(cur.code)) { creditMin += dur; add(cur.code, dur); }
       else if (cur.code === "PRIV") privMin += dur;
     }
   }
 
-  // Statutory break: deducted once work exceeds threshold
+  // Statutory break: deducted once work exceeds threshold, unless the employee punched out for lunch
+  // (the lunch time is then already missing from the work time; same rule as the Access system).
   let breakMin = 0;
-  if (workMin > s.breakAfterHours * 60) {
+  if (!lunchPunched && workMin > s.breakAfterHours * 60) {
     breakMin = Math.min(s.breakMin, workMin - s.breakAfterHours * 60);
     workMin -= breakMin;
     if (byCode["WORK"]) byCode["WORK"] = Math.max(0, byCode["WORK"] - breakMin);

@@ -108,7 +108,11 @@ Pripravuje Claude v samostatných PR (nie agent Lovable). Etapa 1 (import) nasle
 Platia `AGENTS.md` (sekcia o integrácii s Accessom) a `docs/SPOLUPRACA.md`. Návrh tabuliek tu nie je, je súčasťou súkromného SQL balíka.
 
 **Tlačidlá na obrazovke Terminál** (rozhodnutie vlastníka 4. 11. 2026): dnes sú pevné v kóde (`src/routes/_authenticated/terminal.tsx`): Príchod, Odchod, Lekár, Sprievod, Službka, Súkromne. Dovolenka a Nemoc sú celodenné a zadávajú sa v Môj mesiac ako oprava, ktorú schváli vedúci.
-Z 15 prerušení Accessu majú kód terminála len 7 (`terminal_code_map`); ostatné sa zadávajú len v Accesse. Tlačidlá podľa konfigurácie z Accessu (názvy prerušení z Accessu) sa zavedú až po rozhodnutí D1 o výpočte.
+Z 15 prerušení Accessu majú kód terminála len 7 (`terminal_code_map`); ostatné sa zadávajú len v Accesse.
+**Rozhodnutie vlastníka (4. 11. 2026, 21:36):** tlačidlá sa mapujú podľa Accessu: prerušenie má tlačidlo, ak má v Accesse príznak, s presným textom alebo skratkou z Accessu (kontrakt 1.3.0, kľúče `terminal_button`, `terminal_label`, `terminal_order`).
+Ak pravidlá z Accessu nie sú prijaté, ostávajú predvolené tlačidlá: Lekár, Sprievod, Služobná cesta, Služobné vzdialenie (nové) a Súkromne; text „Službka“ sa nahradí textom „Služobná cesta“.
+Služobná cesta aj služobné vzdialenie sa môžu zapísať aj uprostred dňa (napr. o 11:00), nemusia byť celodenné. Plánovaná služobná cesta („zajtra mám služobku“) ide žiadosťou o opravu na zajtrajší deň, ktorú schváli vedúci; prerušenie bez návratu sa v Accesse dopočíta do konca smeny (č. 12 má automatický koniec smeny) a skorší Príchod ho ukončí.
+Nový kód razenia pre služobné vzdialenie a čítanie tlačidiel z konfigurácie vyžadujú databázovú zmenu (súkromný SQL balík), preto sa urobia naraz s etapou 2.
 
 **Čo má terminál vedieť** (bez osobných údajov, zamestnanec je len osobné číslo):
 * verziu konfigurácie organizácie (`config_version`) a jej obsah; vždy platí **najnovšia prijatá verzia**, staršia sa neprijme;

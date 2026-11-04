@@ -47,7 +47,16 @@ const INT_REQ = [
   "auto_end_of_shift",
   "calc",
 ];
-const INT_OPT = ["counts_to_fund", "counts_to_work", "deducts_leave"];
+const INT_OPT = [
+  "counts_to_fund",
+  "counts_to_work",
+  "deducts_leave",
+  "terminal_button",
+  "terminal_label",
+  "terminal_order",
+];
+export const MAX_BUTTONS = 12;
+export const MAX_LABEL = 24;
 const PUNCH_KEYS = ["code", "interruption", "direction", "label"];
 const EMP_KEYS = ["personnel_number", "months"];
 const MON_KEYS = [
@@ -252,8 +261,30 @@ export function checkAccessConfig(
       for (const k of ["start_punch_code", "end_punch_code"])
         if (k in it && !(isInt(it[k]) && (it[k] as number) >= 0 && (it[k] as number) <= 999999))
           E(`prerušenie ${c}: ${k} nie je celé číslo 0 až 999999`);
-      for (const k of ["is_work", "is_lunch", "auto_end_of_shift", ...INT_OPT])
+      for (const k of [
+        "is_work",
+        "is_lunch",
+        "auto_end_of_shift",
+        "counts_to_fund",
+        "counts_to_work",
+        "deducts_leave",
+        "terminal_button",
+      ])
         if (k in it && typeof it[k] !== "boolean") E(`prerušenie ${c}: ${k} nie je true/false`);
+      // tlačidlá terminálu (kontrakt 1.3.0)
+      if ("terminal_label" in it) {
+        const lab = it["terminal_label"];
+        // eslint-disable-next-line no-control-regex
+        if (!(isStr(lab) && lab.length >= 1 && lab.length <= MAX_LABEL && lab === lab.trim() && !/[\u0000-\u001f]/.test(lab)))
+          E(`prerušenie ${c}: terminal_label musí byť text 1 až ${MAX_LABEL} znakov bez medzier na kraji`);
+      }
+      if (
+        "terminal_order" in it &&
+        !(isInt(it["terminal_order"]) && it["terminal_order"] >= 1 && it["terminal_order"] <= 99)
+      )
+        E(`prerušenie ${c}: terminal_order musí byť celé číslo 1 až 99`);
+      if (it["terminal_button"] !== true && ("terminal_label" in it || "terminal_order" in it))
+        E(`prerušenie ${c}: terminal_label a terminal_order patria len prerušeniu s terminal_button = true`);
     });
     if (!ints.has(1)) E("v zozname prerušení chýba č. 1 (pracovná doba)");
   }
@@ -328,6 +359,34 @@ export function checkAccessConfig(
     });
     if (!seenCodes.has("WORK")) W("terminal_code_map: chýba kód WORK");
   }
+
+  // --- tlačidlá terminálu (kontrakt 1.3.0): príznak patrí prerušeniu, ktoré má práve jeden kód terminálu
+  const codesOf = new Map<number, number>();
+  if (Array.isArray(doc["terminal_code_map"])) {
+    for (const m of doc["terminal_code_map"])
+      if (isObj(m) && isInt(m["interruption"]))
+        codesOf.set(m["interruption"], (codesOf.get(m["interruption"]) ?? 0) + 1);
+  }
+  const seenText = new Map<string, number>();
+  let buttons = 0;
+  for (const [c, it] of ints) {
+    if (it["terminal_button"] !== true) continue;
+    buttons += 1;
+    if (c === 1)
+      E("prerušenie 1: práca (č. 1) nemá vlastné tlačidlo, terminál má Príchod a Odchod");
+    const n = codesOf.get(c) ?? 0;
+    if (n !== 1)
+      E(`prerušenie ${c}: tlačidlo potrebuje práve jeden kód v terminal_code_map (je ich ${n})`);
+    const text = isStr(it["terminal_label"]) ? it["terminal_label"] : it["name"];
+    if (isStr(text)) {
+      const key = text.toLowerCase();
+      const first = seenText.get(key);
+      if (first !== undefined)
+        E(`prerušenia ${first} a ${c} majú tlačidlo s rovnakým textom '${text}'`);
+      else seenText.set(key, c);
+    }
+  }
+  if (buttons > MAX_BUTTONS) E(`tlačidiel pre terminál je ${buttons}, najviac ${MAX_BUTTONS}`);
 
   // --- sviatky
   const hol = new Set<string>();

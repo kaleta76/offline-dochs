@@ -42,7 +42,10 @@
       "calc": "COUNTED",
       "counts_to_fund": false,
       "counts_to_work": false,
-      "deducts_leave": false
+      "deducts_leave": false,
+      "terminal_button": true,
+      "terminal_label": "Lekár",
+      "terminal_order": 1
     },
     {
       "code": 4,
@@ -56,7 +59,10 @@
       "calc": "COUNTED",
       "counts_to_fund": false,
       "counts_to_work": false,
-      "deducts_leave": false
+      "deducts_leave": false,
+      "terminal_button": true,
+      "terminal_label": "Služobné vzdialenie",
+      "terminal_order": 4
     },
     {
       "code": 7,
@@ -112,7 +118,10 @@
       "calc": "COUNTED",
       "counts_to_fund": false,
       "counts_to_work": false,
-      "deducts_leave": false
+      "deducts_leave": false,
+      "terminal_button": true,
+      "terminal_label": "Služobná cesta",
+      "terminal_order": 3
     },
     {
       "code": 13,
@@ -140,7 +149,10 @@
       "calc": "COUNTED",
       "counts_to_fund": false,
       "counts_to_work": false,
-      "deducts_leave": false
+      "deducts_leave": false,
+      "terminal_button": true,
+      "terminal_label": "Sprievod",
+      "terminal_order": 2
     }
   ],
   "punch_codes": [
@@ -206,7 +218,8 @@
     { "code": "FAMILY", "interruption": 16 },
     { "code": "LEAVE", "interruption": 8 },
     { "code": "SICK", "interruption": 11 },
-    { "code": "PRIV", "interruption": 13 }
+    { "code": "PRIV", "interruption": 13 },
+    { "code": "ERRAND", "interruption": 4 }
   ],
   "funds": [
     { "id": 1, "name": "Pevný 7:30", "type": 1 },

@@ -1,4 +1,4 @@
-# Kontrakt terminál ⇄ Access (verzia 1, doplnky 1.1 a 1.2)
+# Kontrakt terminál ⇄ Access (verzia 1, doplnky 1.1, 1.2 a 1.3)
 
 Tento priečinok je **jediné miesto, na ktorom sa dohodne rozhranie** medzi terminálom (tento repozitár, vyvíja ho Lovable agent)
 a lokálnym dochádzkovým systémom v Accesse (vyvíja ho Claude). Zmena súborov tu = zmena dohody, preto ide **iba cez pull request**
@@ -74,7 +74,7 @@ v **samostatnom zozname** za rovnaký mesiac (podľa času zneplatneného razeni
 * **Uzavretý mesiac v Accesse:** zneplatnenie sa neaplikuje, ostáva v čakaní do otvorenia mesiaca (rovnako ako razenia).
 * Zlatý súbor: `examples/voids_example.csv`, test `tests/void-export.contract.test.ts`, referencia `reference/void-export.ts`.
 
-## Súbor `dochs_config.json` (kontrakt 1.2.0, smer Access → terminál)
+## Súbor `dochs_config.json` (kontrakt 1.2.0 a 1.3.0, smer Access → terminál)
 Access posiela terminálu **hotový výpočtový plán**, aby terminál počítal saldo rovnako ako Access a zamestnanec si ho mohol skontrolovať skôr, než sekretárka mesiac
 opraví, vytlačí a uzavrie. Zásada je „Access rozhoduje, terminál preberá“: terminál nepozná pravidlá fondov, kalendárov ani úväzkov, dostane z nich už vypočítaný
 denný fond. Formát je JSON (UTF-8), schéma `config-export.schema.json` (`schema_version` 2), zlatý súbor `examples/config_example.json`, overovač `tools/verify_config.py`.
@@ -84,7 +84,7 @@ Súbor je **nadmnožina** pôvodnej konfigurácie (`schema_version` 1); kľúče
 |---|---|
 | `config_version`, `generated_at` | poradie verzií (`rrrr.mm.dd.hhmm`); terminál drží najnovšiu a nikdy nevráti staršiu |
 | `rules` | okno práce, hranica celodennej prekážky, automatický obed, predvolený denný fond, `interruption_check_enabled` |
-| `interruptions[]` | číselník prerušení; **`calc`** určuje, ako sa interval počíta (nižšie) |
+| `interruptions[]` | číselník prerušení; **`calc`** určuje, ako sa interval počíta (nižšie); od 1.3.0 voliteľne `terminal_button`, `terminal_label`, `terminal_order` (tlačidlá terminálu, nižšie) |
 | `punch_codes[]` | kódy razení Accessu (číslo, prerušenie, smer Z/K) |
 | `terminal_code_map[]` | kódy razení terminála (`WORK`, `DOCTOR`, …) → číslo prerušenia v Accesse |
 | `holidays[]` | sviatky roka a nasledujúceho roka |
@@ -93,6 +93,21 @@ Súbor je **nadmnožina** pôvodnej konfigurácie (`schema_version` 1); kľúče
 | `templates[].months[].rules[]` | pravidlá prerušení po mesiacoch: povolený čas, najdlhšie a najkratšie trvanie, minimum odpracovaného času (sedem hodnôt pondelok až nedeľa) |
 | `employees[].months[]` | **plán**: `employment_pct`, `fund_id`, `template_id`, `calendar_id`, `day_types[]` a `expected_min[]` pre každý deň mesiaca |
 | `counts` | počet zamestnancov a mesačných plánov v súbore (kontrola úplnosti) |
+
+**Tlačidlá terminálu (kontrakt 1.3.0, voliteľné kľúče prerušenia).** O tom, ktoré prerušenia majú na obrazovke Terminál vlastné tlačidlo, rozhoduje Access (rozhodnutie vlastníka 4. 11. 2026):
+
+| kľúč | význam |
+|---|---|
+| `terminal_button` | `true` = prerušenie má tlačidlo. Access kľúč vynechá, ak príznak nie je nastavený (súbor bez tlačidiel je ten istý ako v 1.2.0). Neplatí pre č. 1 (práca): tá má Príchod a Odchod. Č. 7 (obed) tlačidlo mať smie: odchod s kódom `LUNCH`, návrat je Príchod. |
+| `terminal_label` | text tlačidla, 1 až 24 znakov: celý názov alebo skratka, ako ju zvolí Access. Bez neho sa použije `name`. Len spolu s `terminal_button = true`. |
+| `terminal_order` | poradie tlačidla (1 až 99, od najmenšieho; pri rovnakom čísle rozhoduje číslo prerušenia). Len spolu s `terminal_button = true`. |
+
+Pravidlá: prerušenie s tlačidlom má v `terminal_code_map` **práve jeden** kód terminála (ten kód tlačidlo zapíše ako odchod `OUT`; návrat je vždy Príchod); text tlačidla je v súbore jedinečný (bez ohľadu na veľkosť písmen);
+tlačidiel je najviac 12. Overovač a kontrola v termináli tieto pravidlá odmietnu.
+Správanie terminálu: Príchod a Odchod sú vždy, ďalej tlačidlá z konfigurácie podľa `terminal_order`. Ak v prijatej konfigurácii nie je žiadne tlačidlo (alebo konfigurácia nebola prijatá),
+terminál ukáže predvolené tlačidlá zabudované v aplikácii: Lekár, Sprievod, Služobná cesta, Služobné vzdialenie, Súkromne.
+Prerušenia, ktoré sa dávajú na celý deň (dovolenka, PN, ošetrovanie a pod.), tlačidlo mať nemusia; zadávajú sa žiadosťou o opravu, ktorú schváli vedúci, alebo priamo v Accesse.
+**Nasadenie:** súbor s novými kľúčmi prijme len verzia terminálu a databázy, ktorá ich pozná. Access ich preto vloží, len keď má aspoň jedno prerušenie nastavené (predvolene žiadne).
 
 **Typ dňa** (`day_types`) má dve písmená: kalendár (`P` pracovný, `V` voľný, `S` sviatok) a deň v týždni (`P` pondelok až piatok, `V` sobota, `N` nedeľa).
 **Denný fond** (`expected_min`) je v minútach po zohľadnení fondu, fondu podľa dňa v týždni, pevného mesačného fondu (mesačný fond ÷ počet pracovných dní) a úväzku

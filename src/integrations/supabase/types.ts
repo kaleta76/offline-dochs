@@ -504,50 +504,6 @@ export type Database = {
           },
         ]
       }
-      punch_void_requests: {
-        Row: {
-          created_at: string
-          decided_at: string | null
-          decided_by: string | null
-          id: string
-          punch_id: number
-          reason: string
-          requested_by: string
-          status: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          decided_at?: string | null
-          decided_by?: string | null
-          id?: string
-          punch_id: number
-          reason: string
-          requested_by: string
-          status?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          decided_at?: string | null
-          decided_by?: string | null
-          id?: string
-          punch_id?: number
-          reason?: string
-          requested_by?: string
-          status?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "punch_void_requests_punch_id_fkey"
-            columns: ["punch_id"]
-            isOneToOne: false
-            referencedRelation: "punches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       punches: {
         Row: {
           client_time: string
@@ -565,8 +521,6 @@ export type Database = {
           server_time: string
           source: string
           user_id: string
-          void_request_id: string | null
-          voided_at: string | null
         }
         Insert: {
           client_time: string
@@ -584,8 +538,6 @@ export type Database = {
           server_time?: string
           source?: string
           user_id: string
-          void_request_id?: string | null
-          voided_at?: string | null
         }
         Update: {
           client_time?: string
@@ -603,8 +555,6 @@ export type Database = {
           server_time?: string
           source?: string
           user_id?: string
-          void_request_id?: string | null
-          voided_at?: string | null
         }
         Relationships: [
           {
@@ -693,10 +643,6 @@ export type Database = {
         Args: { _approve: boolean; _id: string }
         Returns: undefined
       }
-      decide_punch_void: {
-        Args: { _approve: boolean; _id: string }
-        Returns: undefined
-      }
       device_manager_ok: { Args: { _user: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -727,10 +673,6 @@ export type Database = {
           pairing_expires_at: string
           status: string
         }[]
-      }
-      request_punch_void: {
-        Args: { _punch_id: number; _reason: string }
-        Returns: string
       }
       revoke_device: {
         Args: { _id: string; _reason: string }

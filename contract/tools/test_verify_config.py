@@ -287,12 +287,21 @@ class Chyby(unittest.TestCase):
         self._it(8)["terminal_order"] = 5
         self.assertHas(self.doc, "patria len prerušeniu s terminal_button = true")
 
-    def test_praca_a_obed_nemaju_tlacidlo(self):
+    def test_praca_nema_tlacidlo(self):
         self._it(1)["terminal_button"] = True
-        self.assertHas(self.doc, "práca (č. 1) a obed (č. 7) nemajú vlastné tlačidlo")
-        self.doc = golden()
+        self.assertHas(self.doc, "práca (č. 1) nemá vlastné tlačidlo")
+
+    def test_obed_smie_mat_tlacidlo(self):
+        # rozhodnutie vlastníka: Obed môže byť samostatné tlačidlo (odchod s kódom LUNCH, návrat je Príchod)
+        self.doc["terminal_code_map"].append({"code": "LUNCH", "interruption": 7})
         self._it(7)["terminal_button"] = True
-        self.assertHas(self.doc, "práca (č. 1) a obed (č. 7) nemajú vlastné tlačidlo")
+        self._it(7)["terminal_label"] = "Obed"
+        self._it(7)["terminal_order"] = 1
+        self.assertEqual(errors(self.doc), [])
+
+    def test_obed_s_tlacidlom_potrebuje_kod(self):
+        self._it(7)["terminal_button"] = True
+        self.assertHas(self.doc, "prerušenie 7: tlačidlo potrebuje práve jeden kód v terminal_code_map (je ich 0)")
 
     def test_tlacidlo_bez_kodu_v_mapovani(self):
         self.doc["terminal_code_map"] = [m for m in self.doc["terminal_code_map"] if m["code"] != "ERRAND"]

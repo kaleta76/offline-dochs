@@ -98,7 +98,7 @@ Súbor je **nadmnožina** pôvodnej konfigurácie (`schema_version` 1); kľúče
 
 | kľúč | význam |
 |---|---|
-| `terminal_button` | `true` = prerušenie má tlačidlo. Access kľúč vynechá, ak príznak nie je nastavený (súbor bez tlačidiel je ten istý ako v 1.2.0). Neplatí pre č. 1 (práca) a č. 7 (obed): tie majú Príchod a Odchod. |
+| `terminal_button` | `true` = prerušenie má tlačidlo. Access kľúč vynechá, ak príznak nie je nastavený (súbor bez tlačidiel je ten istý ako v 1.2.0). Neplatí pre č. 1 (práca): tá má Príchod a Odchod. Č. 7 (obed) tlačidlo mať smie: odchod s kódom `LUNCH`, návrat je Príchod. |
 | `terminal_label` | text tlačidla, 1 až 24 znakov: celý názov alebo skratka, ako ju zvolí Access. Bez neho sa použije `name`. Len spolu s `terminal_button = true`. |
 | `terminal_order` | poradie tlačidla (1 až 99, od najmenšieho; pri rovnakom čísle rozhoduje číslo prerušenia). Len spolu s `terminal_button = true`. |
 

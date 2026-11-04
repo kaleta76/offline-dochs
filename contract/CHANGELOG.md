@@ -29,7 +29,7 @@
 ## 1.3.0 – 2026-11-04 (doplnok, `punches_*.csv` ani `voids_*.csv` sa nemenia; `schema_version` ostáva 2)
 * Prerušenia v `dochs_config.json` môžu mať tri voliteľné kľúče pre **tlačidlá terminálu**: `terminal_button`, `terminal_label`, `terminal_order`.
   Rozhoduje Access (príznak, text alebo skratka, poradie); terminál tlačidlá zostaví z konfigurácie, bez nej ostanú predvolené.
-* Nové kontroly v `tools/verify_config.py` (a rovnaké v `src/lib/access-config.ts`): typy a rozsahy, text a poradie len s príznakom, č. 1 a č. 7 bez tlačidla,
+* Nové kontroly v `tools/verify_config.py` (a rovnaké v `src/lib/access-config.ts`): typy a rozsahy, text a poradie len s príznakom, č. 1 (práca) bez tlačidla (obed č. 7 ho mať smie),
   práve jeden kód v `terminal_code_map`, jedinečný text, najviac 12 tlačidiel. Súbor bez týchto kľúčov ostáva platný a nezmenený.
 * Zlatý súbor `examples/config_example.json` (+ vstup) má štyri tlačidlá (Lekár, Sprievod, Služobná cesta, Služobné vzdialenie) a kód `ERRAND` → č. 4; pridaných 11 testov v oboch jazykoch.
 * Nasadenie: Access kľúče vkladá, len ak je príznak niekde nastavený. Pred tým treba, aby terminál a databáza prijímali nové kľúče (databázová časť je súkromný SQL balík); inak by sa súbor odmietol.

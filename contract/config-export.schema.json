@@ -51,7 +51,7 @@
           "counts_to_fund": { "type": "boolean", "description": "informatívne (CiselnikPreruseni.ZapocitavatDoFondu), výpočet dňa ho zatiaľ nepoužíva" },
           "counts_to_work": { "type": "boolean", "description": "informatívne (ZapocitavatDoPrace)" },
           "deducts_leave": { "type": "boolean", "description": "informatívne (OdpocitavatZDovolenky)" },
-          "terminal_button": { "type": "boolean", "description": "kontrakt 1.3.0: true = prerušenie má na obrazovke terminálu vlastné tlačidlo (odchod s týmto dôvodom; návrat je Príchod). Neplatí pre č. 1 a č. 7. Prerušenie s true potrebuje práve jeden kód v terminal_code_map. Access kľúč vynechá, ak nie je nastavený." },
+          "terminal_button": { "type": "boolean", "description": "kontrakt 1.3.0: true = prerušenie má na obrazovke terminálu vlastné tlačidlo (odchod s týmto dôvodom; návrat je Príchod). Neplatí pre č. 1 (práca); č. 7 (obed) tlačidlo mať smie. Prerušenie s true potrebuje práve jeden kód v terminal_code_map. Access kľúč vynechá, ak nie je nastavený." },
           "terminal_label": { "type": "string", "minLength": 1, "maxLength": 24, "description": "kontrakt 1.3.0: text tlačidla (celý názov alebo skratka, ako ju určí Access); bez neho sa použije name. Len spolu s terminal_button = true." },
           "terminal_order": { "type": "integer", "minimum": 1, "maximum": 99, "description": "kontrakt 1.3.0: poradie tlačidla na obrazovke (od najmenšieho); pri rovnakom čísle rozhoduje číslo prerušenia. Len spolu s terminal_button = true." }
         },

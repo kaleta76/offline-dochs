@@ -372,10 +372,8 @@ export function checkAccessConfig(
   for (const [c, it] of ints) {
     if (it["terminal_button"] !== true) continue;
     buttons += 1;
-    if (c === 1 || c === 7)
-      E(
-        `prerušenie ${c}: práca (č. 1) a obed (č. 7) nemajú vlastné tlačidlo, terminál má Príchod a Odchod`,
-      );
+    if (c === 1)
+      E("prerušenie 1: práca (č. 1) nemá vlastné tlačidlo, terminál má Príchod a Odchod");
     const n = codesOf.get(c) ?? 0;
     if (n !== 1)
       E(`prerušenie ${c}: tlačidlo potrebuje práve jeden kód v terminal_code_map (je ich ${n})`);

@@ -224,9 +224,20 @@ describe("tlačidlá terminálu (kontrakt 1.3.0)", () => {
       "patria len prerušeniu s terminal_button = true",
     );
   });
-  it("práca a obed nemajú vlastné tlačidlo", () => {
-    hasError((d) => (it_(d, 1).terminal_button = true), "nemajú vlastné tlačidlo");
-    hasError((d) => (it_(d, 7).terminal_button = true), "nemajú vlastné tlačidlo");
+  it("práca nemá vlastné tlačidlo", () => {
+    rejects((d) => (it_(d, 1).terminal_button = true), "práca (č. 1) nemá vlastné tlačidlo");
+  });
+  it("obed smie mať tlačidlo (odchod s kódom LUNCH)", () => {
+    const d = golden();
+    d.terminal_code_map.push({ code: "LUNCH", interruption: 7 });
+    Object.assign(it_(d, 7), { terminal_button: true, terminal_label: "Obed", terminal_order: 1 });
+    expect(check(d).errors).toEqual([]);
+  });
+  it("obed s tlačidlom potrebuje práve jeden kód terminála", () => {
+    rejects(
+      (d) => (it_(d, 7).terminal_button = true),
+      "prerušenie 7: tlačidlo potrebuje práve jeden kód v terminal_code_map (je ich 0)",
+    );
   });
   it("tlačidlo potrebuje práve jeden kód terminála", () => {
     hasError(

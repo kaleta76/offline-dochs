@@ -204,8 +204,8 @@ def check(doc, strict=False):
         if it.get("terminal_button") is not True:
             continue
         buttons.append(c)
-        if c in (1, 7):
-            E(f"prerušenie {c}: práca (č. 1) a obed (č. 7) nemajú vlastné tlačidlo, terminál má Príchod a Odchod")
+        if c == 1:
+            E("prerušenie 1: práca (č. 1) nemá vlastné tlačidlo, terminál má Príchod a Odchod")
         n = len(codes_of.get(c, []))
         if n != 1:
             E(f"prerušenie {c}: tlačidlo potrebuje práve jeden kód v terminal_code_map (je ich {n})")

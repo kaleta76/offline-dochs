@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { loadMonth, MONTHS } from "@/lib/month";
 import { MonthPicker } from "@/components/MonthTable";
+import { AccessConfigImport } from "@/components/AccessConfigImport";
 import { AccessExport } from "@/components/AccessExport";
 import { EmployeeAccess } from "@/components/EmployeeAccess";
 import { TestImport } from "@/components/TestImport";
@@ -104,6 +105,8 @@ function Admin() {
       </section>
 
       <AccessExport />
+
+      <AccessConfigImport />
 
       <TestImport />
 

@@ -111,6 +111,7 @@ Overuje, že razenia, ktoré terminál vydá, Access správne prevezme (pätičk
 
 1. Terminál > Správa > **Export pre Access**: mesiac > **Stiahnuť .csv** → `punches_RRRRMM.csv`.
 2. **Access: druhá kópia databázy `dochadzka_TEST_B.accdb`** (z pôvodnej databázy, nie z kópie A). Mesiac nesmie byť v kópii uzavretý (inak sa razenia uložia do stavu `UZAVRETY`).
+   * **Namiesto kópie môže B byť nová prázdna databáza** (balík Access 2.13.0 alebo novší) so zamestnancami (osobné čísla z `osobne_cisla_pre_terminal.txt` na karte 1 bod 3): na karte 5 kliknite **INICIALIZOVAŤ PREDVOLENÚ KONFIGURÁCIU**. Vytvorí fond 7:30, šablónu bez kontroly a kalendár a priradí ich zamestnancom. Krok 3 potom netreba (databáza razenia nemá). Porovnanie A a B je presné pre zamestnancov s fondom 7:30 a úväzkom 100 %; ak má niekto v A iný fond alebo úväzok, v B mu ich priraďte (karta 2, „Priradiť…“), inak sa saldo líši oprávnene. Fondy z A radšej neprenášajte tlačidlom 5 na karte 1: priniesol by aj razenia z A.
 3. V kópii B zmažte razenia vzorky v mesiaci, aby sa nezdvojili. Vytvorenie > Návrh dotazu > zobrazenie SQL > spustite (osobné čísla a dátumy upravte):
 
    ```sql

@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_Tab_Import"
-'@Verzia 2.7.0
+'@Verzia 2.8.0
 Option Compare Database
 Option Explicit
 
@@ -372,7 +372,13 @@ Public Function SpustiImportStarehoModeluUI() As Boolean
         MsgBox "Vybrali ste aktuálne otvorenú databázu. Vyberte staršiu databázu, z ktorej sa majú dáta preniesť.", vbExclamation, "Import zo staršej databázy"
         Exit Function
     End If
-    Dim strPredch As String
+    Dim strPredch As String, strPredv As String
+    strPredv = mod_00_Common.GetNastavenie("PredvolenePracovneNastavenia", "")
+    If Len(strPredv) > 0 Then
+        If MsgBox("V tejto databáze vznikol predvolený pracovný fond, šablóna alebo kalendár tlačidlom INICIALIZOVAŤ PREDVOLENÚ KONFIGURÁCIU (" & strPredv & ")." & vbCrLf & vbCrLf & _
+                  "Import zo staršej databázy ich nezmení. Fond, šablóna a kalendár č. 1 zo staršej databázy sa ale zmiešajú s predvolenými a priradenia z predvolenej inicializácie môžu prekryť priradenia zo staršej databázy (napr. iný fond niektorého zamestnanca)." & vbCrLf & vbCrLf & _
+                  "Odporúčanie: import urobte do databázy bez predvoleného fondu. Pokračovať aj tak?", vbQuestion + vbYesNo + vbDefaultButton2, "Import zo staršej databázy") <> vbYes Then Exit Function
+    End If
     strPredch = mod_00_Common.GetNastavenie("ImportStarehoModelu", "")
     If InStr(1, strPredch, strCesta, vbTextCompare) = 1 Then
         If MsgBox("Z tejto databázy už import prebehol:" & vbCrLf & strPredch & vbCrLf & vbCrLf & _

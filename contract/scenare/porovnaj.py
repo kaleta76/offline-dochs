@@ -4,11 +4,15 @@
 Použitie:
   python3 -I porovnaj.py --terminal terminal_saldo_202610.csv --access terminal_test_access_vysledky.csv
                          [--ocakavane ocakavane_saldo_2026-10.csv] [--popis popis_2026-10.json] [--vystup PRIEČINOK]
+                         [--iba-osoby-z-accessu]
 
   --terminal   súbor „Stiahnuť saldá“ z administrácie terminálu (alebo ocakavane_saldo_*.csv ako náhrada)
   --access     terminal_test_access_vysledky.csv zo samočinného testu Accessu (Karta 7 Exporty)
   --ocakavane  voliteľne referenčné saldá z enginu terminálu (kontrola, že terminál spracoval import podľa očakávania)
-  --popis      voliteľne popis scenárov po dňoch (vypíše sa pri rozdieloch)
+  --popis      voliteľne popis scenárov po dňoch (vypíše sa pri rozdieloch); dni s kľúčom "preskocit": true sa
+               z porovnania vynechajú (napr. dni, ktoré prevodník z_accessu.py nevedel previesť)
+  --iba-osoby-z-accessu
+               porovná len osoby, ktoré sú v súbore z Accessu (v termináli môžu byť aj ďalšie účty, napr. správca)
 
 Porovnáva sa fond_min a saldo_min (rozhodujúce); odpracovane_min je doplnková informácia, lebo Access a terminál
 ju môžu počítať s inou hranicou (napr. započítanie lekára). Deň, ktorý v jednom súbore chýba, sa berie ako deň
@@ -122,20 +126,34 @@ def main():
     ap.add_argument("--ocakavane")
     ap.add_argument("--popis")
     ap.add_argument("--vystup", default=".")
+    ap.add_argument("--iba-osoby-z-accessu", action="store_true")
     arg = ap.parse_args()
 
     term, acc = citaj(arg.terminal), citaj(arg.access)
-    popis = {}
+    popis, preskocit = {}, set()
     if arg.popis:
         for s in json.load(open(arg.popis, encoding="utf-8")):
             popis[(s["osc"], s["den"])] = s["popis"]
+            if s.get("preskocit"):
+                preskocit.add((s["osc"], s["den"]))
+    osoby = {o for o, _ in acc} if arg.iba_osoby_z_accessu else None
+    vyradene_osoby = sorted({o for o, _ in term} - osoby) if osoby is not None else []
+
+    def zuz(d):
+        return {k: v for k, v in d.items() if k not in preskocit and (osoby is None or k[0] in osoby)}
+
+    term, acc = zuz(term), zuz(acc)
     rep = ["POROVNANIE SALDÁ: terminál a Access", ""]
     rep.append(f"Terminál: {arg.terminal}  ({len(term)} riadkov)")
     rep.append(f"Access:   {arg.access}  ({len(acc)} riadkov)")
+    if preskocit:
+        rep.append(f"Preskočené dni (nepreviedli sa do terminála): {len(preskocit)}")
+    if vyradene_osoby:
+        rep.append(f"Osoby len v termináli (vynechané z porovnania): {', '.join(vyradene_osoby)}")
     rep.append("")
     stav = 0
     if arg.ocakavane:
-        exp = citaj(arg.ocakavane)
+        exp = zuz(citaj(arg.ocakavane))
         rep.append("A. Terminál voči očakávanému výsledku enginu (kontrola importu a výpočtu v termináli)")
         r1 = vypis_pary(rep, term, exp, "terminál", "očakávané", popis)
         rep.append("")

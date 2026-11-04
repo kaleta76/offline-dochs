@@ -57,6 +57,14 @@ rozpis z terminála a intervaly s anomáliami z Accessu. Na rozdiele v pravidle 
 Očakávané rozdiely, ktoré treba rozhodnúť: otvorený deň (9. 10. u 9000003), deň bez razenia (30. 10. u 9000003 – Access riadok pre deň bez razenia
 nemusí mať), duplicity (9. a 13. 10. u 9000001) a prerušenia, ktoré v Accessi nemajú rovnaké pravidlo ako v termináli (sprievod rodiny, súkromné).
 
+## Postup F: skutočné dáta z Ordata
+
+Scenáre vyššie používajú vymyslených zamestnancov. Na **skutočných razeniach a skutočných výsledkoch z Accessu** (po importe z Ordata) slúži
+prevodník `contract/scenare/z_accessu.py`: z `dochs_test_sample.json`, ktorý Access vie vyexportovať, pripraví vstup pre Testovací import v termináli
+a súbor Accessových sald na porovnanie (`porovnaj.py --iba-osoby-z-accessu`). Celý postup vrátane registrácie testovacej organizácie, importu
+konfigurácie, cesty späť do Accessu a upratania je v [`TESTOVACI-SCENAR-SKUTOCNE-DATA.md`](TESTOVACI-SCENAR-SKUTOCNE-DATA.md).
+Výstupy obsahujú skutočné osobné čísla: nepatria do repozitára.
+
 ## Bezpečnosť testovacieho importu
 
 - Zapnúť a spustiť ho smie len správca; zapnutie aj každý import sa zapíše do auditu.

@@ -40,3 +40,19 @@ zalohy/
 *.dump.gz
 *.sql.gz
 __pycache__/
+
+# Skutočné údaje z testu so skutočnými dátami (docs/TESTOVACI-SCENAR-SKUTOCNE-DATA.md): osobné čísla a časy razení, nikdy do repozitára
+dochs_test_sample.json
+access_vysledky_*.csv
+terminal_saldo_*.csv
+porovnanie_report.txt
+porovnanie_rozdiely.csv
+report_prevodu_*.txt
+punches_*.csv
+voids_*.csv
+*.accdb
+*.laccdb
+# vymyslené ukážkové súbory v repozitári ostávajú
+!contract/examples/*.csv
+!contract/scenare/**/*.csv
+!access/testy/**/*.csv

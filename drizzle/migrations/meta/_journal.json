@@ -43,6 +43,13 @@
       "when": 1793664456832,
       "tag": "0005_employee_account_workflows",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793775240985,
+      "tag": "0006_0006_zneplatnenie_razeni",
+      "breakpoints": true
     }
   ]
 }

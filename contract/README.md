@@ -1,4 +1,4 @@
-# Kontrakt terminál ⇄ Access (verzia 1)
+# Kontrakt terminál ⇄ Access (verzia 1, doplnky 1.1 a 1.2)
 
 Tento priečinok je **jediné miesto, na ktorom sa dohodne rozhranie** medzi terminálom (tento repozitár, vyvíja ho Lovable agent)
 a lokálnym dochádzkovým systémom v Accesse (vyvíja ho Claude). Zmena súborov tu = zmena dohody, preto ide **iba cez pull request**
@@ -73,3 +73,49 @@ v **samostatnom zozname** za rovnaký mesiac (podľa času zneplatneného razeni
 * **Nezhoda `record_hash`** (razenie s rovnakým `external_id` má iný hash) = chyba, nezneplatňuje sa, zapíše sa do protokolu.
 * **Uzavretý mesiac v Accesse:** zneplatnenie sa neaplikuje, ostáva v čakaní do otvorenia mesiaca (rovnako ako razenia).
 * Zlatý súbor: `examples/voids_example.csv`, test `tests/void-export.contract.test.ts`, referencia `reference/void-export.ts`.
+
+## Súbor `dochs_config.json` (kontrakt 1.2.0, smer Access → terminál)
+Access posiela terminálu **hotový výpočtový plán**, aby terminál počítal saldo rovnako ako Access a zamestnanec si ho mohol skontrolovať skôr, než sekretárka mesiac
+opraví, vytlačí a uzavrie. Zásada je „Access rozhoduje, terminál preberá“: terminál nepozná pravidlá fondov, kalendárov ani úväzkov, dostane z nich už vypočítaný
+denný fond. Formát je JSON (UTF-8), schéma `config-export.schema.json` (`schema_version` 2), zlatý súbor `examples/config_example.json`, overovač `tools/verify_config.py`.
+Súbor je **nadmnožina** pôvodnej konfigurácie (`schema_version` 1); kľúče `rules`, `interruptions`, `punch_codes`, `holidays` ostávajú.
+
+| časť | obsah |
+|---|---|
+| `config_version`, `generated_at` | poradie verzií (`rrrr.mm.dd.hhmm`); terminál drží najnovšiu a nikdy nevráti staršiu |
+| `rules` | okno práce, hranica celodennej prekážky, automatický obed, predvolený denný fond, `interruption_check_enabled` |
+| `interruptions[]` | číselník prerušení; **`calc`** určuje, ako sa interval počíta (nižšie) |
+| `punch_codes[]` | kódy razení Accessu (číslo, prerušenie, smer Z/K) |
+| `terminal_code_map[]` | kódy razení terminála (`WORK`, `DOCTOR`, …) → číslo prerušenia v Accesse |
+| `holidays[]` | sviatky roka a nasledujúceho roka |
+| `period` | mesiace okna, pre ktoré je plán (zvyčajne predchádzajúci až nasledujúci mesiac) |
+| `funds[]` | názov a typ použitých fondov (informatívne) |
+| `templates[].months[].rules[]` | pravidlá prerušení po mesiacoch: povolený čas, najdlhšie a najkratšie trvanie, minimum odpracovaného času (sedem hodnôt pondelok až nedeľa) |
+| `employees[].months[]` | **plán**: `employment_pct`, `fund_id`, `template_id`, `calendar_id`, `day_types[]` a `expected_min[]` pre každý deň mesiaca |
+| `counts` | počet zamestnancov a mesačných plánov v súbore (kontrola úplnosti) |
+
+**Typ dňa** (`day_types`) má dve písmená: kalendár (`P` pracovný, `V` voľný, `S` sviatok) a deň v týždni (`P` pondelok až piatok, `V` sobota, `N` nedeľa).
+**Denný fond** (`expected_min`) je v minútach po zohľadnení fondu, fondu podľa dňa v týždni, pevného mesačného fondu (mesačný fond ÷ počet pracovných dní) a úväzku
+(zaokrúhlenie polovice na párne, ako `CLng` vo VBA); `0` je nepracovný deň alebo sviatok. Algoritmus presne opisuje `tools/build_config_example.py`
+(referenčná implementácia; z `examples/config_example.input.json` vytvorí zlatý súbor, test to stráži).
+
+**Ako sa interval počíta do dňa (`interruptions[].calc`)** – tak, ako to robí Access 2.11 (`mod_08.TrvanieIntervalu`, `SumarDna`):
+* `WORK`: práca (č. 1) sa oreže oknom práce (`work_window_start_min` až `work_window_end_min`);
+* `LUNCH`: obed (č. 7) sa počíta skutočným trvaním; ak v dni obed je, automatický obed sa neodpočíta;
+* `COUNTED`: každé iné prerušenie sa počíta skutočným trvaním; ak trvá `full_day_obstacle_min` a viac, započíta sa **denný fond dňa** (`expected_min`);
+* po zostavení dňa sa od práce odpočíta automatický obed (`auto_lunch_deduct_min`), ak je zapnutý, deň má fond, odpracovaný čas je nad `auto_lunch_trigger_min` a nebol obed;
+* denné saldo = odpracované + započítané prekážky − `expected_min`.
+Neznámu hodnotu `calc` terminál nesmie nahradiť vlastným odhadom: saldo označí ako nepotvrdené a upozorní správcu (Access mohol zmeniť pravidlo a kontrakt dostane novú verziu).
+
+**Pravidlá prerušení** (`templates`) Access používa len na upozornenia (nemenia výpočet). Hodnoty sú už rozpísané na sedem dní. Kontrola sa nevykoná, ak `disabled`; interval sa
+kontroluje, len ak `allowed_to > allowed_from` a nejde o celý deň (0 až 1440); `max_duration_min` len ak je väčšie ako 0 a menšie ako 1440; kontrolujú sa iba skutočné
+prerušenia kratšie ako `full_day_obstacle_min`.
+
+**Súkromie**: zamestnanec je len `personnel_number` (číslo SAP z `TerminalMapaOsob`, inak osobné číslo). Meno, e-mail, oddelenie ani iný osobný údaj do súboru nepatrí;
+overovač odmietne každý kľúč navyše.
+
+**Prenos a pravidlá pre terminál** (podrobne `docs/KONFIGURACIA-Z-ACCESSU.md`):
+* súbor sa overí (`verify_config.py` alebo rovnaká kontrola v termináli) a **prijme sa celý alebo vôbec**; pri chybe ostáva platná predchádzajúca konfigurácia;
+* import smie spraviť len správca organizácie; zapíše sa do auditu (verzia, počty, kto);
+* mesiac mimo `period` nemá plán: terminál saldo ukáže ako nepotvrdené (bez plánu z Accessu);
+* po vyradení zamestnanca, zmene fondu alebo úväzku Access vydá novú verziu; terminál nepoužije nič staršie, než čo už prijal.

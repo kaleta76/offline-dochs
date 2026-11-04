@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_Tab_Export"
-'@Verzia 2.11.0
+'@Verzia 2.11.1
 Option Compare Database
 Option Explicit
 
@@ -190,7 +190,11 @@ Public Function SpustiExportKonfigTerminalUI() As Boolean
     Dim strFolder As String: strFolder = Trim(Nz(frm!txtCestaExportFolder, CurrentProject.Path & "\"))
     Dim strCesta As String
     strCesta = mod_12_TerminalPriprava.ExportujKonfiguraciuDoSuboru(strFolder)
-    MsgBox "Konfigurácia pre terminál bola uložená:" & vbCrLf & strCesta, vbInformation, "Export konfigurácie"
+    If Len(strCesta) = 0 Then
+        MsgBox "Konfiguráciu pre terminál sa nepodarilo zostaviť, súbor sa nezapísal." & vbCrLf & mod_20_KonfiguraciaExport.SpravaExportu(), vbExclamation, "Export konfigurácie"
+        Exit Function
+    End If
+    MsgBox "Konfigurácia pre terminál bola uložená:" & vbCrLf & strCesta & vbCrLf & vbCrLf & mod_20_KonfiguraciaExport.SpravaExportu(), vbInformation, "Export konfigurácie"
     Call mod_UI_Pomocnik.OznacCinnost("EXPORT")
     SpustiExportKonfigTerminalUI = True
     Exit Function

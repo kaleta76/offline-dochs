@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_12_TerminalPriprava"
-'@Verzia 1.2.0
+'@Verzia 1.3.0
 Option Compare Database
 Option Explicit
 
@@ -16,9 +16,11 @@ Private mInboxPolia As Boolean
 '                               PrijmiRazenie()  zapíše razenie do inboxu (idempotentne podľa ExterneID)
 '                               SpracujInbox()   prenesie nové razenia do DochadzkaImport
 '          ACCESS -> TERMINÁL   tabuľka KonfiguraciaVerzie (verzie konfigurácie prerušení)
-'                               GenerujKonfiguraciuJSON()      zostaví JSON bez osobných údajov
+'                               GenerujKonfiguraciuJSON()      zostaví JSON bez osobných údajov (schema_version 1, ponechané pre spätnú kompatibilitu)
 '                               VytvorVerziuKonfiguracie()     uloží novú verziu, ak sa konfigurácia zmenila
 '                               ExportujKonfiguraciuDoSuboru() zápis do súboru (dočasný prenos)
+'        Od 1.3.0 ukladá verzie a súbor konfigurácia s výpočtovým plánom (schema_version 2) z modulu
+'        mod_20_KonfiguraciaExport; v1 zostáva len ako záloha, ak by zostavenie v2 zlyhalo.
 '
 '        Terminál nepozná osobné údaje: posiela len osobné číslo, čas, kód razenia a ID zariadenia.
 '        Razenie sa nikdy nevkladá dvakrát (ExterneID), chyby ostanú v inboxe so stavom CHYBA.
@@ -29,8 +31,8 @@ Private mInboxPolia As Boolean
 ' - AktualizujOverenie(externeID, overenie)    : Zmení príznak overenia už prijatého razenia (vedúci ho potvrdil v termináli).
 ' - SpracujInbox()                             : Prenos NOVE -> DochadzkaImport; vráti textový report.
 ' - GenerujKonfiguraciuJSON(rok)               : JSON konfigurácia (kódy, pravidlá, sviatky) bez osobných údajov.
-' - VytvorVerziuKonfiguracie(autor)            : Uloží novú verziu konfigurácie; vráti jej číslo (0 = bez zmeny).
-' - ExportujKonfiguraciuDoSuboru(priecinok)    : Uloží aktuálnu konfiguráciu do dochs_config.json.
+' - VytvorVerziuKonfiguracie(autor, json)      : Uloží novú verziu konfigurácie (v2; hotový JSON možno odovzdať); vráti jej číslo (0 = bez zmeny).
+' - ExportujKonfiguraciuDoSuboru(priecinok)    : Uloží aktuálnu konfiguráciu s plánom do dochs_config.json; "" pri chybe.
 '===============================================================================
 
 Public Sub ZabezpecTabulky(ByRef db As DAO.Database)
@@ -323,12 +325,14 @@ End Function
 '-------------------------------------------------------------------------------
 ' Uloží novú verziu konfigurácie, ak sa od poslednej uloženej zmenila. Vráti číslo novej verzie (0 = bez zmeny, -1 = chyba).
 '-------------------------------------------------------------------------------
-Public Function VytvorVerziuKonfiguracie(Optional ByVal strAutor As String = "") As Long
+Public Function VytvorVerziuKonfiguracie(Optional ByVal strAutor As String = "", Optional ByVal strHotovyJson As String = "") As Long
     On Error GoTo Chyba
     Dim db As DAO.Database, rs As DAO.Recordset, strNovy As String, lPoslednaVerzia As Long, strPosledny As String
     Set db = CurrentDb
     Call ZabezpecTabulky(db)
-    strNovy = GenerujKonfiguraciuJSON()
+    strNovy = strHotovyJson
+    If Len(strNovy) = 0 Then strNovy = mod_20_KonfiguraciaExport.GenerujKonfiguraciuV2JSON()
+    If Len(strNovy) = 0 Then strNovy = GenerujKonfiguraciuJSON()
     lPoslednaVerzia = CLng(Nz(DMax("Verzia", "KonfiguraciaVerzie"), 0))
     If lPoslednaVerzia > 0 Then
         Set rs = db.OpenRecordset("SELECT Obsah FROM KonfiguraciaVerzie WHERE Verzia = " & lPoslednaVerzia & ";", dbOpenSnapshot)
@@ -357,12 +361,14 @@ End Function
 '-------------------------------------------------------------------------------
 Public Function ExportujKonfiguraciuDoSuboru(Optional ByVal strPriecinok As String = "") As String
     On Error GoTo Chyba
-    Dim strCesta As String
+    Dim strCesta As String, strJson As String
     If Len(strPriecinok) = 0 Then strPriecinok = CurrentProject.Path
     If Right$(strPriecinok, 1) <> "\" Then strPriecinok = strPriecinok & "\"
     strCesta = strPriecinok & "dochs_config.json"
-    Call mod_00_Common.UlozUTF8Sustor(strCesta, GenerujKonfiguraciuJSON())
-    Call VytvorVerziuKonfiguracie()
+    strJson = mod_20_KonfiguraciaExport.GenerujKonfiguraciuV2JSON()
+    If Len(strJson) = 0 Then Exit Function      ' súbor sa nezapíše (nikdy čiastočný); dôvod je v protokole a v SpravaExportu
+    Call mod_00_Common.UlozUTF8Sustor(strCesta, strJson)
+    Call VytvorVerziuKonfiguracie("", strJson)
     ExportujKonfiguraciuDoSuboru = strCesta
     Exit Function
 Chyba:

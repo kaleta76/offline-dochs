@@ -1,5 +1,23 @@
 # Dochádzka – zmeny
 
+## Balík 2.12.0
+Konfigurácia pre terminál s výpočtovým plánom (kontrakt 1.2.0, `dochs_config.json` v schéme 2).
+- **Súvislosť**: dovtedajší export niesol len číselník prerušení, kódy razení a sviatky. Terminál tak nemohol počítať saldo rovnako ako Access
+  (nepoznal fondy, úväzky ani kalendáre; prerušenia mal pevne v kóde). Teraz Access vypočíta pre každého zamestnanca a deň typ dňa a denný fond a pošle ich
+  hotové, spolu s výkladom, ako sa ktoré prerušenie počíta, a s parametrami pravidiel prerušení. Terminál nemusí poznať pravidlá fondov.
+- **Nový modul `mod_20_KonfiguraciaExport` 1.0.0**: `GenerujKonfiguraciuV2JSON`. Súbor je nadmnožina pôvodnej konfigurácie; pribúda `interruptions[].calc`
+  (WORK / LUNCH / COUNTED podľa `mod_08.TrvanieIntervalu`), `terminal_code_map` (z `TerminalMapaKodov`), `funds`, `templates` (pravidlá prerušení po mesiacoch)
+  a `employees[].months[]` s `day_types` a `expected_min` z `mod_08.NacitajKontextMesiaca`. Zamestnanec je len osobné číslo (číslo SAP z `TerminalMapaOsob`, ak je zadané).
+  Okno plánu: predchádzajúci až nasledujúci mesiac (nastavenia `PlanMesiacovDozadu`, `PlanMesiacovDopredu`, predvolene 1 a 1, najviac 14 mesiacov).
+  Pri chybe sa súbor nezapíše (nikdy čiastočný). Vyradený zamestnanec sa do mesiaca nezahrnie (rovnako ako vo výpočte).
+- **`mod_12_TerminalPriprava` 1.3.0**: `ExportujKonfiguraciuDoSuboru` a `VytvorVerziuKonfiguracie` ukladajú novú konfiguráciu (v1 zostáva ako záloha).
+- **`mod_16_PravidlaPreruseni` 1.1.0**: nová verejná `PravidlaSablonyPreMesiac` (export berie pravidlá tým istým výkladom ako kontrola dňa). Kontrola sa nemení.
+- **`mod_06_AdminTools` 2.6.1**, **`mod_UI_Tab_Export` 2.11.1**: „Export pre Lovable“ aj tlačidlo exportu konfigurácie zapisujú novú konfiguráciu; správa ukáže počty.
+- **Overenie súboru**: `python3 -I contract/tools/verify_config.py dochs_config.json` (v repozitári, bez Accessu). Čo kontroluje a ako sa plán počíta: `contract/README.md`.
+- **Čo to nerobí**: výpočet dňa v Accesse sa NEMENÍ. Nezmenené ostáva aj to, že všetky prerušenia okrem práce a obeda sa započítavajú (nepoužíva sa `ZapocitavatDoFondu`);
+  pravidlá prerušení dávajú len upozornenia.
+- **Neoverené v skutočnom Accesse**: celý nový kód (kontrola párovania blokov a odkazov medzi modulmi; spustené nebolo). Pri chybe pošlite text chyby s názvom procedúry.
+
 ## Balík 2.11.1
 Overenie zariadení z terminála: Access príznak ukladá a hlási pri importe.
 - **Súvislosť**: terminál označuje razenia z neschválených zariadení (`device_verification = unverified`). Kontrakt hovorí, že Access ich má označiť na kontrolu,

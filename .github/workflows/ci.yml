@@ -40,6 +40,12 @@ jobs:
         run: python3 -I contract/tools/verify_export.py contract/examples/punches_example.csv
       - name: Testy overovača exportu
         run: python3 -I contract/tools/test_verify_export.py
+      - name: Overenie zlatého súboru konfigurácie s plánom (kontrakt 1.2.0)
+        run: python3 -I contract/tools/verify_config.py contract/examples/config_example.json --strict
+      - name: Zlatý súbor konfigurácie zodpovedá referenčnému výpočtu plánu
+        run: python3 -I contract/tools/build_config_example.py --check
+      - name: Testy overovača konfigurácie a výpočtu plánu
+        run: python3 -I contract/tools/test_verify_config.py
       - name: Kontrola balíka Access (kontrolné súčty modulov, verzie, zakázané súbory)
         run: python3 -I tools/over_access_balik.py
       - name: Testy kontroly balíka Access

@@ -90,6 +90,7 @@ CI na GitHube (`.github/workflows/ci.yml`) spúšťa po každom PR a pushi do `m
 | [`docs/SPOLUPRACA.md`](docs/SPOLUPRACA.md) | rozdelenie rolí terminál / Access / vlastník, zistenia, rozhodnutia |
 | [`docs/ZNEPLATNENIE-RAZENI.md`](docs/ZNEPLATNENIE-RAZENI.md) | žiadosť o zneplatnenie duplicity, schválenie, prenos do Accessu, poradie nasadenia |
 | [`docs/TESTOVANIE-S-ACCESSOM.md`](docs/TESTOVANIE-S-ACCESSOM.md) | scenár na celý mesiac a porovnanie sald terminál / Access |
+| [`docs/KONFIGURACIA-Z-ACCESSU.md`](docs/KONFIGURACIA-Z-ACCESSU.md) | konfigurácia, prerušenia a výpočtový plán z Accessu do terminálu: čo chýbalo, rozdiely vo výpočte, rozhodnutia, postup |
 | [`docs/REGISTRACIA.md`](docs/REGISTRACIA.md) | registrácia firiem a zamestnancov bez e-mailu |
 | [`docs/OVERENIE-ZARIADENI.md`](docs/OVERENIE-ZARIADENI.md) | čo overenie zariadenia zaručuje a čo nie, neoverené razenia, záchranný kód, zmeny zariadení |
 | [`docs/LOVABLE-KREDITY.md`](docs/LOVABLE-KREDITY.md) | čo míňa kredity, synchronizácia s GitHubom |

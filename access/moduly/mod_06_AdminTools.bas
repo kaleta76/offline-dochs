@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_06_AdminTools"
-'@Verzia 2.6.0
+'@Verzia 2.6.1
 Option Compare Database
 Option Explicit
 
@@ -384,7 +384,9 @@ Public Sub ExportujLovableKonfiguraciu(Optional ByVal dtOd As Variant = Null, Op
 
     Dim jsonConfig As String
     ' Konfigurácia pre terminál sa generuje na jednom mieste (bez osobných údajov) - viď mod_12_TerminalPriprava
-    jsonConfig = mod_12_TerminalPriprava.GenerujKonfiguraciuJSON(iRok)
+    ' Od balíka 2.12.0 súbor nesie aj výpočtový plán (kontrakt 1.2.0); ak by jeho zostavenie zlyhalo, zapíše sa pôvodná konfigurácia
+    jsonConfig = mod_20_KonfiguraciaExport.GenerujKonfiguraciuV2JSON()
+    If Len(jsonConfig) = 0 Then jsonConfig = mod_12_TerminalPriprava.GenerujKonfiguraciuJSON(iRok)
 
     mod_00_Common.UlozUTF8Sustor outFolder & "dochs_config.json", jsonConfig
 

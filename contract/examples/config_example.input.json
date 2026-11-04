@@ -1,0 +1,768 @@
+{
+ "_poznamka": "Vymyslené údaje (žiadne osobné údaje). Vstup pre contract/tools/build_config_example.py, ktorý podľa algoritmu Accessu (mod_08.NacitajKontextMesiaca) vypočíta examples/config_example.json.",
+ "config_version": "2026.11.04.1200",
+ "generated_at": "2026-11-04T12:00:00",
+ "rok": 2026,
+ "period": {
+  "from_month": "2026-10",
+  "to_month": "2026-11"
+ },
+ "rules": {
+  "work_window_start_min": 360,
+  "work_window_end_min": 1020,
+  "full_day_obstacle_min": 360,
+  "auto_lunch_trigger_min": 360,
+  "auto_lunch_deduct_min": 30,
+  "auto_lunch_enabled": true,
+  "duplicate_punch_window_min": 10,
+  "default_daily_fund_min": 450,
+  "auto_repair_mode": 0,
+  "interruption_check_enabled": true
+ },
+ "interruptions": [
+  {
+   "code": 1,
+   "name": "Pracovná doba",
+   "short_name": "Prac.dob",
+   "start_punch_code": 100,
+   "end_punch_code": 101,
+   "is_work": true,
+   "is_lunch": false,
+   "auto_end_of_shift": false,
+   "calc": "WORK",
+   "counts_to_fund": false,
+   "counts_to_work": false,
+   "deducts_leave": false
+  },
+  {
+   "code": 2,
+   "name": "Návšteva lekára",
+   "short_name": "LEK",
+   "start_punch_code": 102,
+   "end_punch_code": 103,
+   "is_work": false,
+   "is_lunch": false,
+   "auto_end_of_shift": false,
+   "calc": "COUNTED",
+   "counts_to_fund": false,
+   "counts_to_work": false,
+   "deducts_leave": false
+  },
+  {
+   "code": 4,
+   "name": "Služobné vzdialenie",
+   "short_name": "SLVZ",
+   "start_punch_code": 106,
+   "end_punch_code": 107,
+   "is_work": false,
+   "is_lunch": false,
+   "auto_end_of_shift": true,
+   "calc": "COUNTED",
+   "counts_to_fund": false,
+   "counts_to_work": false,
+   "deducts_leave": false
+  },
+  {
+   "code": 7,
+   "name": "Obed",
+   "short_name": "OBED",
+   "start_punch_code": 110,
+   "end_punch_code": 111,
+   "is_work": false,
+   "is_lunch": true,
+   "auto_end_of_shift": false,
+   "calc": "LUNCH",
+   "counts_to_fund": false,
+   "counts_to_work": false,
+   "deducts_leave": false
+  },
+  {
+   "code": 8,
+   "name": "Dovolenka",
+   "short_name": "DOVOL",
+   "start_punch_code": 116,
+   "end_punch_code": 117,
+   "is_work": false,
+   "is_lunch": false,
+   "auto_end_of_shift": true,
+   "calc": "COUNTED",
+   "counts_to_fund": false,
+   "counts_to_work": false,
+   "deducts_leave": true
+  },
+  {
+   "code": 11,
+   "name": "Nemoc",
+   "short_name": "NEMOC",
+   "start_punch_code": 120,
+   "end_punch_code": 121,
+   "is_work": false,
+   "is_lunch": false,
+   "auto_end_of_shift": true,
+   "calc": "COUNTED",
+   "counts_to_fund": false,
+   "counts_to_work": false,
+   "deducts_leave": false
+  },
+  {
+   "code": 12,
+   "name": "Služobná cesta",
+   "short_name": "SLCE",
+   "start_punch_code": 122,
+   "end_punch_code": 123,
+   "is_work": false,
+   "is_lunch": false,
+   "auto_end_of_shift": true,
+   "calc": "COUNTED",
+   "counts_to_fund": false,
+   "counts_to_work": false,
+   "deducts_leave": false
+  },
+  {
+   "code": 13,
+   "name": "Ostatné osobné prekážky",
+   "short_name": "OOP",
+   "start_punch_code": 124,
+   "end_punch_code": 125,
+   "is_work": false,
+   "is_lunch": false,
+   "auto_end_of_shift": true,
+   "calc": "COUNTED",
+   "counts_to_fund": false,
+   "counts_to_work": false,
+   "deducts_leave": false
+  },
+  {
+   "code": 16,
+   "name": "Ošetrenie člena rodiny",
+   "short_name": "OČR",
+   "start_punch_code": 130,
+   "end_punch_code": 131,
+   "is_work": false,
+   "is_lunch": false,
+   "auto_end_of_shift": true,
+   "calc": "COUNTED",
+   "counts_to_fund": false,
+   "counts_to_work": false,
+   "deducts_leave": false
+  }
+ ],
+ "punch_codes": [
+  {
+   "code": 100,
+   "interruption": 1,
+   "direction": "Z",
+   "label": "Príchod"
+  },
+  {
+   "code": 101,
+   "interruption": 1,
+   "direction": "K",
+   "label": "Odchod"
+  },
+  {
+   "code": 102,
+   "interruption": 2,
+   "direction": "Z",
+   "label": "Lekár - odchod"
+  },
+  {
+   "code": 103,
+   "interruption": 2,
+   "direction": "K",
+   "label": "Lekár - príchod"
+  },
+  {
+   "code": 106,
+   "interruption": 4,
+   "direction": "Z",
+   "label": "Sl.vzdial-odchod"
+  },
+  {
+   "code": 107,
+   "interruption": 4,
+   "direction": "K",
+   "label": "Sl.vzdia-príchod"
+  },
+  {
+   "code": 110,
+   "interruption": 7,
+   "direction": "Z",
+   "label": "Obed-odchod"
+  },
+  {
+   "code": 111,
+   "interruption": 7,
+   "direction": "K",
+   "label": "Obed-príchod"
+  },
+  {
+   "code": 116,
+   "interruption": 8,
+   "direction": "Z",
+   "label": "Dovolenka-odch."
+  },
+  {
+   "code": 117,
+   "interruption": 8,
+   "direction": "K",
+   "label": "Dovolenka-prích."
+  },
+  {
+   "code": 120,
+   "interruption": 11,
+   "direction": "Z",
+   "label": "Nemoc-odchod"
+  },
+  {
+   "code": 121,
+   "interruption": 11,
+   "direction": "K",
+   "label": "Nemoc-príchod"
+  },
+  {
+   "code": 122,
+   "interruption": 12,
+   "direction": "Z",
+   "label": "Služ.cest-odchod"
+  },
+  {
+   "code": 123,
+   "interruption": 12,
+   "direction": "K",
+   "label": "Služ.cest-prích."
+  },
+  {
+   "code": 124,
+   "interruption": 13,
+   "direction": "Z",
+   "label": "Ost.os.prek.-od."
+  },
+  {
+   "code": 125,
+   "interruption": 13,
+   "direction": "K",
+   "label": "Ost.os.prek.-pr."
+  },
+  {
+   "code": 130,
+   "interruption": 16,
+   "direction": "Z",
+   "label": "Ošetr. ČR-odchod"
+  },
+  {
+   "code": 131,
+   "interruption": 16,
+   "direction": "K",
+   "label": "Ošetr.ČR-príchod"
+  }
+ ],
+ "terminal_code_map": [
+  {
+   "code": "WORK",
+   "interruption": 1
+  },
+  {
+   "code": "DOCTOR",
+   "interruption": 2
+  },
+  {
+   "code": "TRIP",
+   "interruption": 12
+  },
+  {
+   "code": "FAMILY",
+   "interruption": 16
+  },
+  {
+   "code": "LEAVE",
+   "interruption": 8
+  },
+  {
+   "code": "SICK",
+   "interruption": 11
+  },
+  {
+   "code": "PRIV",
+   "interruption": 13
+  }
+ ],
+ "holidays": [
+  {
+   "date": "2026-01-01",
+   "name": "Deň vzniku Slovenskej republiky"
+  },
+  {
+   "date": "2026-01-06",
+   "name": "Zjavenie Pána (Traja králi)"
+  },
+  {
+   "date": "2026-04-03",
+   "name": "Veľký piatok"
+  },
+  {
+   "date": "2026-04-06",
+   "name": "Veľkonočný pondelok"
+  },
+  {
+   "date": "2026-05-01",
+   "name": "Sviatok práce"
+  },
+  {
+   "date": "2026-05-08",
+   "name": "Deň víťazstva nad fašizmom"
+  },
+  {
+   "date": "2026-07-05",
+   "name": "Sviatok sv. Cyrila a Metoda"
+  },
+  {
+   "date": "2026-08-29",
+   "name": "Výročie SNP"
+  },
+  {
+   "date": "2026-09-01",
+   "name": "Deň Ústavy Slovenskej republiky"
+  },
+  {
+   "date": "2026-09-15",
+   "name": "Sedembolestná Panna Mária"
+  },
+  {
+   "date": "2026-11-01",
+   "name": "Sviatok všetkých svätých"
+  },
+  {
+   "date": "2026-11-17",
+   "name": "Deň boja za slobodu a demokraciu"
+  },
+  {
+   "date": "2026-12-24",
+   "name": "Štedrý deň"
+  },
+  {
+   "date": "2026-12-25",
+   "name": "Prvý sviatok vianočný"
+  },
+  {
+   "date": "2026-12-26",
+   "name": "Druhý sviatok vianočný"
+  },
+  {
+   "date": "2027-01-01",
+   "name": "Deň vzniku Slovenskej republiky"
+  },
+  {
+   "date": "2027-01-06",
+   "name": "Zjavenie Pána (Traja králi)"
+  },
+  {
+   "date": "2027-03-26",
+   "name": "Veľký piatok"
+  },
+  {
+   "date": "2027-03-29",
+   "name": "Veľkonočný pondelok"
+  },
+  {
+   "date": "2027-05-01",
+   "name": "Sviatok práce"
+  },
+  {
+   "date": "2027-05-08",
+   "name": "Deň víťazstva nad fašizmom"
+  },
+  {
+   "date": "2027-07-05",
+   "name": "Sviatok sv. Cyrila a Metoda"
+  },
+  {
+   "date": "2027-08-29",
+   "name": "Výročie SNP"
+  },
+  {
+   "date": "2027-09-01",
+   "name": "Deň Ústavy Slovenskej republiky"
+  },
+  {
+   "date": "2027-09-15",
+   "name": "Sedembolestná Panna Mária"
+  },
+  {
+   "date": "2027-11-01",
+   "name": "Sviatok všetkých svätých"
+  },
+  {
+   "date": "2027-11-17",
+   "name": "Deň boja za slobodu a demokraciu"
+  },
+  {
+   "date": "2027-12-24",
+   "name": "Štedrý deň"
+  },
+  {
+   "date": "2027-12-25",
+   "name": "Prvý sviatok vianočný"
+  },
+  {
+   "date": "2027-12-26",
+   "name": "Druhý sviatok vianočný"
+  }
+ ],
+ "funds": [
+  {
+   "id": 1,
+   "name": "Pevný 7:30",
+   "type": 1,
+   "versions": [
+    {
+     "from": "2025-01",
+     "avg_day_min": 450,
+     "monthly_min": 0,
+     "by_weekday": null
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Voľný, 150 h mesačne",
+   "type": 4,
+   "versions": [
+    {
+     "from": "2026-01",
+     "avg_day_min": 450,
+     "monthly_min": 9000,
+     "by_weekday": null
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Krátky piatok",
+   "type": 1,
+   "versions": [
+    {
+     "from": "2025-01",
+     "avg_day_min": 450,
+     "monthly_min": 0,
+     "by_weekday": [
+      480,
+      480,
+      480,
+      480,
+      300,
+      0,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "templates": [
+  {
+   "id": 1,
+   "name": "Štandard",
+   "rules": [
+    {
+     "interruption": 7,
+     "versions": [
+      {
+       "from": "2025-01",
+       "disabled": false,
+       "interval_days": false,
+       "interval_all": [
+        660,
+        810
+       ],
+       "interval_by_day": [
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ]
+       ],
+       "max_days": false,
+       "max_all": 60,
+       "max_by_day": [
+        1440,
+        1440,
+        1440,
+        1440,
+        1440,
+        1440,
+        1440
+       ],
+       "min_duration": 0,
+       "min_worked_before": 180
+      }
+     ]
+    },
+    {
+     "interruption": 2,
+     "versions": [
+      {
+       "from": "2025-01",
+       "disabled": false,
+       "interval_days": false,
+       "interval_all": [
+        0,
+        1440
+       ],
+       "interval_by_day": [
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ]
+       ],
+       "max_days": true,
+       "max_all": 1440,
+       "max_by_day": [
+        240,
+        240,
+        240,
+        240,
+        240,
+        0,
+        0
+       ],
+       "min_duration": 0,
+       "min_worked_before": 0
+      },
+      {
+       "from": "2026-11",
+       "disabled": false,
+       "interval_days": false,
+       "interval_all": [
+        0,
+        1440
+       ],
+       "interval_by_day": [
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ]
+       ],
+       "max_days": true,
+       "max_all": 1440,
+       "max_by_day": [
+        180,
+        180,
+        180,
+        180,
+        180,
+        0,
+        0
+       ],
+       "min_duration": 0,
+       "min_worked_before": 0
+      }
+     ]
+    },
+    {
+     "interruption": 13,
+     "versions": [
+      {
+       "from": "2025-01",
+       "disabled": false,
+       "interval_days": true,
+       "interval_all": [
+        0,
+        1440
+       ],
+       "interval_by_day": [
+        [
+         420,
+         960
+        ],
+        [
+         420,
+         960
+        ],
+        [
+         420,
+         960
+        ],
+        [
+         420,
+         960
+        ],
+        [
+         420,
+         960
+        ],
+        [
+         0,
+         1440
+        ],
+        [
+         0,
+         1440
+        ]
+       ],
+       "max_days": false,
+       "max_all": 1440,
+       "max_by_day": [
+        1440,
+        1440,
+        1440,
+        1440,
+        1440,
+        1440,
+        1440
+       ],
+       "min_duration": 5,
+       "min_worked_before": 0
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Bez obmedzení",
+   "rules": []
+  }
+ ],
+ "calendars": [
+  {
+   "id": 1,
+   "name": "Štandardný",
+   "overrides": {}
+  },
+  {
+   "id": 2,
+   "name": "Štandardný s firemným voľnom",
+   "overrides": {
+    "2026-10-30": "V"
+   }
+  }
+ ],
+ "employees": [
+  {
+   "personnel_number": "9000001",
+   "assignments": [
+    {
+     "from": "2025-01",
+     "fund": 1,
+     "template": 1,
+     "calendar": 1,
+     "employment_pct": 100
+    }
+   ]
+  },
+  {
+   "personnel_number": "9000002",
+   "assignments": [
+    {
+     "from": "2025-01",
+     "fund": 1,
+     "template": 1,
+     "calendar": 1,
+     "employment_pct": 100
+    },
+    {
+     "from": "2026-11",
+     "fund": 1,
+     "template": 2,
+     "calendar": 1,
+     "employment_pct": 50
+    }
+   ]
+  },
+  {
+   "personnel_number": "9000003",
+   "assignments": [
+    {
+     "from": "2026-01",
+     "fund": 2,
+     "template": 2,
+     "calendar": 1,
+     "employment_pct": 100
+    }
+   ]
+  },
+  {
+   "personnel_number": "9000004",
+   "assignments": [
+    {
+     "from": "2025-01",
+     "fund": 3,
+     "template": 1,
+     "calendar": 2,
+     "employment_pct": 100
+    }
+   ]
+  }
+ ]
+}

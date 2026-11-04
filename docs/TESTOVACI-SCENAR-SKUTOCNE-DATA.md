@@ -19,7 +19,7 @@ Terminál zatiaľ počíta po starom (jeden denný fond, bez plánu z Accessu). 
 | Čo | Poznámka |
 |---|---|
 | Kópia databázy Accessu | Zatvorte Access, skopírujte `.accdb` ako `dochadzka_TEST_A.accdb`. Všetko v Accesse robte len v kópiách. Dôvod: Access pozná duplicitu razenia len podľa ID z terminála, nie podľa obsahu. Razenia, ktoré už v databáze sú z Ordata, by sa po importe z terminála **zdvojili**. |
-| Balík Access 2.12.0 | Nainštalovaný v kópii (`docs/VYDANIA-ACCESS.md`). |
+| Balík Access 2.12.1 alebo novší | Nainštalovaný v kópii (`docs/VYDANIA-ACCESS.md`). Verzia 2.12.0 sa v Accesse nedá skompilovať. |
 | Python 3 a repozitár | Stiahnite repozitár (zelené tlačidlo Code > Download ZIP) a rozbaľte ho. Súbory z testu ukladajte **mimo** rozbaleného priečinka, napr. `C:\dochadzka_test\`. |
 | Registračný kód firmy | Máte ho vy (vlastník). V repozitári je len jeho odtlačok. |
 | Prístup do Lovable Cloud | SQL editor (na záverečnú kontrolu stavu databázy). |

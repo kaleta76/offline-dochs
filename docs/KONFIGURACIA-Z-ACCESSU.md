@@ -78,7 +78,7 @@ Niektoré kódy v mapovaní sú v Accesse označené „overiť“ (`FAMILY` →
 ## 6. Postup nasadenia
 
 1. Vlastník schváli PR s kontraktom 1.2.0 (`contract/`).
-2. Nainštalovať balík Access 2.12.0 (`docs/VYDANIA-ACCESS.md`). Karta 7 Exporty, tlačidlo **Vytvoriť verziu konfigurácie prerušení pre terminál**: vznikne `dochs_config.json` v zvolenom priečinku; správa ukáže počty zamestnancov a mesiacov.
+2. Nainštalovať balík Access **2.12.1 alebo novší** (`docs/VYDANIA-ACCESS.md`; 2.12.0 sa nedá skompilovať, pozri `access/CHANGELOG.md`). Karta 7 Exporty, tlačidlo **Vytvoriť verziu konfigurácie prerušení pre terminál**: vznikne `dochs_config.json` v zvolenom priečinku; správa ukáže počty zamestnancov a mesiacov.
 3. Skontrolovať súbor: `python3 -I contract/tools/verify_config.py dochs_config.json` (kontroluje typy dní voči kalendáru, sviatky, počty, odkazy a že v súbore nie sú osobné údaje).
    Súbor neposielať ďalej, kým overovač nehlási „V poriadku“.
 4. Potvrdiť riadky `terminal_code_map` (rozhodnutie o `FAMILY`, `PRIV`).

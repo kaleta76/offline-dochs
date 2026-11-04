@@ -30,3 +30,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Zálohy databázy obsahujú prihlasovacie účty a odtlačky hesiel: nikdy do repozitára (docs/ZALOHA-DATABAZY.md)
+zalohy/
+*.dump
+*.backup
+*.pgdump
+*.dump.gz
+*.sql.gz
+__pycache__/

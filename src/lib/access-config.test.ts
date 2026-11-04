@@ -16,7 +16,17 @@ import {
   parseImportResult,
 } from "./access-config";
 
-const goldenText = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "contract", "examples", "config_example.json"), "utf8");
+const goldenText = readFileSync(
+  join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+    "contract",
+    "examples",
+    "config_example.json",
+  ),
+  "utf8",
+);
 // Pevný „teraz“, aby test nezávisel od dátumu spustenia (zlatý súbor je z 4. 11. 2026).
 const NOW = new Date(Date.UTC(2026, 10, 5, 8, 0));
 
@@ -45,7 +55,13 @@ describe("zlatý súbor", () => {
     const r = check(golden());
     expect(r.errors).toEqual([]);
     expect(r.warnings).toEqual([]);
-    expect(r.summary).toEqual({ configVersion: "2026.11.04.1200", periodFrom: "2026-10", periodTo: "2026-11", employees: 4, employeeMonths: 8 });
+    expect(r.summary).toEqual({
+      configVersion: "2026.11.04.1200",
+      periodFrom: "2026-10",
+      periodTo: "2026-11",
+      employees: 4,
+      employeeMonths: 8,
+    });
   });
 
   it("prejde aj v prísnom režime", () => {
@@ -87,10 +103,21 @@ describe("hlavička a kľúče", () => {
     const d = golden();
     delete d.generated_at;
     expect(check(d).errors).toEqual([]);
-    for (const v of [1, null, ["x"], "x".repeat(41)]) rejects((x) => (x.generated_at = v), "generated_at");
+    for (const v of [1, null, ["x"], "x".repeat(41)])
+      rejects((x) => (x.generated_at = v), "generated_at");
   });
   it("neplatná verzia", () => {
-    for (const v of ["2026-11-04", 20261104, "2026.13.04.1200", "2026.11.32.1200", "2026.11.04.2400", "2026.11.04.1260", "1999.01.01.0000", "2026.02.31.1200", null]) {
+    for (const v of [
+      "2026-11-04",
+      20261104,
+      "2026.13.04.1200",
+      "2026.11.32.1200",
+      "2026.11.04.2400",
+      "2026.11.04.1260",
+      "1999.01.01.0000",
+      "2026.02.31.1200",
+      null,
+    ]) {
       rejects((d) => (d.config_version = v), "config_version");
     }
   });
@@ -101,7 +128,8 @@ describe("hlavička a kľúče", () => {
     expect(check(d).errors).toEqual([]);
   });
   it("rok", () => {
-    for (const v of ["2026", -1, 1.5, 12345678, 1999, 2100, null]) rejects((d) => (d.rok = v), "rok");
+    for (const v of ["2026", -1, 1.5, 12345678, 1999, 2100, null])
+      rejects((d) => (d.rok = v), "rok");
   });
 });
 
@@ -123,7 +151,10 @@ describe("pravidlá a prerušenia", () => {
     rejects((d) => (d.interruptions.find((i: Doc) => i.code === 2).calc = "WORK"), "WORK patrí");
     rejects((d) => (d.interruptions.find((i: Doc) => i.code === 2).calc = "LUNCH"), "LUNCH patrí");
     rejects((d) => (d.interruptions.find((i: Doc) => i.code === 1).calc = "COUNTED"), "WORK patrí");
-    rejects((d) => (d.interruptions.find((i: Doc) => i.code === 7).calc = "COUNTED"), "LUNCH patrí");
+    rejects(
+      (d) => (d.interruptions.find((i: Doc) => i.code === 7).calc = "COUNTED"),
+      "LUNCH patrí",
+    );
   });
   it("neznámy spôsob počítania", () => {
     rejects((d) => (d.interruptions.find((i: Doc) => i.code === 2).calc = "PRIV"), "calc 'PRIV'");
@@ -169,13 +200,19 @@ describe("okno, fondy, šablóny", () => {
     rejects((d) => d.templates.push({ ...d.templates[0] }), "dvakrát");
   });
   it("pravidlá v šablóne", () => {
-    rejects((d) => (d.templates[0].months[0].rules[0].interruption = 99), "neexistujúce prerušenie");
+    rejects(
+      (d) => (d.templates[0].months[0].rules[0].interruption = 99),
+      "neexistujúce prerušenie",
+    );
     rejects((d) => (d.templates[0].months[0].rules[0].max_duration_min = [1, 2, 3]), "7 čísel");
     rejects((d) => (d.templates[0].months[0].rules[0].allowed_to_min[0] = 1441), "7 čísel");
     rejects((d) => (d.templates[0].months[0].rules[0].disabled = 0), "disabled");
     rejects((d) => (d.templates[0].months[0].rules[0].min_duration_min = -1), "min_duration_min");
     rejects((d) => (d.templates[0].months[0].rules[0].extra = 1), "pravidlo musí mať");
-    rejects((d) => d.templates[0].months[0].rules.push({ ...d.templates[0].months[0].rules[0] }), "dve pravidlá");
+    rejects(
+      (d) => d.templates[0].months[0].rules.push({ ...d.templates[0].months[0].rules[0] }),
+      "dve pravidlá",
+    );
   });
   it("mesiac šablóny mimo okna alebo dvakrát", () => {
     rejects((d) => (d.templates[0].months[0].month = "2027-01"), "mimo okna");
@@ -191,7 +228,8 @@ describe("zamestnanci a mesačné plány", () => {
     rejects((d) => (mon(d, pn, "2026-10").poznamka = "x"), "osobné údaje");
   });
   it("neplatné a duplicitné osobné číslo", () => {
-    for (const v of ["", "a b", "x".repeat(21), 123, null, "9000001;"]) rejects((d) => (emp(d, pn).personnel_number = v), "osobné číslo");
+    for (const v of ["", "a b", "x".repeat(21), 123, null, "9000001;"])
+      rejects((d) => (emp(d, pn).personnel_number = v), "osobné číslo");
     rejects((d) => (d.employees[1].personnel_number = pn), "dvakrát");
   });
   it("neúplné počty (useknutý prenos)", () => {
@@ -211,7 +249,8 @@ describe("zamestnanci a mesačné plány", () => {
     rejects((d) => (mon(d, pn, "2026-10").day_types[0] = "PN"), "nesedí s dňom v týždni");
   });
   it("neplatný typ dňa", () => {
-    for (const v of ["XP", "PX", "P", "PPP", "", null, 5]) rejects((d) => (mon(d, pn, "2026-10").day_types[0] = v), "typ dňa");
+    for (const v of ["XP", "PX", "P", "PPP", "", null, 5])
+      rejects((d) => (mon(d, pn, "2026-10").day_types[0] = v), "typ dňa");
   });
   it("sviatok z číselníka musí mať typ dňa začínajúci S", () => {
     // 17. 11. 2026 (utorok) je sviatok
@@ -245,7 +284,8 @@ describe("zamestnanci a mesačné plány", () => {
   it("neexistujúci fond a šablóna, rozsah úväzku", () => {
     rejects((d) => (mon(d, pn, "2026-10").fund_id = 99), "neexistujúci fond");
     rejects((d) => (mon(d, pn, "2026-10").template_id = 99), "neexistujúca šablóna");
-    for (const v of [0, 201, 50.5, "100", null]) rejects((d) => (mon(d, pn, "2026-10").employment_pct = v), "employment_pct");
+    for (const v of [0, 201, 50.5, "100", null])
+      rejects((d) => (mon(d, pn, "2026-10").employment_pct = v), "employment_pct");
     rejects((d) => (mon(d, pn, "2026-10").calendar_id = 0), "calendar_id");
   });
   it("chýbajúci kľúč v mesiaci", () => {
@@ -291,18 +331,45 @@ describe("odpovede databázy", () => {
     });
   });
   it("neznámy tvar je null, nikdy vymyslené čísla", () => {
-    for (const v of [null, "x", [], {}, { status: "ok", config_version: "x" }, { status: "preview" }]) expect(parseImportResult(v)).toBeNull();
+    for (const v of [
+      null,
+      "x",
+      [],
+      {},
+      { status: "ok", config_version: "x" },
+      { status: "preview" },
+    ])
+      expect(parseImportResult(v)).toBeNull();
   });
   it("záporné a nečíselné počty sa berú ako 0", () => {
-    const r = parseImportResult({ ...raw, employees: -5, employee_months: "8", removed_months: NaN });
+    const r = parseImportResult({
+      ...raw,
+      employees: -5,
+      employee_months: "8",
+      removed_months: NaN,
+    });
     expect(r?.employees).toBe(0);
     expect(r?.employeeMonths).toBe(0);
     expect(r?.removedMonths).toBe(0);
   });
   it("aktuálna konfigurácia z tabuľky", () => {
     expect(
-      parseCurrentConfig({ config_version: "2026.11.04.1200", period_from: "2026-10-01", period_to: "2026-11-01", employees_count: 4, employee_months_count: 8, imported_at: "2026-11-04T12:05:00+00:00" }),
-    ).toEqual({ configVersion: "2026.11.04.1200", periodFrom: "2026-10", periodTo: "2026-11", employees: 4, employeeMonths: 8, importedAt: "2026-11-04T12:05:00+00:00" });
+      parseCurrentConfig({
+        config_version: "2026.11.04.1200",
+        period_from: "2026-10-01",
+        period_to: "2026-11-01",
+        employees_count: 4,
+        employee_months_count: 8,
+        imported_at: "2026-11-04T12:05:00+00:00",
+      }),
+    ).toEqual({
+      configVersion: "2026.11.04.1200",
+      periodFrom: "2026-10",
+      periodTo: "2026-11",
+      employees: 4,
+      employeeMonths: 8,
+      importedAt: "2026-11-04T12:05:00+00:00",
+    });
     expect(parseCurrentConfig(null)).toBeNull();
     expect(parseCurrentConfig({ config_version: "x" })).toBeNull();
   });
@@ -316,7 +383,9 @@ describe("odpovede databázy", () => {
     expect(countMonths(2)).toBe("2 mesačné plány");
     const r = parseImportResult(raw)!;
     expect(describeImportResult(r)).toContain("Zatiaľ sa nič nezapísalo");
-    expect(describeImportResult({ ...r, status: "imported", dryRun: false })).toContain("Prijatá verzia 4. 11. 2026 12:00");
+    expect(describeImportResult({ ...r, status: "imported", dryRun: false })).toContain(
+      "Prijatá verzia 4. 11. 2026 12:00",
+    );
     expect(describeImportResult({ ...r, status: "unchanged" })).toContain("už prijatá");
     expect(describeImportResult({ ...r, removedMonths: 2 })).toContain("2 mesačné plány");
   });

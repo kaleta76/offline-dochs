@@ -65,7 +65,9 @@ export function AccessConfigImport() {
     reset();
     if (!file) return;
     if (file.size > MAX_FILE_BYTES) {
-      setLoadError(`Súbor má ${Math.round(file.size / 1e6)} MB, najviac je ${MAX_FILE_BYTES / 1e6} MB.`);
+      setLoadError(
+        `Súbor má ${Math.round(file.size / 1e6)} MB, najviac je ${MAX_FILE_BYTES / 1e6} MB.`,
+      );
       return;
     }
     setBusy("read");
@@ -99,7 +101,10 @@ export function AccessConfigImport() {
       }
       const result = parseImportResult(data);
       if (!result) {
-        setMessage({ ok: false, text: "Neočakávaná odpoveď databázy, nič sa nepovažuje za zapísané." });
+        setMessage({
+          ok: false,
+          text: "Neočakávaná odpoveď databázy, nič sa nepovažuje za zapísané.",
+        });
         return;
       }
       if (dryRun) {
@@ -128,9 +133,10 @@ export function AccessConfigImport() {
       <h2 className="mb-3 text-sm font-bold uppercase tracking-widest">Konfigurácia z Accessu</h2>
       <p className="text-xs text-muted-foreground">
         Nahrajte súbor <span className="num">dochs_config.json</span> vytvorený v Accesse (karta
-        Exporty, tlačidlo „Vytvoriť verziu konfigurácie prerušení pre terminál“). Najprv sa ukáže náhľad a nič sa nezapíše. Súbor sa zapíše celý
-        alebo vôbec; staršia verzia, než je prijatá, sa neprijme. Súbor nesmie obsahovať mená ani iné
-        osobné údaje, zamestnanec je v ňom len osobné číslo.
+        Exporty, tlačidlo „Vytvoriť verziu konfigurácie prerušení pre terminál“). Najprv sa ukáže
+        náhľad a nič sa nezapíše. Súbor sa zapíše celý alebo vôbec; staršia verzia, než je prijatá,
+        sa neprijme. Súbor nesmie obsahovať mená ani iné osobné údaje, zamestnanec je v ňom len
+        osobné číslo.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -178,8 +184,9 @@ export function AccessConfigImport() {
               <p role="status">
                 Súbor „{loaded.name}“ je v poriadku: verzia{" "}
                 <span className="num">{formatConfigVersion(check.summary.configVersion)}</span>,{" "}
-                {countEmployees(check.summary.employees)}, {countMonths(check.summary.employeeMonths)},
-                okno {formatMonth(check.summary.periodFrom)} až {formatMonth(check.summary.periodTo)}.
+                {countEmployees(check.summary.employees)},{" "}
+                {countMonths(check.summary.employeeMonths)}, okno{" "}
+                {formatMonth(check.summary.periodFrom)} až {formatMonth(check.summary.periodTo)}.
               </p>
             )
           )}
@@ -221,7 +228,10 @@ export function AccessConfigImport() {
       )}
 
       {message && (
-        <p role={message.ok ? "status" : "alert"} className={`mt-3 text-sm ${message.ok ? "" : "text-destructive"}`}>
+        <p
+          role={message.ok ? "status" : "alert"}
+          className={`mt-3 text-sm ${message.ok ? "" : "text-destructive"}`}
+        >
           {message.text}
         </p>
       )}

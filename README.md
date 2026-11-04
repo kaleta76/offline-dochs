@@ -52,7 +52,7 @@ komunikácia so snímačmi SKE cez sériový port (tento modul nie je vo verejno
 | `src/` | terminál: React + TanStack Start, výpočtový motor `src/lib/engine.ts`, offline fronta, export pre Access |
 | `drizzle/migrations/` | migrácie databázy terminála `0000`–`0006` (aplikuje ich Lovable) |
 | `docs/migracie/` | texty migrácií a záchranné skripty (`0006` zneplatnenie razení je spustená, `0007` zrušenie testovacej organizácie čaká na spustenie) |
-| `docs/zaloha/` | SQL na snapshot databázy pred zásahom, na porovnanie po ňom `stav_databazy.sql` (dotaz len na čítanie: aktuálny stav databázy pre Claude) a `kontrola_0007.sql` (kontrola práv pred migráciou 0007 a výsledku po nej) |
+| `docs/zaloha/` | SQL na snapshot databázy pred zásahom, na porovnanie po ňom, `stav_databazy.sql` (dotaz len na čítanie: aktuálny stav databázy pre Claude) a `kontrola_0007.sql` (kontrola práv pred migráciou 0007 a výsledku po nej) |
 | `tools/` | kontroly balíka Access a zálohy databázy, `tools/sql_test/` = lokálny test SQL migrácií na PostgreSQL |
 | `contract/` | **kontrakt terminál ⇄ Access**: popis, zlaté súbory, referenčná implementácia, testy, overovač, testovacie scenáre. Mení sa iba cez PR so schválením vlastníka |
 | `access/` | dochádzkový systém v Accesse: inštalátor, moduly VBA, testy |

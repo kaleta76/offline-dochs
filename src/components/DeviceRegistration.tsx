@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ShieldCheck, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { getOrCreateDeviceKey, newDeviceKey, saveDeviceKey, type DeviceKey } from "@/lib/device";
+import { ensurePersistent, getOrCreateDeviceKey, newDeviceKey, saveDeviceKey, type DeviceKey } from "@/lib/device";
 import { deviceLabel } from "@/lib/device-trace";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +13,9 @@ type Dev = { id: string; status: string; pairing_code: string | null; pairing_ex
 export function DeviceRegistration({ userId, online }: { userId: string; online: boolean }) {
   const [key, setKey] = useState<DeviceKey | null>(null);
   const [persisted, setPersisted] = useState(true);
+  const [asking, setAsking] = useState(false);
+  const [retried, setRetried] = useState(false);
+  const prevStatus = useRef<string | null>(null);
   const [dev, setDev] = useState<Dev | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [left, setLeft] = useState(0);
@@ -48,23 +51,46 @@ export function DeviceRegistration({ userId, online }: { userId: string; online:
   }, [dev?.pairing_expires_at]);
   useEffect(() => { if (key && dev?.status === "pending" && left === 0 && online) void load(key); }, [left]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Chrome rozhoduje o trvalom uložení potichu a odpoveď sa mení (záložka, inštalácia, návštevnosť), preto sa po schválení
+  // zariadenia a na požiadanie opýtame znova. Pri načítaní sa pýta už getOrCreateDeviceKey.
+  useEffect(() => {
+    const s = dev?.status ?? null;
+    if (prevStatus.current === "pending" && (s === "active" || s === "backup")) void ensurePersistent().then(setPersisted);
+    prevStatus.current = s;
+  }, [dev?.status]);
+
+  async function retryPersist() {
+    setAsking(true);
+    try { setPersisted(await ensurePersistent()); setRetried(true); } finally { setAsking(false); }
+  }
+
   async function replace() {
     setMsg(null);
     if (dev && dev.status === "pending") await supabase.rpc("revoke_device", { _id: dev.id, _reason: "Nahradené žiadosťou o náhradu" });
     const k = await newDeviceKey(userId);
     const { error } = await supabase.rpc("register_device", { _token_hash: k.hash, _ua_hint: navigator.userAgent, _replace: true });
     if (error) { setMsg(error.message); return; }
-    await saveDeviceKey(k); setKey(k);
+    setPersisted(await saveDeviceKey(k)); setKey(k);
   }
 
   if (!dev) return !online ? null : msg ? <p role="alert" className="mb-4 text-sm text-destructive">{msg}</p> : null;
   const label = deviceLabel(dev.id);
   if (dev.status === "active" || dev.status === "backup") {
     return (
-      <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-        <ShieldCheck className="h-4 w-4 text-success" /> Overené zariadenie{dev.status === "backup" ? " (záložné)" : ""}
-        {label && <span className="num font-bold" title="Označenie tohto zariadenia. Vedúci ho vidí v zozname zariadení.">· {label}</span>}
-        {!persisted && <span className="text-warning">· prehliadač nepotvrdil trvalé uloženie kľúča</span>}
+      <div className="mb-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-success" /> Overené zariadenie{dev.status === "backup" ? " (záložné)" : ""}
+          {label && <span className="num font-bold" title="Označenie tohto zariadenia. Vedúci ho vidí v zozname zariadení.">· {label}</span>}
+        </div>
+        {!persisted && (
+          <p className="mt-1" role="status">
+            <span className="font-bold text-warning">Kľúč zariadenia je uložený, prehliadač však zatiaľ nezaručil, že ho nezmaže.</span>{" "}
+            Pridajte túto stránku medzi záložky (Ctrl+D) alebo ju nainštalujte ako aplikáciu a stlačte{" "}
+            <Button variant="link" size="sm" className="h-auto p-0 align-baseline" onClick={retryPersist} disabled={asking}>Skúsiť znova</Button>.
+            {retried && !asking && " Prehliadač to stále odmieta."}{" "}
+            Ak by sa kľúč stratil, zariadenie sa zaregistruje znova a schváli ho vedúci. Pípať sa dá aj dovtedy.
+          </p>
+        )}
       </div>
     );
   }

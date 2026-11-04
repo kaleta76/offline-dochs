@@ -39,25 +39,38 @@ export async function getDeviceKey(userId: string): Promise<DeviceKey | undefine
   try { return await run<DeviceKey | undefined>("readonly", (s) => s.get(userId)); } catch { return undefined; }
 }
 
+/**
+ * Asks the browser to keep this site's data (the device key) instead of evicting it when disk space runs low.
+ * Chrome decides silently from bookmark, installed app, site engagement and notification permission, and the answer
+ * changes over time, so asking again later can succeed; Firefox asks the user, so callers must not ask more often than needed.
+ */
+export async function ensurePersistent(): Promise<boolean> {
+  try {
+    const s = typeof navigator === "undefined" ? undefined : navigator.storage;
+    if (!s) return false;
+    if (s.persisted && (await s.persisted())) return true;
+    if (s.persist) return Boolean(await s.persist());
+  } catch { /* unsupported or blocked */ }
+  return false;
+}
+
 /** Creates a fresh key (replacing any old one for this user). Returns key + persistence result. */
 export async function createDeviceKey(userId: string): Promise<{ key: DeviceKey; persisted: boolean }> {
   const token = generateToken();
   const key: DeviceKey = { user_id: userId, token, hash: await sha256Hex(token), created_at: new Date().toISOString() };
   await run("readwrite", (s) => s.put(key));
-  let persisted = false;
-  try { persisted = (await navigator.storage?.persist?.()) ?? false; } catch { /* unsupported */ }
-  return { key, persisted };
+  return { key, persisted: await ensurePersistent() };
 }
 
 export async function getOrCreateDeviceKey(userId: string) {
   const existing = await getDeviceKey(userId);
-  if (existing) return { key: existing, persisted: (await navigator.storage?.persisted?.().catch(() => false)) ?? false };
+  if (existing) return { key: existing, persisted: await ensurePersistent() };
   return createDeviceKey(userId);
 }
 
-export async function saveDeviceKey(key: DeviceKey) {
+export async function saveDeviceKey(key: DeviceKey): Promise<boolean> {
   await run("readwrite", (s) => s.put(key));
-  try { await navigator.storage?.persist?.(); } catch { /* unsupported */ }
+  return ensurePersistent();
 }
 export async function newDeviceKey(userId: string): Promise<DeviceKey> {
   const token = generateToken();

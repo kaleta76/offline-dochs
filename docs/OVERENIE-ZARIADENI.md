@@ -19,6 +19,19 @@ Výsledok je v stĺpci `device_verification`: `verified` (schválené zariadenie
 * Vedúci ich potvrdí v Môj tím → Zariadenia → „Pípnutia z neoverených zariadení“ (príznak sa zmení na `confirmed`).
 * V exporte pre Access ide príznak v stĺpci `device_verification`. Access od 2.11.1 neoverené razenia ukladá a hlási pri importe.
 
+## „Prehliadač nezaručil trvalé uloženie kľúča“
+
+Kľúč je v IndexedDB prehliadača. Kým prehliadač nepovolí „trvalé“ úložisko, môže ho pri nedostatku miesta zmazať (a pri ručnom vymazaní údajov stránky sa zmaže vždy).
+Hlásenie pod stavom „Overené zariadenie“ teda **neznamená, že sa kľúč neuložil** (inak by zariadenie vôbec neboli overené), ale že prehliadač zatiaľ nič nezaručil.
+
+* **Chrome a Edge** rozhodujú potichu, bez otázky: trvalé úložisko dostane stránka, ktorú máte medzi záložkami, nainštalovanú ako aplikáciu, často navštevujete alebo má povolené oznámenia.
+  Pri novej, zriedka otváranej stránke odpovedia „nie“. Odpoveď sa však časom mení, preto sa aplikácia pýta znova: pri každom načítaní, hneď po schválení zariadenia a na tlačidle **Skúsiť znova**.
+* **Firefox** sa pýta používateľa vyskakovacím oknom; aplikácia sa preto bez vášho kliknutia nepýta častejšie než pri načítaní a po schválení.
+* **Súkromné okno** trvalé úložisko nikdy nedá a po zatvorení okna kľúč zmizne. Terminál v ňom nepoužívajte.
+
+Čo urobiť: stránku pridať medzi záložky (Ctrl+D) alebo ju nainštalovať ako aplikáciu (ikona inštalácie v adresnom riadku Chrome; v ukážke Lovable `id-preview--…` je service worker vypnutý, takže inštalácia tam nemusí byť dostupná; záložka funguje vždy) a stlačiť **Skúsiť znova**.
+Ak sa kľúč aj tak stratí, použije sa „Nahradiť pôvodné zariadenie“ a schváli ho vedúci; pípať sa dá aj dovtedy, razenia sú označené „neoverené“. Žiadne razenie sa nestratí.
+
 ## Záchranný kód zariadenia: prečo sa už nezobrazuje
 
 Pôvodný postup: po schválení sa zariadeniu raz zobrazil záchranný kód a ten sa dal zadať na inom zariadení (`recover_device`).
@@ -77,5 +90,6 @@ Typ zariadenia sa určuje z user-agent (prvých 80 znakov uložených v `user_ag
 ## Čo nie je overené
 
 * Obrazovky (Môj mesiac, Môj tím, Zariadenia) som nespúšťal v živom prostredí. Logika (označenie zmien, štítok, typ zariadenia, počet neoverených) má testy v `src/lib/device-trace.test.ts`.
+* Hlásenie o trvalom uložení kľúča: opakovanú otázku a text som nespúšťal v Chrome (logika má testy v `src/lib/device.test.ts`). Že záložka alebo inštalácia v Chrome naozaj zmení odpoveď, vychádza z dokumentácie prehliadača, nie z vlastného pokusu.
 * Po Publish skontrolujte: (1) na novom zariadení sa nezobrazí záchranný kód ani tlačidlo „Mám záchranný kód“, (2) razenie z neschváleného zariadenia má v Môj mesiac štítok „neoverené“, (3) v Môj tím sa objaví stĺpec „Neoverené“,
   (4) po náhrade zariadenia sa v Zariadenia objaví „Zmeny zariadení“.

@@ -35,6 +35,7 @@ dist-ssr
 zalohy/
 *.dump
 *.backup
+*.backup.zip
 *.pgdump
 *.dump.gz
 *.sql.gz

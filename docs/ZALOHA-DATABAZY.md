@@ -19,7 +19,7 @@ Podľa dokumentácie Lovable ([Database backups](https://docs.lovable.dev/featur
 |---|---|---|
 | **Denné zálohy** | More → Database → Manage → Backups | Lovable ich robí sám, drží približne 14 dní, každá má časovú značku UTC. Zahŕňajú štruktúru aj údaje, nie súbory v Storage. |
 | **Obnova zo zálohy** | tlačidlo „Restore to this backup“ pri zálohe | Vráti **celú databázu** (štruktúru aj údaje) a **zmaže všetko, čo vzniklo po záloze**. Databáza je pár minút nedostupná. Nedá sa vrátiť späť. Smie ju spraviť každý s právom upravovať projekt. |
-| **Export celej databázy** | More → Database → Manage → Settings → Export data → Export → Start export | Komprimovaný archív PostgreSQL (štruktúra, údaje, prihlasovacie účty aj odtlačky hesiel), na načítanie cez `pg_restore`. Lovable pošle e-mail a súbor uloží do projektu (More → Storage). Jeden export za 24 hodín, databáza do 15 GB. Neobsahuje súbory zo Storage, tajné hodnoty ani nastavenia prihlásenia. |
+| **Export celej databázy** | More → Database → Manage → Settings → Export data → Export → Start export | Súbor `NAZOV_RRMMDD.backup.zip` s jedným súborom `NAZOV_RRMMDD.backup`: archív `pg_dump` (štruktúra, údaje, prihlasovacie účty aj odtlačky hesiel) na načítanie cez `pg_restore`. Overené na skutočnom exporte zo 4. 11. 2026: formát archívu 1.16, databáza PostgreSQL 17.11, `pg_dump` 18.6, údaje stlačené zstd, 57 tabuliek s údajmi. Lovable pošle e-mail a súbor uloží do projektu (More → Storage). Jeden export za 24 hodín, databáza do 15 GB. Neobsahuje súbory zo Storage, tajné hodnoty ani nastavenia prihlásenia. |
 | **CSV jednej tabuľky** | More → Database → pohľad na tabuľku | Len jedna tabuľka naraz, na rýchlu kontrolu. |
 
 Názvy ponúk sa v Lovable menia; ak niečo nenájdete, hľadajte „Database“ → „Backups“ / „Export“.
@@ -33,28 +33,46 @@ Stiahnutie preto robí tlačidlo Export a skript z repozitára robí to, čo sa 
 
 1. V Lovable otvorte projekt: **More → Database → Manage → Settings → Export data → Export → Start export**.
 2. Počkajte na e-mail od Lovable (databáza je malá, trvá to minúty).
-3. **More → Storage**: stiahnite súbor so zálohou na počítač (napr. do `Stiahnuté`). Ak Lovable ponúka aj kontrolný súčet, poznačte si ho.
+3. **More → Storage**: stiahnite súbor so zálohou (`…backup.zip`) na počítač (napr. do `Stiahnuté`). **Nerozbaľujte ho**, skript číta priamo zip. Ak Lovable ponúka aj kontrolný súčet, poznačte si ho.
 
 ## 3. Overenie a uloženie stiahnutého súboru
 
-Potrebný je Python 3 (na Windowse príkaz `py`, inštalácia z python.org alebo Microsoft Store). Voliteľne PostgreSQL (nástroj `pg_restore`): s ním skript overí aj zoznam tabuliek vo vnútri archívu.
+Potrebný je Python 3 (na Windowse príkaz `py`, inštalácia z python.org alebo Microsoft Store). PostgreSQL netreba: skript archív `pg_dump` prečíta sám.
 
 V koreni repozitára (priečinok, kde je `README.md`):
 
 ```
-py -3 -I tools\over_zalohu.py "C:\Users\vy\Downloads\export.dump"
+py -3 -I tools\over_zalohu.py "C:\Users\vy\Downloads\offline-dochs_261104.backup.zip"
 ```
 
 (na Linuxe a macOS `python3 -I tools/over_zalohu.py ...`). Skript:
 
-- skontroluje, že súbor nie je prázdny ani useknutý, a rozpozná formát (pg_dump, tar, gzip, zip, SQL),
-- overí, že vo vnútri sú **údaje** všetkých tabuliek aplikácie (`organizations`, `profiles`, `user_roles`, `punches`, `devices`, `audit_log`, `organization_*`, `corrections`, `month_closures`, `punch_void_requests`, `personnel_requests`, `notification_preferences`) aj prihlasovacích účtov `auth.users`,
+- skontroluje, že súbor nie je prázdny ani useknutý, a rozpozná formát (zip, pg_dump, tar, gzip, SQL),
+- prečíta archív `pg_dump` (verzie 1.14 až 1.16, teda PostgreSQL 12 až 18) a overí, že každý blok údajov je celý a nepoškodený,
+- overí, že vo vnútri sú **údaje** všetkých tabuliek aplikácie (`organizations`, `profiles`, `user_roles`, `punches`, `devices`, `audit_log`, `organization_*`, `corrections`, `month_closures`, `punch_void_requests`, `personnel_requests`, `notification_preferences`) aj prihlasovacích účtov `auth.users`, a pri každej vypíše, či je **prázdna**. Prázdne `organizations`, `profiles`, `user_roles` alebo `auth.users` skript odmietne ako chybný export. Prázdne razenia, uzávierky a žiadosti sú v poriadku, ak ich aplikácia ešte nepoužila,
+- vypíše verziu archívu, verziu databázy a čas vytvorenia,
 - vypíše SHA-256 (ak máte kontrolný súčet z Lovable, pridajte `--sha256 HEX`),
 - uloží kópiu do `zalohy\RRRR-MM-DD_HHMM\` aj so súborom `.sha256` a `manifest.json`, kópia je len na čítanie.
 
+Ukážka výstupu (skutočný export zo 4. 11. 2026, skrátené):
+
+```
+Formát:       zip → pg_custom
+Archív pg_dump 1.16.0: server PostgreSQL 17.11, pg_dump 18.6 (Debian 18.6-3), kompresia zstd, vytvorený 2026-11-04 08:35:10 (čas na stroji, kde sa export robil)
+Tabuľky s údajmi: 57, z toho očakávaných 16 z 16
+  public.organizations               obsahuje údaje (počet riadkov sa pri tejto kompresii nezisťuje)
+  public.month_closures              prázdna
+  auth.users                         obsahuje údaje (počet riadkov sa pri tejto kompresii nezisťuje)
+V poriadku (nič sa neukladalo).
+```
+
+**Počty riadkov.** Export z Lovable je stlačený zstd, ktorý Python bez doplnkov nerozbalí, preto skript povie len „obsahuje údaje“ alebo „prázdna“. Presné počty riadkov dá snapshot (kap. 4) zo živej databázy. Archív sa pritom nerozbaľuje do databázy, takže **skutočnú obnoviteľnosť** potvrdí iba pg_restore.
+
+**Obnova cez pg_restore.** Archív verzie 1.16 prečíta len `pg_restore` z PostgreSQL **17 alebo novšieho**. Starší (napríklad 16) skončí s `unsupported version (1.16) in file header`. Skript v takom prípade vypíše upozornenie, že archív je podľa vlastnej kontroly v poriadku, ale nainštalovaný `pg_restore` je príliš starý. Na obnovu si nainštalujte PostgreSQL 17 alebo novší.
+
 Výsledok „V poriadku“ znamená, že archív je čitateľný a obsahuje očakávané tabuľky. **Problém** znamená: súbor ako zálohu nepoužívať a urobiť Export znova. Možnosti: `--iba-over` (nič neukladať), `--ulozit CESTA` (iný priečinok).
 
-Bez Pythonu aspoň kontrolný súčet: `Get-FileHash -Algorithm SHA256 "C:\...\export.dump"` v PowerShelli.
+Bez Pythonu aspoň kontrolný súčet: `Get-FileHash -Algorithm SHA256 "C:\...\offline-dochs_261104.backup.zip"` v PowerShelli.
 
 ## 4. Snapshot priamo v databáze (poistka pred zásahom)
 
@@ -82,7 +100,7 @@ Od najmenšieho zásahu po najväčší:
    ```
    **Neplatí pre `punches`, `profiles`, `auth.users`** ani pre tabuľky s väzbami: razenia prechádzajú spúšťačom `punches_chain`, ktorý prepíše čas a hash (reťaz by sa porušila), a účty majú väzby na prihlásenie. Také veci nevracajte ručne, použite bod 2.
 2. **Zásah pokazil viac vecí**: v Lovable **Backups → Restore to this backup** a vybrať najnovšiu zálohu pred zásahom. Stratíte všetko, čo vzniklo po nej (razenia, registrácie). Schéma sa vráti tiež, takže po obnove požiadajte Lovable agenta, aby otestoval aplikáciu a opravil prípadný nesúlad s kódom.
-3. **Lovable zálohy nestačia** (staršie ako 14 dní, chyba Lovable): z Exportu sa dá archív načítať `pg_restore` do **novej, prázdnej** databázy PostgreSQL na vlastnom počítači alebo vo vlastnom projekte a údaje sa z nej dajú vytiahnuť (`pg_restore --list` ukáže obsah). Do projektu v Lovable Cloud sa tak obnoviť nedá, to vie len Lovable.
+3. **Lovable zálohy nestačia** (staršie ako 14 dní, chyba Lovable): z Exportu sa dá archív načítať `pg_restore` (verzia 17 alebo novšia, pozri kap. 3) do **novej, prázdnej** databázy PostgreSQL na vlastnom počítači alebo vo vlastnom projekte a údaje sa z nej dajú vytiahnuť (`pg_restore --list` ukáže obsah). Do projektu v Lovable Cloud sa tak obnoviť nedá, to vie len Lovable.
 
 Zrušená organizácia (migrácia 0007) sa dá obnoviť výlučne bodmi 2 a 3.
 
@@ -94,6 +112,8 @@ Zrušená organizácia (migrácia 0007) sa dá obnoviť výlučne bodmi 2 a 3.
 
 ## Čo je overené a čo nie
 
-Overené (lokálny PostgreSQL 16 s napodobeninou Supabase, `tools/sql_test/run.sh`): snapshot aj porovnanie prebehli, kópie majú rovnaké počty riadkov, rovnaký obsah `profiles`, zapnuté RLS a anon/authenticated k nim nemajú prístup. Skript `over_zalohu.py` prešiel testami (`tools/test_over_zalohu.py`) a skúškou na skutočných výpisoch `pg_dump` vo formátoch custom, tar, tar.gz (adresárový), SQL a SQL.gz; výpis bez údajov o razeniach správne odmietol.
+Overené (lokálny PostgreSQL 16 s napodobeninou Supabase, `tools/sql_test/run.sh`): snapshot aj porovnanie prebehli, kópie majú rovnaké počty riadkov, rovnaký obsah `profiles`, zapnuté RLS a anon/authenticated k nim nemajú prístup.
 
-**Neoverené:** presný formát súboru, ktorý Lovable vyrobí (preto skript rozpoznáva viac formátov); či Lovable SQL editor povolí zápis (`CREATE SCHEMA`); ako dlho trvá Export na ostrej databáze; obnova cez „Restore to this backup“ (nevyskúšaná, popis je z dokumentácie Lovable).
+**Skutočný export z Lovable (4. 11. 2026, `offline-dochs_261104.backup.zip`, 0,5 MB):** skript ho prečítal, všetkých 16 očakávaných tabuliek má údaje, `month_closures`, `punch_void_requests`, `personnel_requests` a `notification_preferences` sú prázdne. Nezávisle som údaje rozbalil (zstd) a spočítal riadky v jednotlivých tabuľkách: prázdne tabuľky sa zhodujú, `auth.users` a `profiles` majú rovnaký počet záznamov. Skript `over_zalohu.py` má testy (`tools/test_over_zalohu.py`: archívy 1.14, 1.15 a 1.16 zložené bajt po bajte, poškodený, useknutý a neúplný gzip, prázdne tabuľky, zip) a bol porovnaný s výpismi `pg_dump` 16 vo všetkých kompresiách (gzip, bez, zstd, lz4, výpis cez rúru): počty riadkov sa zhodujú s `COUNT(*)`, zoznam tabuliek so zoznamom z `pg_restore --list`.
+
+**Neoverené:** skutočná obnova exportu do databázy (potrebuje `pg_restore` 17+, ktorý tu nebol k dispozícii); archívy s kompresiou lz4 a archívy zapísané do rúry skript číta len čiastočne (zoznam tabuliek áno, prázdnosť a počty nie); či Lovable SQL editor povolí zápis (`CREATE SCHEMA`); ako dlho trvá Export na väčšej databáze; obnova cez „Restore to this backup“ (nevyskúšaná, popis je z dokumentácie Lovable).

@@ -76,4 +76,4 @@ jobs:
           if git grep -nE 'service_role|BEGIN (RSA |EC )?PRIVATE KEY' -- . ':!drizzle' ':!contract' ':!docs' ':!prompts' ':!.github' ':!src/integrations' ':!.lovable' ':!tools/sql_test'; then echo "Podozrivá tajná hodnota"; exit 1; fi
       - name: Zálohy databázy nepatria do repozitára
         run: |
-          if git ls-files | grep -E '(^|/)zalohy/|\.(dump|backup|pgdump)(\.gz)?$|\.sql\.gz$'; then echo "V repozitári je záloha databázy (obsahuje prihlasovacie účty a odtlačky hesiel)"; exit 1; fi
+          if git ls-files | grep -E '(^|/)zalohy/|\.(dump|backup|pgdump)(\.(gz|zip))?$|\.sql\.gz$'; then echo "V repozitári je záloha databázy (obsahuje prihlasovacie účty a odtlačky hesiel)"; exit 1; fi

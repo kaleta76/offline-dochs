@@ -107,6 +107,9 @@ Niektoré kódy v mapovaní sú v Accesse označené „overiť“ (`FAMILY` →
 Pripravuje Claude v samostatných PR (nie agent Lovable). Etapa 1 (import) nasleduje po schválení kontraktu 1.2.0 a spustení databázovej časti (kapitola 5), obe sú hotové; etapa 2 (výpočet) čaká na rozhodnutie D1 a na prvý skutočný súbor z Accessu 2.12.0.
 Platia `AGENTS.md` (sekcia o integrácii s Accessom) a `docs/SPOLUPRACA.md`. Návrh tabuliek tu nie je, je súčasťou súkromného SQL balíka.
 
+**Tlačidlá na obrazovke Terminál** (rozhodnutie vlastníka 4. 11. 2026): dnes sú pevné v kóde (`src/routes/_authenticated/terminal.tsx`): Príchod, Odchod, Lekár, Sprievod, Službka, Súkromne. Dovolenka a Nemoc sú celodenné a zadávajú sa v Môj mesiac ako oprava, ktorú schváli vedúci.
+Z 15 prerušení Accessu majú kód terminála len 7 (`terminal_code_map`); ostatné sa zadávajú len v Accesse. Tlačidlá podľa konfigurácie z Accessu (názvy prerušení z Accessu) sa zavedú až po rozhodnutí D1 o výpočte.
+
 **Čo má terminál vedieť** (bez osobných údajov, zamestnanec je len osobné číslo):
 * verziu konfigurácie organizácie (`config_version`) a jej obsah; vždy platí **najnovšia prijatá verzia**, staršia sa neprijme;
 * číselník prerušení vrátane výkladu `calc` (`WORK`, `LUNCH`, `COUNTED`), mapovanie kódov terminála na prerušenia Accessu a pravidlá (`rules`, hranica celodennej prekážky, okno práce, automatický obed);

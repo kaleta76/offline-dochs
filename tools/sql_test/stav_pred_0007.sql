@@ -68,3 +68,22 @@ SELECT t.ok((SELECT count(*) FROM stav_o WHERE sekcia = '07_organizacie') = 3, '
 DROP TABLE t.stav_b;
 DROP OWNED BY editor_sql;
 DROP ROLE editor_sql;
+
+-- 8. docs/zaloha/kontrola_0007.sql pred migráciou: správca databázy má všetky práva, migrácia ešte nebola spustená.
+\set k `cat "$ZALOHA_DIR/kontrola_0007.sql"`
+SELECT length(:'k') > 500 AS nacitane \gset
+SELECT t.ok(:'nacitane'::boolean, 'kontrola_0007.sql sa načítala (neprázdna)');
+CREATE TABLE t.kontrola AS :k
+SELECT t.ok((SELECT count(*) FROM t.kontrola) = 1, 'kontrola vráti jeden riadok');
+SELECT t.ok((SELECT smie_vytvarat_v_public AND vlastni_organizations AND vlastni_guard_last_admin AND smie_mazat_auth_users FROM t.kontrola), 'správca databázy má všetky potrebné práva');
+SELECT t.ok((SELECT NOT stlpec_is_test AND funkcie_0007 = 0 AND purge_pre_authenticated IS NULL AND purge_pre_service_role IS NULL FROM t.kontrola), 'pred migráciou: stĺpec ani funkcie 0007 neexistujú');
+DROP TABLE t.kontrola;
+-- Rola bez práv: kontrola nespadne a práva hlási ako false (aj bez prístupu do schémy auth).
+CREATE ROLE bez_prav NOLOGIN;
+GRANT USAGE ON SCHEMA public TO bez_prav;
+SET ROLE bez_prav;
+CREATE TEMP TABLE kontrola_b AS :k
+RESET ROLE;
+SELECT t.ok((SELECT rola = 'bez_prav' AND NOT smie_vytvarat_v_public AND NOT vlastni_organizations AND NOT vlastni_guard_last_admin AND NOT smie_mazat_auth_users FROM kontrola_b), 'rola bez práv: všetky práva false');
+DROP OWNED BY bez_prav;
+DROP ROLE bez_prav;

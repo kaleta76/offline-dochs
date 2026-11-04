@@ -14,7 +14,7 @@ Pred zrušením, ak chcete údaje zachovať, urobte zálohu: [`ZALOHA-DATABAZY.m
 ## Ochrany
 
 - Zrušiť sa dá **len organizácia, ktorú správca predtým označil ako testovaciu** (stĺpec `organizations.is_test`). Ostrú firmu databáza zrušiť odmietne (`Zrušiť sa dá len organizácia označená ako testovacia`), aj keby niekto obišiel obrazovku.
-- **„Pôvodná organizácia“** (`00000000-0000-4000-8000-000000000001`, údaje prevzaté z pôvodnej aplikácie) sa nedá označiť ani zrušiť.
+- **„Pôvodná organizácia“** (`00000000-0000-4000-8000-000000000001`, údaje prevzaté z pôvodnej aplikácie) sa nedá označiť ani zrušiť. V ostrej databáze ju vlastník 4. 11. 2026 zrušil jednorazovým SQL skriptom (rovnaký postup ako `purge_organization` bez tejto ochrany, mimo repozitára), pretože išlo len o skúšobné údaje. Ochrana ostáva v kóde, iná organizácia s týmto ID už v databáze nie je.
 - Správca môže zrušiť **iba vlastnú** organizáciu. Cudzie nevidí ani nezmení (testované s dvoma organizáciami: cudzia ostala po zrušení bajt po bajte rovnaká).
 - Je potrebné presné potvrdenie názvom a všetko prebehne v jednej transakcii: pri chybe sa nezmení nič.
 - Zrušenie zanechá v `audit_log` jediný záznam `organization.deleted` (názov, počty, kto). Ostatné záznamy auditu zrušených účtov sa zmažú.

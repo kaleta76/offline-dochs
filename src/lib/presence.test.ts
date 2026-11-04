@@ -51,6 +51,35 @@ describe("presenceOf", () => {
   });
 });
 
+describe("presenceOf: razenia v budúcnosti", () => {
+  const now = t("09:00");
+
+  it("schválená plánovaná cesta na zajtra sa dnes nepočíta", () => {
+    const planned: PresencePunch = { code: "TRIP", direction: "OUT", time: new Date("2026-11-05T07:00:00") };
+    const r = presenceOf([p("WORK", "IN", "07:00"), planned], now);
+    expect(r.state).toBe("in");
+  });
+
+  it("plánované razenie, ktoré nastalo, sa počíta (cesta dnes o 08:00)", () => {
+    const r = presenceOf([p("WORK", "IN", "07:00"), p("TRIP", "OUT", "08:00")], now);
+    expect(r.state).toBe("away");
+    expect(r.code).toBe("TRIP");
+  });
+
+  it("razenie o pár minút pred hodinami iného zariadenia sa nestratí", () => {
+    const r = presenceOf([p("WORK", "IN", "07:00"), p("DOCTOR", "OUT", "09:10")], now);
+    expect(r.state).toBe("away");
+  });
+
+  it("razenie o niekoľko hodín dopredu sa nepočíta, deň bez iného razenia je none", () => {
+    expect(presenceOf([p("TRIP", "OUT", "14:00")], now)).toEqual(NO_PRESENCE);
+  });
+
+  it("bez `now` sa nič nevylučuje (spätná kompatibilita)", () => {
+    expect(presenceOf([p("TRIP", "OUT", "14:00")]).state).toBe("away");
+  });
+});
+
 describe("summarizePresence", () => {
   it("spočíta stavy", () => {
     const list = [

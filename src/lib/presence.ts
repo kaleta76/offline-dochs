@@ -28,10 +28,22 @@ export interface Presence {
 
 export const NO_PRESENCE: Presence = { state: "none", code: null, direction: null, since: null };
 
-export function presenceOf(punches: readonly PresencePunch[]): Presence {
+/**
+ * Razenie s časom ďaleko v budúcnosti ešte nenastalo (napr. schválená plánovaná služobná cesta na zajtra, ktorú vedúci schválil dnes).
+ * Tolerancia pokryje rozdiel hodín zariadení, aby sa razenie z iného zariadenia o pár minút „napred“ nestratilo.
+ */
+export const FUTURE_TOLERANCE_MS = 30 * 60_000;
+
+export function notHappenedYet(time: Date, now: Date): boolean {
+  return time.getTime() > now.getTime() + FUTURE_TOLERANCE_MS;
+}
+
+/** `now` zadajte, keď vstup môže obsahovať plánované razenia v budúcnosti; bez neho sa neskoré razenia nevylučujú. */
+export function presenceOf(punches: readonly PresencePunch[], now?: Date): Presence {
   let last: PresencePunch | null = null;
   for (const p of punches) {
     if (p.voided) continue;
+    if (now && notHappenedYet(p.time, now)) continue;
     if (!last || p.time.getTime() >= last.time.getTime()) last = p;
   }
   if (!last) return NO_PRESENCE;

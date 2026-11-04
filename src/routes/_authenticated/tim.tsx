@@ -66,9 +66,11 @@ function Team() {
         .order("client_time");
       if (error) throw error;
       const byUser = new Map<string, Presence>();
+      const now = new Date();
       for (const id of teamIds) {
         const own = (data ?? []).filter((r) => r.user_id === id);
-        byUser.set(id, presenceOf(own.map((r) => ({ code: r.code, direction: r.direction as "IN" | "OUT", time: new Date(r.client_time), voided: !!r.voided_at }))));
+        // schválené plánované razenia (napr. služobná cesta na zajtra) majú čas v budúcnosti a teraz sa nepočítajú
+        byUser.set(id, presenceOf(own.map((r) => ({ code: r.code, direction: r.direction as "IN" | "OUT", time: new Date(r.client_time), voided: !!r.voided_at })), now));
       }
       return byUser;
     },

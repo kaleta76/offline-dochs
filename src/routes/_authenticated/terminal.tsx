@@ -9,6 +9,7 @@ import { enqueue, useQueue } from "@/lib/offline-queue";
 import { Button } from "@/components/ui/button";
 import { DeviceRegistration } from "@/components/DeviceRegistration";
 import { dayKey, hm, labelOf } from "@/lib/month";
+import { notHappenedYet } from "@/lib/presence";
 
 export const Route = createFileRoute("/_authenticated/terminal")({
   head: () => ({ meta: [{ title: "Terminál – Dochádzka" }, { name: "description", content: "Záznam príchodu, odchodu a prerušení." }, { property: "og:title", content: "Terminál – Dochádzka" }, { property: "og:description", content: "Záznam príchodu, odchodu a prerušení." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -71,7 +72,10 @@ function Terminal() {
   const list = [
     ...(today.data ?? []).map((p) => ({ id: p.client_uuid, code: p.code, dir: p.direction, time: new Date(p.client_time), pending: false, error: undefined as string | undefined })),
     ...items.filter((i) => dayKey(new Date(i.client_time)) === todayKey && !(today.data ?? []).some(p => p.client_uuid === i.client_uuid)).map((i) => ({ id: i.client_uuid, code: i.code, dir: i.direction, time: new Date(i.client_time), pending: true, error: i.error })),
-  ].sort((a, b) => a.time.getTime() - b.time.getTime());
+  ]
+    // schválené plánované razenie (napr. služobná cesta na zajtra) sa ukáže, až keď nastane
+    .filter((p) => !notHappenedYet(p.time, now ?? new Date()))
+    .sort((a, b) => a.time.getTime() - b.time.getTime());
   const last = list[list.length - 1];
   const atWork = last ? last.dir === "IN" : false;
 

@@ -2,7 +2,7 @@ import { personnelLabel } from "@/lib/personnel";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { LogIn, LogOut, Stethoscope, Briefcase, Coffee, CheckCircle2, CloudOff } from "lucide-react";
+import { LogIn, LogOut, Stethoscope, Briefcase, Coffee, Users, CheckCircle2, CloudOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { enqueue, useQueue } from "@/lib/offline-queue";
@@ -19,6 +19,7 @@ const ACTIONS = [
   { code: "WORK", dir: "IN", label: "Príchod", icon: LogIn, cls: "bg-success text-success-foreground" },
   { code: "WORK", dir: "OUT", label: "Odchod", icon: LogOut, cls: "bg-secondary text-secondary-foreground" },
   { code: "DOCTOR", dir: "OUT", label: "Lekár", icon: Stethoscope, cls: "bg-card text-foreground border-2 border-foreground" },
+  { code: "FAMILY", dir: "OUT", label: "Sprievod", icon: Users, cls: "bg-card text-foreground border-2 border-foreground" },
   { code: "TRIP", dir: "OUT", label: "Službka", icon: Briefcase, cls: "bg-card text-foreground border-2 border-foreground" },
   { code: "PRIV", dir: "OUT", label: "Súkromne", icon: Coffee, cls: "bg-card text-foreground border-2 border-foreground" },
 ] as const;

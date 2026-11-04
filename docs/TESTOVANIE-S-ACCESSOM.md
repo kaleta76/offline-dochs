@@ -37,7 +37,8 @@ u 9000001).
    (zamestnanci musia existovať; správca 9000001 už je).
 2. Sekcia **Testovacia prevádzka a porovnanie s Accessom**: **Zapnúť testovaciu prevádzku**, vybrať `import_do_terminalu_2026-10.csv`,
    **Skontrolovať** (nič nezapíše), potom **Importovať**. Výsledok ukáže počty po osobách a „Reťaz je v poriadku“.
-   Opakovaný import toho istého súboru nič nezduplikuje.
+   Opakovaný import toho istého súboru nič nezduplikuje. Identifikátor razenia obsahuje aj organizáciu, takže razenia rovnakého zamestnanca
+   zo staršej testovacej organizácie import do novej neblokujú (staršie verzie ich hlásili ako „už existovalo“ a nezapísali).
 3. Rovnaká sekcia: mesiac **október 2026**, **Stiahnuť saldá (.csv)** -> `terminal_saldo_202610.csv`.
 4. Sekcia Export pre Access: mesiac október 2026 -> `punches_202610.csv`.
 5. **Access** (inú kópiu databázy než v postupe A, alebo nechajte samočinný test odstrániť staré testovacie údaje): karta 7, **Samočinný test

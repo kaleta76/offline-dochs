@@ -194,13 +194,28 @@ export function parseTestCsv(text: string, validCodes: ReadonlySet<string>): Tes
 }
 
 /**
- * Stály identifikátor razenia z testovacieho importu: ten istý riadok dá vždy to isté UUID, takže opakovaný
- * import rovnakého súboru nevytvorí duplicity (stĺpec punches.client_uuid je jedinečný).
+ * Stály identifikátor razenia z testovacieho importu: ten istý riadok v tej istej organizácii dá vždy to isté UUID,
+ * takže opakovaný import rovnakého súboru nevytvorí duplicity (stĺpec punches.client_uuid je jedinečný v celej databáze).
+ * Bez `organization` vznikne pôvodný identifikátor (bez organizácie), ktorý používali staršie importy; zápis ho už
+ * nepoužíva, len ním rozpoznáva razenia zapísané skôr. Identifikátor s organizáciou zabráni tomu, aby razenia rovnakého
+ * človeka z inej (napr. skoršej testovacej) organizácie zablokovali import do novej.
  */
-export async function testPunchUuid(r: Pick<TestPunchRow, "sap" | "code" | "direction" | "utc">) {
-  const h = await sha256Hex(`testimport|${r.sap}|${r.code}|${r.direction}|${r.utc.toISOString()}`);
+export async function testPunchUuid(r: Pick<TestPunchRow, "sap" | "code" | "direction" | "utc">, organization?: string) {
+  const scope = organization ? `testimport|${organization}` : "testimport";
+  const h = await sha256Hex(`${scope}|${r.sap}|${r.code}|${r.direction}|${r.utc.toISOString()}`);
   const variant = ((parseInt(h[16]!, 16) & 0x3) | 0x8).toString(16);
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${variant}${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+/**
+ * Z nájdených razení vyberie identifikátory, ktoré už v organizácii sú: len tie, čo patria účtom tejto organizácie.
+ * Razenie s rovnakým (starým) identifikátorom pri účte inej organizácie sa nepočíta, aby neblokovalo import.
+ */
+export function existingInOrganization(
+  found: readonly { client_uuid: string; user_id: string }[],
+  orgUsers: ReadonlySet<string>,
+): Set<string> {
+  return new Set(found.filter((f) => orgUsers.has(f.user_id)).map((f) => f.client_uuid));
 }
 
 export interface ChainRow {

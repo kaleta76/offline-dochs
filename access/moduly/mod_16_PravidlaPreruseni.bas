@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_16_PravidlaPreruseni"
-'@Verzia 1.0.0
+'@Verzia 1.1.0
 Option Compare Database
 Option Explicit
 
@@ -20,6 +20,7 @@ Option Explicit
 ' ZOZNAM PROCEDÚR A FUNKCIÍ:
 ' ------------------------------------------------------------------------------
 ' - ObnovPravidla()                        : Zahodí vyrovnávaciu pamäť pravidiel (po úprave pravidiel).
+' - PravidlaSablonyPreMesiac(db, sab, ym) : Pravidlá šablóny platné pre mesiac (slovník číslo prerušenia -> pravidlo); pre export konfigurácie.
 ' - VyhodnotDen(db, r, dDen, lSablona)     : Pridá upozornenia dňa do r (po SpracujDen).
 '===============================================================================
 
@@ -102,6 +103,14 @@ Private Function Pravidla(ByRef db As DAO.Database, ByVal lSab As Long, ByVal ym
     End If
     mCache.Add key, dic
     Set Pravidla = dic
+End Function
+
+'-------------------------------------------------------------------------------
+' Verejný prístup k rovnakým pravidlám, aké používa kontrola dňa (export konfigurácie pre terminál ich preberá bez vlastného výkladu tabuľky).
+' Kľúče pravidla: Nazov, IntOdM, IntDoM, IntDni, MaxM, MaxDni, MinO, MinT, Vypnute, IntOd1..7, IntDo1..7, Max1..7.
+'-------------------------------------------------------------------------------
+Public Function PravidlaSablonyPreMesiac(ByRef db As DAO.Database, ByVal lSablona As Long, ByVal ym As Long) As Object
+    Set PravidlaSablonyPreMesiac = Pravidla(db, lSablona, ym)
 End Function
 
 Private Function Cas(ByVal lMin As Long) As String

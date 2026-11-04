@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kaleta76/offline-dochs/contract/config-export.schema.json",
+  "title": "dochs_config.json – konfigurácia a výpočtový plán z Accessu pre terminál (kontrakt 1.2.0, schema_version 2)",
+  "description": "Smer Access -> terminál. Access je systém, ktorý rozhoduje (fondy, kalendáre, sviatky, úväzky, pravidlá); terminál len preberá hotové výsledky a podľa nich počíta saldo. Súbor NESMIE obsahovať osobné údaje: zamestnanec je len osobné číslo. Nadmnožina schema_version 1 (všetky kľúče verzie 1 ostávajú). Sémantiku a krížové kontroly (dĺžky polí, typ dňa vs. dátum, odkazy) overuje contract/tools/verify_config.py.",
+  "type": "object",
+  "required": ["schema_version", "config_version", "rok", "rules", "interruptions", "punch_codes", "holidays",
+               "period", "terminal_code_map", "funds", "templates", "employees", "counts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 2 },
+    "config_version": { "type": "string", "pattern": "^[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}\\.[0-9]{4}$", "description": "rrrr.mm.dd.hhmm čas zostavenia v Accesse; terminál ho používa ako poradie verzií" },
+    "generated_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$", "description": "miestny čas počítača s Accessom, informatívne" },
+    "rok": { "type": "integer", "minimum": 2000, "maximum": 2100, "description": "rok, od ktorého sa exportujú sviatky (rok a rok + 1)" },
+    "rules": {
+      "type": "object",
+      "required": ["work_window_start_min", "work_window_end_min", "full_day_obstacle_min", "auto_lunch_trigger_min",
+                   "auto_lunch_deduct_min", "auto_lunch_enabled", "duplicate_punch_window_min", "default_daily_fund_min", "auto_repair_mode"],
+      "properties": {
+        "work_window_start_min": { "type": "integer", "minimum": 0, "maximum": 1440 },
+        "work_window_end_min": { "type": "integer", "minimum": 0, "maximum": 1440 },
+        "full_day_obstacle_min": { "type": "integer", "minimum": 1, "maximum": 1440 },
+        "auto_lunch_trigger_min": { "type": "integer", "minimum": 0, "maximum": 1440 },
+        "auto_lunch_deduct_min": { "type": "integer", "minimum": 0, "maximum": 600 },
+        "auto_lunch_enabled": { "type": "boolean" },
+        "duplicate_punch_window_min": { "type": "integer", "minimum": 0, "maximum": 1440 },
+        "default_daily_fund_min": { "type": "integer", "minimum": 0, "maximum": 1440 },
+        "auto_repair_mode": { "type": "integer", "minimum": 0, "maximum": 9 },
+        "interruption_check_enabled": { "type": "boolean", "description": "false = Access pravidlá prerušení (templates) nevyhodnocuje; terminál ich vtedy nemá ukazovať ako upozornenia" }
+      },
+      "additionalProperties": true
+    },
+    "interruptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "name", "short_name", "start_punch_code", "end_punch_code", "is_work", "is_lunch", "auto_end_of_shift", "calc"],
+        "properties": {
+          "code": { "type": "integer", "minimum": 1, "description": "číslo prerušenia v Accesse (CiselnikPreruseni.Cislo)" },
+          "name": { "type": "string" },
+          "short_name": { "type": "string" },
+          "start_punch_code": { "type": "integer" },
+          "end_punch_code": { "type": "integer" },
+          "is_work": { "type": "boolean" },
+          "is_lunch": { "type": "boolean" },
+          "auto_end_of_shift": { "type": "boolean" },
+          "calc": {
+            "enum": ["WORK", "LUNCH", "COUNTED"],
+            "description": "ako sa interval počíta do dňa (Access 2.11 mod_08.TrvanieIntervalu): WORK = práca oreže oknom práce; LUNCH = skutočné trvanie, jeho prítomnosť vypína automatický obed; COUNTED = skutočné trvanie, od full_day_obstacle_min nahor sa započíta denný fond dňa (expected_min). Neznáma hodnota = terminál nesmie počítať saldo, ale upozorní správcu."
+          },
+          "counts_to_fund": { "type": "boolean", "description": "informatívne (CiselnikPreruseni.ZapocitavatDoFondu), výpočet dňa ho zatiaľ nepoužíva" },
+          "counts_to_work": { "type": "boolean", "description": "informatívne (ZapocitavatDoPrace)" },
+          "deducts_leave": { "type": "boolean", "description": "informatívne (OdpocitavatZDovolenky)" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "punch_codes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "interruption", "direction", "label"],
+        "properties": {
+          "code": { "type": "integer" },
+          "interruption": { "type": "integer", "minimum": 0 },
+          "direction": { "enum": ["Z", "K", ""] },
+          "label": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "holidays": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["date", "name"],
+        "properties": {
+          "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+          "name": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "period": {
+      "type": "object",
+      "required": ["from_month", "to_month"],
+      "properties": {
+        "from_month": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+        "to_month": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+      },
+      "additionalProperties": false,
+      "description": "mesiace (vrátane), pre ktoré Access vypočítal plán; pre mesiac mimo okna terminál plán nemá a saldo označí ako nepotvrdené"
+    },
+    "terminal_code_map": {
+      "type": "array",
+      "description": "mapovanie kódov razení terminála (WORK, DOCTOR, ...) na čísla prerušení v Accesse (TerminalMapaKodov)",
+      "items": {
+        "type": "object",
+        "required": ["code", "interruption"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,19}$" },
+          "interruption": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "funds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "type"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1 },
+          "name": { "type": "string" },
+          "type": { "type": "integer", "minimum": 0, "maximum": 9, "description": "typ fondu v Accesse: 1 pevný, 2 pružný, 3 voľný s dennou dĺžkou, 4 voľný s pevným mesačným fondom" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "templates": {
+      "type": "array",
+      "description": "šablóny pravidiel prerušení (ParametrePreruseni) vyhodnotené pre každý mesiac okna; používa sa len na upozornenia, nemení výpočet dňa",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "months"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1 },
+          "name": { "type": "string" },
+          "months": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["month", "rules"],
+              "properties": {
+                "month": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["interruption", "disabled", "allowed_from_min", "allowed_to_min", "max_duration_min", "min_duration_min", "min_worked_before_min"],
+                    "properties": {
+                      "interruption": { "type": "integer", "minimum": 1 },
+                      "disabled": { "type": "boolean" },
+                      "allowed_from_min": { "type": "array", "minItems": 7, "maxItems": 7, "items": { "type": "integer", "minimum": 0, "maximum": 1440 }, "description": "pondelok až nedeľa" },
+                      "allowed_to_min": { "type": "array", "minItems": 7, "maxItems": 7, "items": { "type": "integer", "minimum": 0, "maximum": 1440 } },
+                      "max_duration_min": { "type": "array", "minItems": 7, "maxItems": 7, "items": { "type": "integer", "minimum": 0, "maximum": 1440 } },
+                      "min_duration_min": { "type": "integer", "minimum": 0, "maximum": 1440 },
+                      "min_worked_before_min": { "type": "integer", "minimum": 0, "maximum": 1440 }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "employees": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["personnel_number", "months"],
+        "properties": {
+          "personnel_number": { "type": "string", "pattern": "^[0-9A-Za-z]{1,20}$", "description": "jediný identifikátor zamestnanca; žiadne meno, e-mail ani oddelenie" },
+          "months": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["month", "employment_pct", "fund_id", "template_id", "calendar_id", "day_types", "expected_min"],
+              "properties": {
+                "month": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                "employment_pct": { "type": "integer", "minimum": 1, "maximum": 200 },
+                "fund_id": { "type": "integer", "minimum": 1 },
+                "template_id": { "type": "integer", "minimum": 1 },
+                "calendar_id": { "type": "integer", "minimum": 1 },
+                "day_types": {
+                  "type": "array", "minItems": 28, "maxItems": 31,
+                  "items": { "type": "string", "pattern": "^[PVS][PVN]$" },
+                  "description": "typ každého dňa mesiaca: 1. písmeno kalendár (P pracovný, V voľný, S sviatok), 2. písmeno deň v týždni (P pondelok až piatok, V sobota, N nedeľa)"
+                },
+                "expected_min": {
+                  "type": "array", "minItems": 28, "maxItems": 31,
+                  "items": { "type": "integer", "minimum": 0, "maximum": 1440 },
+                  "description": "denný fond zamestnanca v minútach po zohľadnení fondu, dňa v týždni, pevného mesačného fondu a úväzku; 0 = nepracovný deň alebo sviatok"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["employees", "employee_months"],
+      "properties": {
+        "employees": { "type": "integer", "minimum": 0 },
+        "employee_months": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false,
+      "description": "kontrola úplnosti prenosu: počet zamestnancov a počet ich mesačných plánov v súbore"
+    }
+  }
+}

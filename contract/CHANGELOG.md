@@ -16,3 +16,13 @@
   zneplatnenie ide v samostatnom zozname; dôvod sa neexportuje. Pravidlá pre Access sú v `README.md`.
 * Zlatý súbor `examples/voids_example.csv` (+ `voids_example.input.json`), referencia `reference/void-export.ts`, kontraktový test `tests/void-export.contract.test.ts`.
 * Access verzie 1.0 súbor `voids_*.csv` jednoducho ignoruje: zneplatnené razenia sa v ňom budú naďalej počítať, kým Access nepodporí 1.1 (importér Accessu 2.11.0).
+
+## 1.2.0 – 2026-11-04 (doplnok, `punches_*.csv` ani `voids_*.csv` sa nemenia)
+* Súbor `dochs_config.json` v schéme 2 (smer Access → terminál) nesie **výpočtový plán**: pre každého zamestnanca a mesiac okna typ dňa a denný fond v minútach, úväzok,
+  priradenie fondu a šablóny, k tomu výklad, ako sa ktoré prerušenie počíta (`calc`), mapovanie kódov terminála na prerušenia Accessu a pravidlá prerušení po mesiacoch.
+  Nadmnožina schémy 1 (všetky kľúče ostávajú). Zamestnanec je len osobné číslo.
+* Schéma `config-export.schema.json`, zlatý súbor `examples/config_example.json` (+ vymyslený vstup `config_example.input.json`), referenčný výpočet plánu
+  `tools/build_config_example.py`, overovač `tools/verify_config.py` a testy `tools/test_verify_config.py`.
+* Access: balík 2.12.0 (`mod_20_KonfiguraciaExport`). Terminál zatiaľ konfiguráciu neprijíma; návrh je v `docs/KONFIGURACIA-Z-ACCESSU.md` a `prompts/06-konfiguracia-z-accessu.md`.
+* Schválenie vlastníkom repozitára je potrebné (zmena `contract/`).
+

@@ -34,4 +34,10 @@ SELECT t.ok((SELECT hodnota FROM t.stav4 WHERE sekcia = '02_tabulky' AND polozka
 SELECT t.ok(NOT EXISTS (SELECT 1 FROM t.stav4 WHERE polozka || ' ' || hodnota ~* '(@|9000|passw|hesl)'), 'ani po 0007 výstup neobsahuje osobné údaje');
 -- organization.deleted je v audite len ako názov akcie s počtom, bez podrobností
 SELECT t.ok((SELECT hodnota FROM t.stav4 WHERE sekcia = '09_audit' AND polozka = 'organization.deleted') LIKE 'celkom=1;%', 'zrušenie je v audite ako jedna akcia');
+-- 4. docs/zaloha/kontrola_0007.sql po migrácii.
+\set k `cat "$ZALOHA_DIR/kontrola_0007.sql"`
+CREATE TABLE t.kontrola2 AS :k
+SELECT t.ok((SELECT stlpec_is_test AND funkcie_0007 = 4 AND NOT purge_pre_authenticated AND purge_pre_service_role FROM t.kontrola2), 'po migrácii: stĺpec aj 4 funkcie existujú, purge_organization nie je pre authenticated, je pre service_role');
+SELECT t.ok((SELECT smie_vytvarat_v_public AND vlastni_organizations AND vlastni_guard_last_admin AND smie_mazat_auth_users FROM t.kontrola2), 'po migrácii: práva správcu databázy ostali');
+DROP TABLE t.kontrola2;
 DROP TABLE t.stav2, t.stav3, t.stav4, t.stav;

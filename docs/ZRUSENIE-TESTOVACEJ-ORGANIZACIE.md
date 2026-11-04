@@ -28,12 +28,14 @@ Razenia (`punches`) a žiadosti o zneplatnenie, opravy, uzávierky mesiacov, ži
 ## Nasadenie (poradie je dôležité)
 
 1. **Záloha** podľa [`ZALOHA-DATABAZY.md`](ZALOHA-DATABAZY.md).
-2. **Migrácia 0007** v databáze. Dve možnosti:
+2. **Kontrola pred migráciou**: v SQL editore spustite `docs/zaloha/kontrola_0007.sql` (jeden dotaz len na čítanie, jeden riadok). Migrácia je pripravená, keď `smie_vytvarat_v_public`, `vlastni_organizations`, `vlastni_guard_last_admin` aj `smie_mazat_auth_users` sú `true` a `stlpec_is_test` je `false`. Ak je niečo `false`, migráciu nespúšťajte a pošlite výsledok.
+3. **Migrácia 0007** v databáze. Dve možnosti:
    - SQL editor v Lovable Cloud: otvorte súbor `docs/migracie/0007_zrusenie_testovacej_organizacie.sql` na GitHube (Raw), skopírujte celý a spustite. Skript len pridáva stĺpec a funkcie, žiadne údaje nemení.
    - Lovable agent (kredity): v chate napíšte *„Spusti migráciu z tohto SQL presne tak, ako je, nič iné nemeň“* a **vložte SQL priamo do správy** (agent má niekedy zastaraný náhľad repozitára).
-3. Zlúčiť PR a **Publish**. Kód funguje aj pred migráciou: sekcia ukáže, že migrácia ešte nebola spustená, a nič iné sa nepokazí. Pred zlúčením PR však migráciu spustiť netreba.
+4. **Kontrola po migrácii**: znova `kontrola_0007.sql` (čakáte `stlpec_is_test = true`, `funkcie_0007 = 4`, `purge_pre_authenticated = false`, `purge_pre_service_role = true`), prípadne `stav_databazy.sql` (päť značiek „0007 …“ = `ano`).
+5. Zlúčiť PR a **Publish**. Kód funguje aj pred migráciou: sekcia ukáže, že migrácia ešte nebola spustená, a nič iné sa nepokazí. Pred zlúčením PR však migráciu spustiť netreba.
 
-Ak by migrácia padla, zmení sa nič (je to jedna transakcia). Návrat: [`migracie/0007_spat_zachranny.sql`](migracie/0007_spat_zachranny.sql) (zruší funkcie a stĺpec, už zrušené organizácie nevráti).
+Ak by migrácia padla, zmení sa podľa očakávania nič (skript je jedna transakcia; či ho SQL editor Lovable naozaj spúšťa ako celok, nie je overené, preto kontrola po migrácii). Návrat: [`migracie/0007_spat_zachranny.sql`](migracie/0007_spat_zachranny.sql) (zruší funkcie a stĺpec, už zrušené organizácie nevráti).
 
 ## Organizácia, do ktorej sa nikto nevie prihlásiť
 

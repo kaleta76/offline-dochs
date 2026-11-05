@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_01_SystemInit"
-'@Verzia 2.9.0
+'@Verzia 2.9.1
 Option Compare Database
 Option Explicit
 
@@ -679,7 +679,7 @@ Public Sub InicializujPravidlaAnomalii()
                    "'KONTROLA_FONDU', 'ENGINE', 40, " & _
                    "'AUTO_DOPLNIT', 'AUTOMATICKY', 360, " & _
                    "'TrvanieObedaMin=30; NepipnutyObed=True', True, " & _
-                   "'Ak zamestnanec odpracuje viac ako 6 hodín (360 minút) a nepípol prestávku na obed, engine automaticky odpočíta 30 minút obeda.');", dbFailOnError
+                   "'Ak zamestnanec odpracuje 6 hodín (360 minút) a viac a nepípol prestávku na obed, engine automaticky odpočíta 30 minút obeda.');", dbFailOnError
 
         db.Execute "INSERT INTO CiselnikPravidielAnomalii VALUES (" & _
                    "'OPAKOVANY_KOD_NAD_10MIN', " & _

@@ -218,6 +218,44 @@ End Sub
         self.assertEqual(r, [])
 
 
+class DeklaracieNaUrovniModulu(unittest.TestCase):
+    def test_const_za_proceduru_je_chyba(self):
+        # Access hlási "Only comments may appear after End Sub, End Function, or End Property"
+        r = kontrola(m1="""
+Public Sub A()
+End Sub
+Private Const ZOZNAM As String = "a;b"
+Public Sub B()
+    MsgBox ZOZNAM
+End Sub
+""")
+        self.assertEqual(len(r), 1, r)
+        self.assertIn("za procedúrou", r[0])
+
+    def test_premenna_na_urovni_modulu_za_proceduru_je_chyba(self):
+        r = kontrola(m1="""
+Public Sub A()
+End Sub
+Private mPocet As Long
+""")
+        self.assertEqual(len(r), 1, r)
+
+    def test_const_na_zaciatku_a_type_su_v_poriadku(self):
+        r = kontrola(m1="""
+Private Const ZOZNAM As String = "a;b"
+Private mPocet As Long
+Public Type TX
+    A As Long
+End Type
+Public Sub B()
+    Dim x As Long
+    x = mPocet
+    MsgBox ZOZNAM & x
+End Sub
+""")
+        self.assertEqual(r, [])
+
+
 class Balik(unittest.TestCase):
     def test_moduly_balika_prechadzaju_bez_nalezu(self):
         chyby, _ = kv.skontroluj(os.path.join(os.path.dirname(HERE), "access", "moduly"))

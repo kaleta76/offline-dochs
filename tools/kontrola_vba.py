@@ -15,7 +15,9 @@ Kontroluje (v zátvorke chyba, ktorú by Access hlásil):
   5. argument odovzdaný ByRef s iným deklarovaným typom než parameter (ByRef argument type mismatch);
   6. nespárované bloky If / For / Do / With / Select / procedúry (Block If without End If, Next without For, ...);
   7. súbor bez Option Explicit;
-  8. znak mimo kódovej stránky Windows 1250 (inštalátor by modul odmietol).
+  8. znak mimo kódovej stránky Windows 1250 (inštalátor by modul odmietol);
+  9. deklarácia na úrovni modulu (Const, Dim, Public/Private premenná, Type, Enum, Declare) za prvou procedúrou
+     (Only comments may appear after End Sub, End Function, or End Property).
 Nič nemení.
 """
 import argparse
@@ -233,6 +235,11 @@ def nacitaj_modul(cesta):
         if low.startswith("option "):
             continue
         if cur is None:
+            if mod.vsetky_procs and not (v_enum or v_typ):
+                if (re.match(r"^(?:(?:Public|Private|Friend)\s+)?(?:Enum|Type)\s+\w+", r, re.I)
+                        or re.match(r"^(?:(?:Public|Private)\s+)?Declare\b", r, re.I)
+                        or (RE_DECL.match(r) and not RE_PROC.match(r))):
+                    mod.chyby.append(Chyba("CHYBA", nazov, no, "deklarácia na úrovni modulu za procedúrou (presunúť na začiatok modulu, pred prvú procedúru)"))
             m = re.match(r"^(?:(?:Public|Private|Friend)\s+)?Enum\s+(\w+)", r, re.I)
             if m:
                 v_enum = True

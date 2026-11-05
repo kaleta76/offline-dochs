@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_PomocnikTexty"
-'@Verzia 1.3.0
+'@Verzia 1.3.2
 Option Compare Database
 Option Explicit
 
@@ -262,6 +262,7 @@ Private Sub SeedPrerusenia()
     Riadok "MOZNOST", "Tlačidlo pre terminál", "Blok Tlačidlo a príznaky pre terminál platí pre vybrané prerušenie. Zapnuté Tlačidlo v termináli dá zamestnancovi vlastné tlačidlo odchodu s týmto dôvodom (Príchod a Odchod sú vždy). Zadajte text (najviac 24 znakov, inak sa použije názov), poradie 1 až 99 a ikonu zo zoznamu. Tlačidiel môže byť najviac 12 a každé potrebuje práve jeden kód terminála (ak žiadny nie je, vznikne PRER a číslo prerušenia). Prerušenie 1 (práca) tlačidlo nemá. Nastavenie sa prenesie exportom konfigurácie (karta 7). Ak ho nezapnete, terminál sa správa ako doteraz."
     Riadok "MOZNOST", "Príznaky prerušenia", "Môže požiadať vopred: zamestnanec ho vie v termináli naplánovať. Schvaľuje vedúci: deň s týmto dôvodom je nepotvrdený, kým ho vedúci neschváli. Len na celý deň: dovolenka alebo PN, nemá tlačidlo. Nezapočíta sa do práce: neplatený odchod, interval sa nepočíta ani do práce, ani do prekážok dňa (obed č. 7 a práca č. 1 sa tak označiť nedajú). Príznaky sa uložia tlačidlom Uložiť a ovplyvnia až nový prepočet."
     Riadok "KROK", "Parametre výpočtu", "V časti 2 nastavte okno práce (od {-} do), dĺžku obeda a limit práce, od ktorého sa obed odpočíta, ak nebol pípnutý. Uložte tlačidlom Uložiť parametre."
+    Riadok "KROK", "Pravidlá výpočtu", "V časti 2b nastavte razený obed (skutočný čas, najmenej alebo vždy presne zadané minúty), či odchod bez dôvodu z terminálu znamená obed alebo odchod, zaokrúhlenie prvého príchodu a posledného odchodu a kam sa dopĺňa zabudnuté razenie. Razený obed (najmenej alebo vždy presne) sa upraví len v dni, keď práca spolu s obedom dosiahne limit Obed od z časti 2 (predvolene 360 minút, teda od 6:00 vrátane); kratšia zmena nárok na prestávku nemá a obed sa počíta skutočným časom. Tlačidlá Predvoľba len vyplnia polia; uložíte ich tlačidlom Uložiť pravidlá. Predvolené hodnoty dávajú doterajší výpočet; uzavreté mesiace sa neprepočítajú."
     Riadok "KROK", "Časový profil strediska", "V časti 3 nastavte základný čas, pružný čas ráno a popoludní, službu cestou a obedné okno (od {-} do, trvanie v minútach). Uložte tlačidlom Uložiť časový profil strediska."
     Riadok "KROK", "Pracovné fondy a pravidlá prerušení", "Tlačidlo Pracovné fondy... otvorí editor fondov (dĺžka dňa, pružný čas, rôzne dni v týždni), tlačidlo Pravidlá prerušení... editor pravidiel, napríklad obed najskôr o 11:00 a najdlhšie 30 minút. V oboch oknách môžete vybrať zamestnanca, pozrieť históriu verzií (platné od mesiaca), zistiť, kto nastavenie používa, a použiť predvolené hodnoty."
     Riadok "TIP", "Komu sa fond a pravidlá priraďujú", "Editory menia číselníky. Ktorý zamestnanec má ktorý fond a ktorú šablónu pravidiel, nastavíte na karte 2 Zamestnanci, aj pre vybranú skupinu."

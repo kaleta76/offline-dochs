@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_09_AutoOprava"
-'@Verzia 1.2.0
+'@Verzia 1.3.1
 Option Compare Database
 Option Explicit
 
@@ -24,6 +24,10 @@ Option Explicit
 ' REŽIM (NastaveniaSystemu "AutoOpravaRezim"):
 '   0 = nič negenerovať, 1 = A automaticky, B ako návrh na schválenie (predvolené),
 '   2 = A aj B automaticky (v zozname ostanú na kontrolu).
+'   CIEĽ (NastaveniaSystemu "AutoOpravaCiel", kontrakt auto_repair_target): 0 = doplniť tak, aby sa deň vyrovnal na denný
+'   fond (predvolené, ako doteraz), 1 = doplniť na koniec okna práce.
+'   PRÍPADY (NastaveniaSystemu "AutoOpravaPripady", kontrakt auto_repair_cases, súčet bitov): 1 = zabudnutý odchod z práce,
+'   2 = zabudnutý návrat z prerušenia (nie z obeda); predvolene 3 (oba). Opravy obeda (trieda A) tým nie sú dotknuté.
 ' STAVY: NAVRH, UPLATNENE, ZAMIETNUTE, ZASTARANE.
 ' ZOZNAM PROCEDÚR A FUNKCIÍ:
 ' ------------------------------------------------------------------------------
@@ -60,6 +64,26 @@ Public Function RezimAutoOpravy() As Long
     l = CLng(Val(mod_00_Common.GetNastavenie("AutoOpravaRezim", "1")))
     If l < 0 Or l > 2 Then l = 1
     RezimAutoOpravy = l
+End Function
+
+'-------------------------------------------------------------------------------
+' Cieľ doplnenia zabudnutého razenia: 0 = denný fond, 1 = koniec okna práce.
+'-------------------------------------------------------------------------------
+Public Function CielAutoOpravy() As Long
+    Dim l As Long
+    l = CLng(Val(mod_00_Common.GetNastavenie("AutoOpravaCiel", "0")))
+    If l < 0 Or l > 1 Then l = 0
+    CielAutoOpravy = l
+End Function
+
+'-------------------------------------------------------------------------------
+' Prípady opráv (súčet bitov): 1 odchod z práce, 2 návrat z prerušenia. Mimo 1 až 3 platí 3.
+'-------------------------------------------------------------------------------
+Public Function PripadyAutoOpravy() As Long
+    Dim l As Long
+    l = CLng(Val(mod_00_Common.GetNastavenie("AutoOpravaPripady", "3")))
+    If l < 1 Or l > 3 Then l = 3
+    PripadyAutoOpravy = l
 End Function
 
 Public Sub NastavRezim(ByVal lRezim As Long)
@@ -148,12 +172,15 @@ End Sub
 '-------------------------------------------------------------------------------
 Private Function JedenNavrh(ByRef ev() As TUdalost, ByVal n As Long, ByVal lFond As Long, ByRef nav As TNavrh) As Boolean
     Dim r As TVysledokDna, lOdpr As Long, lPrek As Long, lRem As Long, lNeed As Long, lKon As Long, i As Long
-    Dim bObed As Boolean, lObedMin As Long, lWin As Long
+    Dim bObed As Boolean, lObedMin As Long, lWin As Long, lCiel As Long, lPripady As Long
 
     Call mod_08_UdalostiDna.SpracujDen(ev, 1, n, r)
+    Call mod_08_UdalostiDna.UplatniZaokruhlenie(r)
     Call mod_08_UdalostiDna.SumarDna(r, lFond, lOdpr, lPrek)
     lObedMin = mod_08_UdalostiDna.PrmObedMin()
     lWin = mod_08_UdalostiDna.PrmOknoDo()
+    lCiel = CielAutoOpravy()
+    lPripady = PripadyAutoOpravy()
 
     ' 1) otvorené prerušenie na konci dňa
     If r.PrerOtvorene Then
@@ -164,14 +191,22 @@ Private Function JedenNavrh(ByRef ev() As TUdalost, ByVal n As Long, ByVal lFond
             JedenNavrh = True
             Exit Function
         End If
-        If JeAutoKoniec(r.PrerCislo) Then
+        If JeAutoKoniec(r.PrerCislo) And (lPripady And 2) <> 0 Then
             lRem = lFond - lOdpr - lPrek
             If lRem < 0 Then lRem = 0
             lKon = r.PrerZac + lRem
-            If lKon > lWin And lWin > r.PrerZac Then lKon = lWin
+            If lCiel = 1 And lWin > r.PrerZac Then
+                lKon = lWin
+            ElseIf lKon > lWin And lWin > r.PrerZac Then
+                lKon = lWin
+            End If
             nav.Trieda = "B": nav.Kod = "DOPLN_KONIEC_PRERUSENIA"
             nav.Cas = lKon: nav.Smer = "K": nav.Cislo = r.PrerCislo: nav.Zdroj = 2
-            nav.Popis = "Prerušenie bez návratu - ukončené do naplnenia denného fondu (" & mod_00_Common.MinutyNaCasText(lKon) & ")"
+            If lCiel = 1 Then
+                nav.Popis = "Prerušenie bez návratu - ukončené na konci okna práce (" & mod_00_Common.MinutyNaCasText(lKon) & ")"
+            Else
+                nav.Popis = "Prerušenie bez návratu - ukončené do naplnenia denného fondu (" & mod_00_Common.MinutyNaCasText(lKon) & ")"
+            End If
             JedenNavrh = True
         End If
         Exit Function         ' ostatné otvorené prerušenia ostávajú na ručné posúdenie
@@ -190,20 +225,25 @@ Private Function JedenNavrh(ByRef ev() As TUdalost, ByVal n As Long, ByVal lFond
     Next i
 
     ' 3) otvorená práca (chýba odchod) - odhad podľa fondu
-    If r.Praca And Not r.PracaObnovena Then
+    If r.Praca And Not r.PracaObnovena And (lPripady And 1) <> 0 Then
         lRem = lFond - lOdpr - lPrek
         If lRem < 0 Then lRem = 0
         lNeed = lRem
         For i = 1 To r.nIv
             If r.Iv(i).Cislo = 7 Then bObed = True
         Next i
-        If lFond > 0 And Not bObed And (lOdpr + lRem) > mod_08_UdalostiDna.PrmObedLimit() Then lNeed = lNeed + lObedMin
+        If lFond > 0 And Not bObed And (lOdpr + lRem) >= mod_08_UdalostiDna.PrmObedLimit() Then lNeed = lNeed + lObedMin
         lKon = r.PracaZac + lNeed
+        If lCiel = 1 And lWin > r.PracaZac Then lKon = lWin
         If lKon > lWin And lWin > r.PracaZac Then lKon = lWin
         If lKon < r.PracaZac Then lKon = r.PracaZac
         nav.Trieda = "B": nav.Kod = "DOPLN_ODCHOD"
         nav.Cas = lKon: nav.Smer = "K": nav.Cislo = 1: nav.Zdroj = 1
-        nav.Popis = "Chýbal odchod - odhad podľa denného fondu (" & mod_00_Common.MinutyNaCasText(lKon) & ")"
+        If lCiel = 1 Then
+            nav.Popis = "Chýbal odchod - doplnený na koniec okna práce (" & mod_00_Common.MinutyNaCasText(lKon) & ")"
+        Else
+            nav.Popis = "Chýbal odchod - odhad podľa denného fondu (" & mod_00_Common.MinutyNaCasText(lKon) & ")"
+        End If
         JedenNavrh = True
     End If
 End Function

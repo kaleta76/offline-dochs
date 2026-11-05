@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_08_UdalostiDna"
-'@Verzia 1.3.0
+'@Verzia 1.4.1
 Option Compare Database
 Option Explicit
 
@@ -12,7 +12,7 @@ Option Explicit
 '          - stavový automat dňa (SpracujDen): páruje príchod/odchod a prerušenia,
 '            vytvára intervaly a zoznam anomálií,
 '          - denný kontext mesiaca (kalendár, sviatky, pracovný fond),
-'          - parametre výpočtu (okno práce, obed, duplicity).
+'          - parametre výpočtu (okno práce, obed, duplicity, razený obed, zaokrúhľovanie).
 ' PRAVIDLÁ PÁROVANIA (Smer Z = začiatok, K = koniec; Číslo 1 = pracovná doba):
 '   - Z1 otvorí prácu, K1 ju uzavrie. Z prerušenia uzavrie prácu a otvorí prerušenie,
 '     K prerušenia ho uzavrie a práca sa obnoví (návrat do práce).
@@ -27,7 +27,9 @@ Option Explicit
 ' - HranicaDna(u, n, i0)                 : Posledný index rovnakého dňa v poli udalostí.
 ' - SpracujDen(u, i0, i1, r)             : Stavový automat dňa -> intervaly + anomálie.
 ' - TrvanieIntervalu(...)                : Započítané trvanie intervalu (okno práce, celodenná prekážka).
-' - SumarDna(r, fond, odpr, prek)        : Odpracované a započítané prekážky dňa (vrátane auto-obeda).
+' - SumarDna(r, fond, odpr, prek)        : Odpracované a započítané prekážky dňa (vrátane auto-obeda a režimu razeného obeda).
+' - UplatniZaokruhlenie(r)               : Zaokrúhli prvý razený príchod a posledný razený odchod dňa (ak je zapnuté).
+' - ZaokruhliCas(cas, krok, smer)        : Zaokrúhli minúty od polnoci na násobok kroku (nahor / nadol / najbližší).
 ' - NacitajKontextMesiaca(...)           : Typ dňa a fond pre každý deň mesiaca.
 ' - NastaveniaZamestnanca(...)           : Priradený fond/šablóna/kalendár platný pre mesiac.
 ' - FondZamestnanca(...)                 : Priemerný denný fond zamestnanca v mesiaci (vrátane úväzku).
@@ -53,6 +55,7 @@ Public Type TInterval
     ZacAuto As Boolean    ' začiatok pochádza z automatickej opravy (nie zo skutočného razenia)
     KonAuto As Boolean    ' koniec pochádza z automatickej opravy
     ZacRezum As Boolean   ' začiatok práce = návrat z prerušenia (nie príchod)
+    KonOdchod As Boolean  ' koniec práce = odchod (nie začiatok prerušenia)
 End Type
 
 Public Type TAnomalia
@@ -91,6 +94,11 @@ Private mObedLimit As Long
 Private mObedAktivny As Boolean
 Private mCelodenna As Long
 Private mDuplLimit As Long
+Private mObedRezim As Long        ' razený obed: 0 skutočný čas, 1 najmenej mObedMinZazn, 2 vždy presne mObedMinZazn
+Private mObedMinZazn As Long
+Private mZaokrPrichod As Long     ' krok zaokrúhlenia prvého príchodu dňa (min, 0 = nezaokrúhľuje)
+Private mZaokrOdchod As Long      ' krok zaokrúhlenia posledného odchodu dňa (min, 0 = nezaokrúhľuje)
+Private mZaokrSmer As Long        ' 0 príchod nahor a odchod nadol, 1 oba nahor, 2 oba nadol, 3 najbližší
 Private mNezapocitane As Object   ' čísla prerušení, ktorých interval sa nezapočíta (príznak NezapocitavatInterval)
 
 '-------------------------------------------------------------------------------
@@ -122,6 +130,18 @@ Private Sub NacitajParametre()
     If mObedMin <= 0 Then mObedMin = 30
     mDuplLimit = mod_00_Common.LimitPravidla("DUPLICITA_DO_10MIN", 10)
     If mDuplLimit < 0 Then mDuplLimit = 10
+
+    ' pravidlá výpočtu z karty 5 (kontrakt 1.4.0); bez nastavenia platia hodnoty zodpovedajúce doterajšiemu výpočtu
+    mObedRezim = CLng(Val(mod_00_Common.GetNastavenie("ObedZaznamenanyRezim", "0")))
+    If mObedRezim < 0 Or mObedRezim > 2 Then mObedRezim = 0
+    mObedMinZazn = CLng(Val(mod_00_Common.GetNastavenie("ObedZaznamenanyMin", "30")))
+    If mObedMinZazn < 0 Or mObedMinZazn > 600 Then mObedMinZazn = 30
+    mZaokrPrichod = CLng(Val(mod_00_Common.GetNastavenie("ZaokruhleniePrichodMin", "0")))
+    If mZaokrPrichod < 0 Or mZaokrPrichod > 60 Then mZaokrPrichod = 0
+    mZaokrOdchod = CLng(Val(mod_00_Common.GetNastavenie("ZaokruhlenieOdchodMin", "0")))
+    If mZaokrOdchod < 0 Or mZaokrOdchod > 60 Then mZaokrOdchod = 0
+    mZaokrSmer = CLng(Val(mod_00_Common.GetNastavenie("ZaokruhlenieSmer", "0")))
+    If mZaokrSmer < 0 Or mZaokrSmer > 3 Then mZaokrSmer = 0
 
     ' prerušenia s príznakom "nezapočítať" (kontrakt 1.4.0 calc UNPAID); bez stĺpca alebo príznaku je zoznam prázdny = doterajšie správanie
     Set mNezapocitane = CreateObject("Scripting.Dictionary")
@@ -176,6 +196,31 @@ End Function
 Public Function PrmDuplicitaLimit() As Long
     Call NacitajParametre
     PrmDuplicitaLimit = mDuplLimit
+End Function
+
+Public Function PrmObedRezim() As Long
+    Call NacitajParametre
+    PrmObedRezim = mObedRezim
+End Function
+
+Public Function PrmObedMinZaznamenany() As Long
+    Call NacitajParametre
+    PrmObedMinZaznamenany = mObedMinZazn
+End Function
+
+Public Function PrmZaokruhleniePrichod() As Long
+    Call NacitajParametre
+    PrmZaokruhleniePrichod = mZaokrPrichod
+End Function
+
+Public Function PrmZaokruhlenieOdchod() As Long
+    Call NacitajParametre
+    PrmZaokruhlenieOdchod = mZaokrOdchod
+End Function
+
+Public Function PrmZaokruhlenieSmer() As Long
+    Call NacitajParametre
+    PrmZaokruhlenieSmer = mZaokrSmer
 End Function
 
 '-------------------------------------------------------------------------------
@@ -309,7 +354,7 @@ Public Function HranicaDna(ByRef u() As TUdalost, ByVal n As Long, ByVal i0 As L
     HranicaDna = i
 End Function
 
-Private Sub PridajInterval(ByRef r As TVysledokDna, ByVal lC As Long, ByVal lZ As Long, ByVal lK As Long, ByVal bZA As Boolean, ByVal bKA As Boolean, Optional ByVal bRezum As Boolean = False)
+Private Sub PridajInterval(ByRef r As TVysledokDna, ByVal lC As Long, ByVal lZ As Long, ByVal lK As Long, ByVal bZA As Boolean, ByVal bKA As Boolean, Optional ByVal bRezum As Boolean = False, Optional ByVal bOdchod As Boolean = False)
     If r.nIv >= UBound(r.Iv) Then ReDim Preserve r.Iv(1 To UBound(r.Iv) + 8)
     r.nIv = r.nIv + 1
     r.Iv(r.nIv).Cislo = lC
@@ -318,6 +363,7 @@ Private Sub PridajInterval(ByRef r As TVysledokDna, ByVal lC As Long, ByVal lZ A
     r.Iv(r.nIv).ZacAuto = bZA
     r.Iv(r.nIv).KonAuto = bKA
     r.Iv(r.nIv).ZacRezum = bRezum
+    r.Iv(r.nIv).KonOdchod = bOdchod
 End Sub
 
 Private Sub PridajAnomaliu(ByRef r As TVysledokDna, ByVal strKod As String, ByVal lCas As Long, ByVal lC As Long, Optional ByVal strInfo As String = "")
@@ -386,7 +432,7 @@ Public Sub SpracujDen(ByRef u() As TUdalost, ByVal i0 As Long, ByVal i1 As Long,
             ' ---------------- ODCHOD ----------------
             If bPraca Then
                 If Not (bPr And lPrZ = lWz) Then
-                    Call PridajInterval(r, 1, lWz, cas, bWzAuto, bAuto, bWzRes)
+                    Call PridajInterval(r, 1, lWz, cas, bWzAuto, bAuto, bWzRes, True)
                 End If
                 bPraca = False: bWret = False
             ElseIf bPr Then
@@ -485,7 +531,7 @@ End Function
 ' Súčty dňa podľa pravidiel enginu: odpracované (po odpočte auto-obeda) a započítané prekážky.
 '-------------------------------------------------------------------------------
 Public Sub SumarDna(ByRef r As TVysledokDna, ByVal lFond As Long, ByRef lOdpr As Long, ByRef lPrek As Long)
-    Dim i As Long, bObed As Boolean
+    Dim i As Long, bObed As Boolean, lObedSkut As Long
     lOdpr = 0: lPrek = 0
     For i = 1 To r.nIv
         Select Case r.Iv(i).Cislo
@@ -493,12 +539,94 @@ Public Sub SumarDna(ByRef r As TVysledokDna, ByVal lFond As Long, ByRef lOdpr As
                 lOdpr = lOdpr + TrvanieIntervalu(1, r.Iv(i).Zac, r.Iv(i).Kon, lFond)
             Case 7
                 bObed = True
+                If r.Iv(i).Kon > r.Iv(i).Zac Then lObedSkut = lObedSkut + (r.Iv(i).Kon - r.Iv(i).Zac)
             Case Else
                 lPrek = lPrek + TrvanieIntervalu(r.Iv(i).Cislo, r.Iv(i).Zac, r.Iv(i).Kon, lFond)
         End Select
     Next i
     Call NacitajParametre
-    If mObedAktivny And lFond > 0 And lOdpr > mObedLimit And Not bObed Then lOdpr = lOdpr - mObedMin
+    ' Prah (parameter Obed od) platí od uvedenej hodnoty vrátane: pri 360 min už 6:00 práce obed zahŕňa, 5:59 ešte nie.
+    If mObedAktivny And lFond > 0 And lOdpr >= mObedLimit And Not bObed Then lOdpr = lOdpr - mObedMin
+    ' razený obed (kontrakt lunch_recorded_mode): 0 = skutočný čas (obed nie je práca, nič sa neupravuje),
+    ' 1 = najmenej mObedMinZazn (kratší obed sa dorovná odpočtom), 2 = vždy presne mObedMinZazn.
+    ' Upravuje sa len deň, v ktorom práca spolu s obedom dosiahne ten istý prah ako automatický obed
+    ' (kratšia zmena na prestávku nárok nemá, taký obed sa počíta skutočným časom).
+    If bObed And mObedRezim > 0 And (lOdpr + lObedSkut) >= mObedLimit Then
+        If mObedRezim = 1 Then
+            If lObedSkut < mObedMinZazn Then lOdpr = lOdpr - (mObedMinZazn - lObedSkut)
+        Else
+            lOdpr = lOdpr + lObedSkut - mObedMinZazn
+        End If
+        If lOdpr < 0 Then lOdpr = 0
+    End If
+End Sub
+
+'-------------------------------------------------------------------------------
+' Zaokrúhli minúty od polnoci na násobok kroku. lSmer: 1 nahor, -1 nadol, 0 na najbližší (polovica nahor).
+' Krok 0 alebo 1 čas nemení.
+'-------------------------------------------------------------------------------
+Public Function ZaokruhliCas(ByVal lCas As Long, ByVal lKrok As Long, ByVal lSmer As Long) As Long
+    Dim lZv As Long
+    If lKrok <= 1 Then ZaokruhliCas = lCas: Exit Function
+    lZv = lCas Mod lKrok
+    If lZv = 0 Then ZaokruhliCas = lCas: Exit Function
+    If lSmer > 0 Then
+        ZaokruhliCas = lCas - lZv + lKrok
+    ElseIf lSmer < 0 Then
+        ZaokruhliCas = lCas - lZv
+    ElseIf lZv * 2 >= lKrok Then
+        ZaokruhliCas = lCas - lZv + lKrok
+    Else
+        ZaokruhliCas = lCas - lZv
+    End If
+End Function
+
+'-------------------------------------------------------------------------------
+' Zaokrúhlenie podľa pravidiel výpočtu: prvý razený príchod dňa a posledný razený odchod dňa (rovnako ako terminál).
+' Netýka sa času z automatickej opravy ani návratu z prerušenia. Volá sa po SpracujDen a pred zápisom intervalov
+' a súčtov, takže interval, zostava aj súčty dňa majú rovnaký (zaokrúhlený) čas. Bez zapnutého zaokrúhlenia nič nemení.
+'-------------------------------------------------------------------------------
+Public Sub UplatniZaokruhlenie(ByRef r As TVysledokDna)
+    Dim i As Long, iPrv As Long, iPos As Long, lSmerP As Long, lSmerO As Long, bPoslednyOdchod As Boolean
+    Call NacitajParametre
+    If mZaokrPrichod <= 1 And mZaokrOdchod <= 1 Then Exit Sub
+    Select Case mZaokrSmer
+        Case 1: lSmerP = 1: lSmerO = 1
+        Case 2: lSmerP = -1: lSmerO = -1
+        Case 3: lSmerP = 0: lSmerO = 0
+        Case Else: lSmerP = 1: lSmerO = -1
+    End Select
+    For i = 1 To r.nIv
+        If r.Iv(i).Cislo = 1 Then
+            If iPrv = 0 Then
+                iPrv = i
+            ElseIf r.Iv(i).Zac < r.Iv(iPrv).Zac Then
+                iPrv = i
+            End If
+            If iPos = 0 Then
+                iPos = i
+            ElseIf r.Iv(i).Kon > r.Iv(iPos).Kon Then
+                iPos = i
+            End If
+        End If
+    Next i
+    If iPrv = 0 Then Exit Sub
+
+    If mZaokrPrichod > 1 Then
+        If Not r.Iv(iPrv).ZacAuto And Not r.Iv(iPrv).ZacRezum Then
+            r.Iv(iPrv).Zac = ZaokruhliCas(r.Iv(iPrv).Zac, mZaokrPrichod, lSmerP)
+        End If
+    End If
+
+    If mZaokrOdchod > 1 Then
+        bPoslednyOdchod = (r.Iv(iPos).KonOdchod And Not r.Iv(iPos).KonAuto)
+        If bPoslednyOdchod Then
+            For i = 1 To r.nIv
+                If r.Iv(i).Cislo <> 1 And r.Iv(i).Zac >= r.Iv(iPos).Kon Then bPoslednyOdchod = False
+            Next i
+        End If
+        If bPoslednyOdchod Then r.Iv(iPos).Kon = ZaokruhliCas(r.Iv(iPos).Kon, mZaokrOdchod, lSmerO)
+    End If
 End Sub
 
 '-------------------------------------------------------------------------------

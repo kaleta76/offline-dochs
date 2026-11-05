@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_20_KonfiguraciaExport"
-'@Verzia 1.2.0
+'@Verzia 1.3.0
 Option Compare Database
 Option Explicit
 
@@ -17,6 +17,9 @@ Option Explicit
 '                                    needs_approval, full_day_only (kontrakt 1.3.0 a 1.4.0; len keď ich správca nastavil),
 '          - rules (voliteľné, kontrakt 1.4.0) lunch_recorded_mode, lunch_min_min, unlabeled_out_is_lunch, rounding_*,
 '                                    auto_repair_target, auto_repair_cases: len keď ich správca nastavil inak ako predvolene,
+'          - interruptions[] voliteľne full_day_min, counts_to_lunch_base (kontrakt 1.5.0; len keď ich správca nastavil, len pre započítavané),
+'          - regimes[], employees[].months[].regime_ids   režimy výpočtu a ich rozpis po dňoch (kontrakt 1.5.0; len keď nejaký režim existuje
+'                                    a je použiteľný; podľa nich Access aj terminál počítajú zamestnancovi deň s inými parametrami),
 '          - terminal_code_map       kódy razení terminála (WORK, DOCTOR, ...) -> čísla prerušení v Accesse,
 '          - funds, templates        názvy fondov a pravidlá prerušení (parametre) po mesiacoch,
 '          - employees[].months[]    pre každého zamestnanca a mesiac okna: úväzok, priradenie a PLÁN DNÍ
@@ -243,6 +246,7 @@ End Function
 Private Function SekciaPreruseni(ByRef db As DAO.Database, ByVal dicPrer As Object) As String
     Dim rs As DAO.Recordset, s As String, b As Boolean, c As Long
     Dim bAK As Boolean, bFond As Boolean, bPrac As Boolean, bDov As Boolean, bTerm As Boolean, bNezap As Boolean
+    Dim bPrah As Boolean, bZakl As Boolean
     s = "  ""interruptions"": [" & vbCrLf
     If mod_00_Common.TabulkaExistujeDB(db, "CiselnikPreruseni") Then
         bAK = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "AutoKoniecDoKoncaSmeny")
@@ -250,6 +254,8 @@ Private Function SekciaPreruseni(ByRef db As DAO.Database, ByVal dicPrer As Obje
         bPrac = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "ZapocitavatDoPrace")
         bDov = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "OdpocitavatZDovolenky")
         bTerm = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "TerminalTlacidlo") And mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "NezapocitavatInterval")
+        bPrah = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "PrahCelyDenMin")
+        bZakl = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "DoZakladuObeda")
         Set rs = db.OpenRecordset("SELECT * FROM CiselnikPreruseni ORDER BY Cislo;", dbOpenSnapshot)
         b = True
         Do While Not rs.EOF
@@ -266,7 +272,7 @@ Private Function SekciaPreruseni(ByRef db As DAO.Database, ByVal dicPrer As Obje
                     ", ""counts_to_fund"": " & JB(PoleBool(rs, "ZapocitavatDoFondu", bFond)) & _
                     ", ""counts_to_work"": " & JB(PoleBool(rs, "ZapocitavatDoPrace", bPrac)) & _
                     ", ""deducts_leave"": " & JB(PoleBool(rs, "OdpocitavatZDovolenky", bDov)) & _
-                    PriznakyTerminalu(rs, bTerm, c) & " }"
+                    PriznakyTerminalu(rs, bTerm, c) & PriznakyVypoctu(rs, bPrah, bZakl, c, bNezap) & " }"
             rs.MoveNext
         Loop
         rs.Close
@@ -316,6 +322,111 @@ Private Function PriznakyTerminalu(ByRef rs As DAO.Recordset, ByVal bStlpce As B
     If CBool(Nz(rs!VyzadujeSchvalenie, False)) Then s = s & ", ""needs_approval"": true"
     If CBool(Nz(rs!LenCelyDen, False)) Then s = s & ", ""full_day_only"": true"
     PriznakyTerminalu = s
+End Function
+
+'-------------------------------------------------------------------------------
+' Voliteľné kľúče výpočtu prerušenia (kontrakt 1.5.0): full_day_min (vlastná hranica celého dňa) a counts_to_lunch_base (čas sa pripočíta
+' k základu pre prah obeda). Len pre prerušenie, ktorého čas sa započítava (nie č. 1, č. 7 ani nezapočítavané), a len keď ich správca nastavil.
+' Vráti text začínajúci čiarkou, alebo prázdny reťazec.
+'-------------------------------------------------------------------------------
+Private Function PriznakyVypoctu(ByRef rs As DAO.Recordset, ByVal bPrah As Boolean, ByVal bZakl As Boolean, ByVal c As Long, ByVal bNezap As Boolean) As String
+    Dim s As String, l As Long
+    If c = 1 Or c = 7 Or bNezap Then Exit Function
+    If bPrah Then
+        If Not IsNull(rs!PrahCelyDenMin) Then
+            l = CLng(rs!PrahCelyDenMin)
+            If l >= 1 And l <= 1440 Then s = s & ", ""full_day_min"": " & l
+        End If
+    End If
+    If bZakl Then
+        If CBool(Nz(rs!DoZakladuObeda, False)) Then s = s & ", ""counts_to_lunch_base"": true"
+    End If
+    PriznakyVypoctu = s
+End Function
+
+'-------------------------------------------------------------------------------
+' Režimy výpočtu (kontrakt 1.5.0). Exportujú sa len použiteľné režimy (mod_21_RezimyVypoctu.ChybaRezimu); neplatný režim sa preskočí
+' a hlási sa v správe exportu, rovnako ho vo výpočte preskočí Access, takže deň sa v oboch počíta so základnými nastaveniami.
+' Do dicRez uloží čísla exportovaných režimov. Bez režimu vráti prázdny reťazec (kľúč regimes sa do súboru nevloží).
+'-------------------------------------------------------------------------------
+Private Function SekciaRezimy(ByRef db As DAO.Database, ByVal dicRez As Object) As String
+    Dim rs As DAO.Recordset, s As String, b As Boolean, lID As Long, strN As String, strChyba As String, dicNazvy As Object
+    Dim sR As String, sI As String
+    If Not mod_00_Common.TabulkaExistujeDB(db, "RezimyVypoctu") Then Exit Function
+    Set dicNazvy = CreateObject("Scripting.Dictionary")
+    Set rs = db.OpenRecordset("SELECT RezimID, Nazov FROM RezimyVypoctu ORDER BY RezimID;", dbOpenSnapshot)
+    b = True
+    Do While Not rs.EOF
+        lID = CLng(rs!RezimID)
+        strN = Trim$(CStr(Nz(rs!Nazov, "")))
+        strChyba = ""
+        If lID < 1 Or lID > 99 Then
+            strChyba = "číslo režimu musí byť 1 až 99"
+        ElseIf Len(strN) < 1 Or Len(strN) > 40 Then
+            strChyba = "názov musí mať 1 až 40 znakov"
+        ElseIf dicNazvy.Exists(LCase$(strN)) Then
+            strChyba = "názov sa opakuje"
+        ElseIf dicRez.Count >= 20 Then
+            strChyba = "režimov je viac než 20"
+        Else
+            strChyba = mod_21_RezimyVypoctu.ChybaRezimu(db, lID)
+        End If
+        If Len(strChyba) > 0 Then
+            Call mod_00_Common.ZapisLog("mod_20_KonfiguraciaExport.SekciaRezimy", "WARN", "Režim č. " & lID & " sa neexportuje: " & strChyba)
+            mSprava = mSprava & "Preskočený režim " & lID & " (" & strChyba & ")." & vbCrLf
+        Else
+            sR = RezimPravidlaJSON(db, lID)
+            sI = RezimPrerusenia(db, lID)
+            If Not b Then s = s & "," & vbCrLf
+            b = False
+            s = s & "    { ""id"": " & lID & ", ""name"": " & J(strN)
+            If Len(sR) > 0 Then s = s & "," & vbCrLf & "      ""rules"": { " & sR & " }"
+            If Len(sI) > 0 Then s = s & "," & vbCrLf & "      ""interruptions"": [" & sI & "]"
+            s = s & " }"
+            dicNazvy(LCase$(strN)) = True
+            dicRez(lID) = True
+        End If
+        rs.MoveNext
+    Loop
+    rs.Close
+    If dicRez.Count > 0 Then SekciaRezimy = "  ""regimes"": [" & vbCrLf & s & vbCrLf & "  ]"
+End Function
+
+' Pravidlá režimu ako zoznam "kľúč": hodnota (áno/nie kľúče ako true/false), oddelený čiarkami; prázdny reťazec, ak režim žiadne nemá.
+Private Function RezimPravidlaJSON(ByRef db As DAO.Database, ByVal lID As Long) As String
+    Dim rs As DAO.Recordset, s As String, strK As String
+    Set rs = db.OpenRecordset("SELECT Kluc, Hodnota FROM RezimyPravidla WHERE RezimID = " & lID & " ORDER BY Kluc;", dbOpenSnapshot)
+    Do While Not rs.EOF
+        strK = CStr(rs!Kluc)
+        If Len(s) > 0 Then s = s & ", "
+        If strK = "auto_lunch_enabled" Or strK = "unlabeled_out_is_lunch" Then
+            s = s & J(strK) & ": " & JB(CLng(rs!Hodnota) <> 0)
+        Else
+            s = s & J(strK) & ": " & CLng(rs!Hodnota)
+        End If
+        rs.MoveNext
+    Loop
+    rs.Close
+    RezimPravidlaJSON = s
+End Function
+
+' Úpravy prerušení režimu, každá na vlastnom riadku; prázdny reťazec, ak režim žiadne nemá.
+Private Function RezimPrerusenia(ByRef db As DAO.Database, ByVal lID As Long) As String
+    Dim rs As DAO.Recordset, s As String, o As String
+    Set rs = db.OpenRecordset("SELECT CisloPreruseni, TypVypoctu, PrahCelyDenMin, DoZakladuObeda FROM RezimyPreruseni WHERE RezimID = " & lID & " ORDER BY CisloPreruseni;", dbOpenSnapshot)
+    Do While Not rs.EOF
+        o = "{ ""code"": " & CLng(rs!CisloPreruseni)
+        If Len(CStr(Nz(rs!TypVypoctu, ""))) > 0 Then o = o & ", ""calc"": " & J(CStr(rs!TypVypoctu))
+        If Not IsNull(rs!PrahCelyDenMin) Then o = o & ", ""full_day_min"": " & CLng(rs!PrahCelyDenMin)
+        If Not IsNull(rs!DoZakladuObeda) Then o = o & ", ""counts_to_lunch_base"": " & JB(CLng(rs!DoZakladuObeda) <> 0)
+        o = o & " }"
+        If Len(s) > 0 Then s = s & ","
+        s = s & vbCrLf & "        " & o
+        rs.MoveNext
+    Loop
+    rs.Close
+    If Len(s) > 0 Then s = s & vbCrLf & "      "
+    RezimPrerusenia = s
 End Function
 
 Private Function SekciaKodyRazeni(ByRef db As DAO.Database) As String
@@ -418,12 +529,12 @@ End Function
 ' Vráti text poľa employees bez zátvoriek.
 '-------------------------------------------------------------------------------
 Private Function SekciaZamestnanci(ByRef db As DAO.Database, ByRef lMes() As Long, ByVal nMes As Long, _
-                                   ByVal dicFond As Object, ByVal dicSab As Object, ByRef nMesPlanov As Long) As String
+                                   ByVal dicFond As Object, ByVal dicSab As Object, ByVal dicRez As Object, ByRef nMesPlanov As Long) As String
     Dim rs As DAO.Recordset, strOC As String, strPN As String, i As Long, d As Long, y As Long, m As Long
     Dim k As TKontextMesiaca, kPrazdny As TKontextMesiaca
     Dim lFond As Long, lSab As Long, lKal As Long, lUv As Long, f As Long
     Dim sT As String, sF As String, sM As String, nM As Long, bVyr As Boolean, bPrvy As Boolean
-    Dim dicMapa As Object
+    Dim dicMapa As Object, lRez() As Long, sRI As String, bRI As Boolean, lR As Long
 
     Set dicMapa = MapaOsobDoTerminalu(db)
     bVyr = mod_00_Common.PoleExistujeDB(db, "Zamestnanci", "Vyradeny") And mod_00_Common.PoleExistujeDB(db, "Zamestnanci", "VyradenyOd")
@@ -455,16 +566,25 @@ Private Function SekciaZamestnanci(ByRef db As DAO.Database, ByRef lMes() As Lon
                         dicSab(lSab) = True
                         sT = ""
                         sF = ""
+                        sRI = ""
+                        bRI = False
+                        If dicRez.Count > 0 Then Call mod_21_RezimyVypoctu.RezimyMesiaca(db, strOC, y, m, lRez)
                         For d = 1 To k.PocetDni
                             f = Klamp(k.Fond(d), 0, 1440)
                             sT = sT & IIf(d > 1, ", ", "") & """" & k.Typ(d) & """"
                             sF = sF & IIf(d > 1, ", ", "") & f
+                            lR = 0
+                            If dicRez.Count > 0 Then
+                                If dicRez.Exists(lRez(d)) Then lR = lRez(d)      ' neexportovaný (neplatný) režim sa v rozpise nahradí nulou
+                            End If
+                            If lR > 0 Then bRI = True
+                            sRI = sRI & IIf(d > 1, ", ", "") & lR
                         Next d
                         If nM > 0 Then sM = sM & "," & vbCrLf
                         sM = sM & "        { ""month"": " & J(MesText(lMes(i))) & ", ""employment_pct"": " & lUv & ", ""fund_id"": " & lFond & _
                                   ", ""template_id"": " & lSab & ", ""calendar_id"": " & lKal & "," & vbCrLf & _
                                   "          ""day_types"": [" & sT & "]," & vbCrLf & _
-                                  "          ""expected_min"": [" & sF & "] }"
+                                  "          ""expected_min"": [" & sF & "]" & IIf(bRI, "," & vbCrLf & "          ""regime_ids"": [" & sRI & "]", "") & " }"
                         nM = nM + 1
                     End If
                 End If
@@ -564,7 +684,7 @@ End Function
 Public Function GenerujKonfiguraciuV2JSON(Optional ByVal lOdYM As Long = 0, Optional ByVal lDoYM As Long = 0) As String
     On Error GoTo Chyba
     Dim db As DAO.Database, lDnes As Long, nMes As Long, i As Long, lMes() As Long
-    Dim dicPrer As Object, dicFond As Object, dicSab As Object
+    Dim dicPrer As Object, dicFond As Object, dicSab As Object, dicRez As Object, sRez As String
     Dim sPrer As String, sKody As String, sSv As String, sMapa As String, sZam As String, sFond As String, sSab As String
     Dim nMesPlanov As Long, s As String, strChyba As String
 
@@ -598,12 +718,14 @@ Public Function GenerujKonfiguraciuV2JSON(Optional ByVal lOdYM As Long = 0, Opti
     Set dicPrer = CreateObject("Scripting.Dictionary")
     Set dicFond = CreateObject("Scripting.Dictionary")
     Set dicSab = CreateObject("Scripting.Dictionary")
+    Set dicRez = CreateObject("Scripting.Dictionary")
 
     sPrer = SekciaPreruseni(db, dicPrer)
+    sRez = SekciaRezimy(db, dicRez)
     sKody = SekciaKodyRazeni(db)
     sSv = SekciaSviatky(db, CInt(lOdYM \ 100))
     sMapa = SekciaMapaKodov(db, dicPrer)
-    sZam = SekciaZamestnanci(db, lMes, nMes, dicFond, dicSab, nMesPlanov)
+    sZam = SekciaZamestnanci(db, lMes, nMes, dicFond, dicSab, dicRez, nMesPlanov)
     sFond = SekciaFondy(db, dicFond)
     sSab = SekciaSablony(db, dicSab, lMes, nMes, dicPrer)
 
@@ -614,6 +736,7 @@ Public Function GenerujKonfiguraciuV2JSON(Optional ByVal lOdYM As Long = 0, Opti
     s = s & "  ""rok"": " & (lOdYM \ 100) & "," & vbCrLf
     s = s & SekciaPravidla() & "," & vbCrLf
     s = s & sPrer & "," & vbCrLf
+    If Len(sRez) > 0 Then s = s & sRez & "," & vbCrLf
     s = s & sKody & "," & vbCrLf
     s = s & sSv & "," & vbCrLf
     s = s & "  ""period"": { ""from_month"": " & J(MesText(lOdYM)) & ", ""to_month"": " & J(MesText(lDoYM)) & " }," & vbCrLf

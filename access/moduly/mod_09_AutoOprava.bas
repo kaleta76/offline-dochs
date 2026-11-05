@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_09_AutoOprava"
-'@Verzia 1.3.1
+'@Verzia 1.4.0
 Option Compare Database
 Option Explicit
 
@@ -61,7 +61,8 @@ Private mAutoKoniec As Object
 '-------------------------------------------------------------------------------
 Public Function RezimAutoOpravy() As Long
     Dim l As Long
-    l = CLng(Val(mod_00_Common.GetNastavenie("AutoOpravaRezim", "1")))
+    ' režim výpočtu platný pre aktuálny deň (kontrakt 1.5.0) prepíše základné nastavenie
+    If Not mod_08_UdalostiDna.RezimPrepisuje("auto_repair_mode", l) Then l = CLng(Val(mod_00_Common.GetNastavenie("AutoOpravaRezim", "1")))
     If l < 0 Or l > 2 Then l = 1
     RezimAutoOpravy = l
 End Function
@@ -71,7 +72,7 @@ End Function
 '-------------------------------------------------------------------------------
 Public Function CielAutoOpravy() As Long
     Dim l As Long
-    l = CLng(Val(mod_00_Common.GetNastavenie("AutoOpravaCiel", "0")))
+    If Not mod_08_UdalostiDna.RezimPrepisuje("auto_repair_target", l) Then l = CLng(Val(mod_00_Common.GetNastavenie("AutoOpravaCiel", "0")))
     If l < 0 Or l > 1 Then l = 0
     CielAutoOpravy = l
 End Function
@@ -81,7 +82,7 @@ End Function
 '-------------------------------------------------------------------------------
 Public Function PripadyAutoOpravy() As Long
     Dim l As Long
-    l = CLng(Val(mod_00_Common.GetNastavenie("AutoOpravaPripady", "3")))
+    If Not mod_08_UdalostiDna.RezimPrepisuje("auto_repair_cases", l) Then l = CLng(Val(mod_00_Common.GetNastavenie("AutoOpravaPripady", "3")))
     If l < 1 Or l > 3 Then l = 3
     PripadyAutoOpravy = l
 End Function
@@ -316,7 +317,7 @@ Public Sub AnalyzujMesiacZamestnanca(ByRef db As DAO.Database, ByVal strOC As St
     Dim dDen As Date, lFond As Long, nav As TNavrh, e As TUdalost, r As TVysledokDna
     Dim dicEx As Object, dicNew As Object, strKey As String, v As Variant, strStav As String
     Dim rsOpr As DAO.Recordset, rsAn As DAO.Recordset, bStop As Boolean, strZav As String
-    Dim lF0 As Long, lSabl As Long, lK0 As Long
+    Dim lF0 As Long, lSabl As Long, lK0 As Long, lRez() As Long
 
     ' uzavretý (podpísaný) mesiac sa nemení: bez analýzy, bez zmeny opráv a anomálií
     If mod_18_Uzavierka.JeUzavrety(strOC, iRok, iMes) Then Exit Sub
@@ -334,11 +335,15 @@ Public Sub AnalyzujMesiacZamestnanca(ByRef db As DAO.Database, ByVal strOC As St
     If n > 0 Then
         Call mod_08_UdalostiDna.NacitajKontextMesiaca(db, strOC, iRok, iMes, k)
         Call mod_08_UdalostiDna.NastaveniaZamestnanca(db, strOC, iRok, iMes, lF0, lSabl, lK0)
+        Call mod_21_RezimyVypoctu.RezimyMesiaca(db, strOC, iRok, iMes, lRez)
         i = 1
         Do While i <= n
             i1 = mod_08_UdalostiDna.HranicaDna(u, n, i)
             dDen = u(i).Datum
             If Not mod_05_UI_AttendanceEditor.Ed_JeDenUpraveny(strOC, dDen) Then
+                ' režim výpočtu platný v tento deň (0 = základné nastavenia); od neho závisí aj režim opráv, ich cieľ a prípady
+                Call mod_08_UdalostiDna.NastavRezimVypoctu(lRez(Day(dDen)))
+                lRezim = RezimAutoOpravy()
                 lFond = k.Fond(Day(dDen))
                 ' kópia udalostí dňa
                 m = i1 - i + 1
@@ -402,6 +407,7 @@ Public Sub AnalyzujMesiacZamestnanca(ByRef db As DAO.Database, ByVal strOC As St
             i = i1 + 1
         Loop
     End If
+    Call mod_08_UdalostiDna.NastavRezimVypoctu(0)
     rsOpr.Close: rsAn.Close
 
     ' opravy, ktoré už nie sú potrebné (doplnilo sa skutočné razenie / zmenili sa dáta)
@@ -413,6 +419,7 @@ Public Sub AnalyzujMesiacZamestnanca(ByRef db As DAO.Database, ByVal strOC As St
     Next v
     Exit Sub
 Chyba:
+    Call mod_08_UdalostiDna.NastavRezimVypoctu(0)
     Call mod_00_Common.ZapisLog("mod_09_AutoOprava.AnalyzujMesiacZamestnanca", "ERROR", Err.Description, "OC=" & strOC & " " & iMes & "/" & iRok)
 End Sub
 

@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_21_RezimyVypoctu"
-'@Verzia 1.0.0
+'@Verzia 1.1.0
 Option Compare Database
 Option Explicit
 
@@ -21,6 +21,10 @@ Option Explicit
 '   Nové vlastnosti prerušenia v číselníku (CiselnikPreruseni): PrahCelyDenMin (od akej dĺžky jedného intervalu sa započíta celý
 '   denný fond; prázdne = spoločná hranica z nastavení) a DoZakladuObeda (čas prerušenia sa pripočíta k základu pre prah obeda).
 '
+'   Výpočet: pred výpočtom každého dňa zamestnanca sa režim dňa nastaví cez mod_08_UdalostiDna.NastavRezimVypoctu (modMesaatnaDochadzka,
+'   mod_09_AutoOprava); export podľa kontraktu 1.5.0 je v mod_20_KonfiguraciaExport. Neplatný režim (ChybaRezimu) sa vo výpočte ani
+'   v exporte neuplatní, deň sa počíta so základnými nastaveniami.
+'
 '   Uzavretý mesiac sa nemení: obdobie ani parametre režimu, ktoré by zasiahli uzavretý mesiac zamestnanca, sa neuložia.
 '
 ' ZOZNAM PROCEDÚR A FUNKCIÍ:
@@ -36,6 +40,7 @@ Option Explicit
 ' - ChybaRezimu(db, id)                          : Kontrola celého režimu (dvojica okna práce, úpravy prerušení); "" = použiteľný.
 ' - UlozObdobie / OdstranObdobie                 : Obdobie režimu zamestnanca.
 ' - RezimNaDen(db, OC, deň)                      : Číslo režimu platného v deň (0 = bez režimu).
+' - RezimyMesiaca(db, OC, rok, mesiac, pole)     : Číslo režimu pre každý deň mesiaca (pole 1 až 31; používa výpočet a export).
 ' - DotknutyUzavrety(db, id)                     : Prvý uzavretý mesiac zamestnanca, ktorý režim používa ("" = žiadny).
 '===============================================================================
 
@@ -119,8 +124,8 @@ Public Function RozsahPravidla(ByVal strKluc As String, ByRef lMin As Long, ByRe
             lMin = 0
             lMax = 3
         Case "auto_repair_mode"
-            lMin = 0
-            lMax = 9
+            lMin = 0              ' kontrakt pripúšťa 0 až 9, Access pozná len 0 vypnuté, 1 isté automaticky, 2 všetko automaticky
+            lMax = 2
         Case "auto_repair_target", "auto_lunch_enabled", "unlabeled_out_is_lunch"
             lMin = 0
             lMax = 1
@@ -752,3 +757,31 @@ Public Function RezimNaDen(ByRef db As DAO.Database, ByVal strOC As String, ByVa
 Chyba:
     RezimNaDen = 0
 End Function
+
+'-------------------------------------------------------------------------------
+' Číslo režimu pre každý deň mesiaca zamestnanca: lId(1 až 31), 0 = bez režimu. Pole sa vždy vytvorí (aj pri chybe alebo bez tabuľky).
+'-------------------------------------------------------------------------------
+Public Sub RezimyMesiaca(ByRef db As DAO.Database, ByVal strOC As String, ByVal iRok As Long, ByVal iMes As Long, ByRef lId() As Long)
+    Dim rs As DAO.Recordset, d1 As Date, d2 As Date, a As Date, b As Date, i As Long
+    ReDim lId(1 To 31)
+    On Error GoTo Chyba
+    If Not mod_00_Common.TabulkaExistujeDB(db, TBL_OBDOBIA) Then Exit Sub
+    d1 = DateSerial(iRok, iMes, 1)
+    d2 = DateSerial(iRok, iMes + 1, 0)
+    Set rs = db.OpenRecordset("SELECT RezimID, PlatiOd, PlatiDo FROM " & TBL_OBDOBIA & " WHERE OsobneCislo = " & mod_00_Common.SqlText(strOC) & _
+                              " AND PlatiOd <= " & mod_00_Common.SqlDatum(d2) & " AND PlatiDo >= " & mod_00_Common.SqlDatum(d1) & " ORDER BY PlatiOd;", dbOpenSnapshot)
+    Do While Not rs.EOF
+        a = CDate(rs!PlatiOd)
+        If a < d1 Then a = d1
+        b = CDate(rs!PlatiDo)
+        If b > d2 Then b = d2
+        For i = Day(a) To Day(b)
+            lId(i) = CLng(Nz(rs!RezimID, 0))
+        Next i
+        rs.MoveNext
+    Loop
+    rs.Close
+    Exit Sub
+Chyba:
+    Call mod_00_Common.ZapisLog("mod_21_RezimyVypoctu.RezimyMesiaca", "ERROR", Err.Description, "OC=" & strOC & " " & iMes & "/" & iRok)
+End Sub

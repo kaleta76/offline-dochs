@@ -1,6 +1,6 @@
 {
-  "balik": "2.15.1",
-  "vytvorene": "2026-11-05 18:46:45",
+  "balik": "2.16.0",
+  "vytvorene": "2026-11-05 20:05:18",
   "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
   "zrusene": [
     "modExportLovableConfig",
@@ -21,9 +21,9 @@
     },
     "mod_01_SystemInit": {
       "subor": "moduly/mod_01_SystemInit.bas",
-      "verzia": "2.9.1",
-      "sha256": "8c8721a4e256681835c02a3f4d4a50c77165a103a09cb93c31b015c097d71d9e",
-      "obsah_sha256": "2758eba6fdbca732c5eb94c0357e4f470ec8d7159bb610982dfae556ea50ae02"
+      "verzia": "2.9.2",
+      "sha256": "1c3eb0fb00ce52d60c5cbb8af1632466b06e6e6f0e97b64667a44eb05891539e",
+      "obsah_sha256": "a9186cb5aa55662c1191d4d19066a816b4b287257c4ad50d1d5e47b32b9d9b1c"
     },
     "mod_02_DBFImport": {
       "subor": "moduly/mod_02_DBFImport.bas",
@@ -75,9 +75,9 @@
     },
     "mod_10_Konfiguracia": {
       "subor": "moduly/mod_10_Konfiguracia.bas",
-      "verzia": "1.4.1",
-      "sha256": "fc3a09b2ae5d03fa067797ab120c768670b29c8d6b192da348e1e014c85c568d",
-      "obsah_sha256": "41cbc8fb5ed64fa0ff5dc13fb9488c73ce626f75edfe35eee16bfc4cb0ed6750"
+      "verzia": "1.4.2",
+      "sha256": "8e7672e12348f2b61fac1c34fc9ec683c9275a1f2567fa3dbc54069e25726b15",
+      "obsah_sha256": "4098ef18b25d4eb29f1202c8d8cb7c798a64d8284fc5fe7c1eeb38a2d0957995"
     },
     "mod_11_ImportZamestnancov": {
       "subor": "moduly/mod_11_ImportZamestnancov.bas",
@@ -138,6 +138,12 @@
       "verzia": "1.2.0",
       "sha256": "352bfb1a47607ab445be9f8ffdfec38bc9d7cc3bbe23bbff8dd4d0eba625a45b",
       "obsah_sha256": "b5a21ea5dbabb8a0d2841d50bd1b225fde4f90819d853f33984180cbf3ea8743"
+    },
+    "mod_21_RezimyVypoctu": {
+      "subor": "moduly/mod_21_RezimyVypoctu.bas",
+      "verzia": "1.0.0",
+      "sha256": "6f8bdc91576851bf13ceb5b0b3dd5a0719efa941ab84278dea575ac64736199d",
+      "obsah_sha256": "32a65c37df75072f18bf5bc02f082e8f1d7efd3c2d89aa1b2eff5122c25600e2"
     },
     "mod_UI_Core": {
       "subor": "moduly/mod_UI_Core.bas",

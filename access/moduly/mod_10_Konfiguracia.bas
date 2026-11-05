@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_10_Konfiguracia"
-'@Verzia 1.4.1
+'@Verzia 1.4.2
 Option Compare Database
 Option Explicit
 
@@ -129,6 +129,9 @@ Public Sub ZabezpecStlpceKonfiguracie(ByRef db As DAO.Database)
     Call PridajStlpec(db, "CiselnikPreruseni", "VyzadujeSchvalenie", "YESNO")
     Call PridajStlpec(db, "CiselnikPreruseni", "LenCelyDen", "YESNO")
     Call PridajStlpec(db, "CiselnikPreruseni", "NezapocitavatInterval", "YESNO")
+    ' vlastnosti výpočtu prerušenia (kontrakt 1.5.0); prázdne = spoločná hranica celého dňa z nastavení a bez pripočítania k základu obeda
+    Call PridajStlpec(db, "CiselnikPreruseni", "PrahCelyDenMin", "LONG")
+    Call PridajStlpec(db, "CiselnikPreruseni", "DoZakladuObeda", "YESNO")
     Call PridajStlpec(db, "Sviatky", "Rok", "LONG")
 End Sub
 

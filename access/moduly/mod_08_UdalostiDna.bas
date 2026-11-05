@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_08_UdalostiDna"
-'@Verzia 1.5.0
+'@Verzia 1.5.1
 Option Compare Database
 Option Explicit
 
@@ -127,6 +127,7 @@ End Type
 Private mZaklad As TSada
 Private mSad(1 To 99) As TSada
 Private mSadHot(1 To 99) As Boolean
+Private mSadZlyhala(1 To 99) As Boolean     ' sadu režimu sa nepodarilo zostaviť (neplatný režim): nepokúšať sa znova, kým sa cache nezahodí
 
 '-------------------------------------------------------------------------------
 ' Zahodí cache parametrov (volať po zmene nastavení alebo pravidiel).
@@ -210,6 +211,7 @@ Private Sub NacitajParametre()
     ' základná sada (bez režimu); sady režimov sa zostavia pri prvom použití
     Call UlozDoSady(mZaklad)
     Erase mSadHot
+    Erase mSadZlyhala
     mRezim = 0
     mNacitane = True
 End Sub
@@ -278,7 +280,7 @@ Public Sub NastavRezimVypoctu(ByVal lRezim As Long)
         mRezim = 0
         Exit Sub
     End If
-    If Not mSadHot(lRezim) Then Call ZostavSaduRezimu(lRezim)
+    If Not mSadHot(lRezim) And Not mSadZlyhala(lRezim) Then Call ZostavSaduRezimu(lRezim)
     If mSadHot(lRezim) Then
         Call NacitajZSady(mSad(lRezim))
         mRezim = lRezim
@@ -302,6 +304,7 @@ Private Sub ZostavSaduRezimu(ByVal lRezim As Long)
     strChyba = mod_21_RezimyVypoctu.ChybaRezimu(db, lRezim)
     If Len(strChyba) > 0 Then
         Call mod_00_Common.ZapisLog("mod_08_UdalostiDna.ZostavSaduRezimu", "WARN", "Režim č. " & lRezim & " sa neuplatní: " & strChyba)
+        mSadZlyhala(lRezim) = True
         Exit Sub
     End If
     Call NacitajZSady(mZaklad)
@@ -345,6 +348,7 @@ Private Sub ZostavSaduRezimu(ByVal lRezim As Long)
 Chyba:
     Call mod_00_Common.ZapisLog("mod_08_UdalostiDna.ZostavSaduRezimu", "ERROR", "Režim č. " & lRezim & ": " & Err.Description)
     mSadHot(lRezim) = False
+    mSadZlyhala(lRezim) = True
     Call NacitajZSady(mZaklad)
 End Sub
 

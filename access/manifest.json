@@ -1,6 +1,6 @@
 {
   "balik": "2.17.0",
-  "vytvorene": "2026-11-05 20:12:13",
+  "vytvorene": "2026-11-05 20:13:38",
   "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
   "zrusene": [
     "modExportLovableConfig",
@@ -63,9 +63,9 @@
     },
     "mod_08_UdalostiDna": {
       "subor": "moduly/mod_08_UdalostiDna.bas",
-      "verzia": "1.5.0",
-      "sha256": "4292c601dd670164ab326161eb1aaaa24f90bf2a773d626da3a41a90b7b86b56",
-      "obsah_sha256": "ada3a4cef1fa0e1fb1b954a94f82f5e1f7c3982fa9365513b10583b24b7f3dd6"
+      "verzia": "1.5.1",
+      "sha256": "bab4a24dc6750b479a60ae7d83ffc1dcd85d44fae734439264ddf3f97a795c65",
+      "obsah_sha256": "8e2e93fe16411adcc0d68ab7d9dbee89e060eb202107fd01519bee0fc4ed7e1d"
     },
     "mod_09_AutoOprava": {
       "subor": "moduly/mod_09_AutoOprava.bas",

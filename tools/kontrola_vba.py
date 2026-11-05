@@ -14,7 +14,8 @@ Kontroluje (v zátvorke chyba, ktorú by Access hlásil):
   4. nesprávny počet argumentov pri volaní procedúry z balíka (Wrong number of arguments);
   5. argument odovzdaný ByRef s iným deklarovaným typom než parameter (ByRef argument type mismatch);
   6. nespárované bloky If / For / Do / With / Select / procedúry (Block If without End If, Next without For, ...);
-  7. súbor bez Option Explicit.
+  7. súbor bez Option Explicit;
+  8. znak mimo kódovej stránky Windows 1250 (inštalátor by modul odmietol).
 Nič nemení.
 """
 import argparse
@@ -212,6 +213,13 @@ def nacitaj_modul(cesta):
     mod = Modul(nazov, cesta)
     with open(cesta, "rb") as f:
         text = f.read().decode("utf-8-sig")
+    # inštalátor zapisuje kód do databázy v ANSI kódovej stránke Windows (na Slovensku 1250) a modul so znakom mimo nej odmietne
+    for no_r, rad in enumerate(text.split("\n"), 1):
+        try:
+            rad.encode("cp1250")
+        except UnicodeEncodeError as e:
+            zn = rad[e.start]
+            mod.chyby.append(Chyba("CHYBA", nazov, no_r, "znak U+%04X '%s' nie je v kódovej stránke Windows 1250, inštalátor modul odmietne (použite ASCII alebo znak z 1250)" % (ord(zn), zn)))
     riadky = logicke_riadky(text)
     cur = None
     v_enum = v_typ = False

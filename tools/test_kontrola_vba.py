@@ -199,6 +199,25 @@ End Function
         self.assertEqual(r, [])
 
 
+class Kodovanie(unittest.TestCase):
+    def test_znak_mimo_cp1250_je_chyba(self):
+        r = kontrola(m1="""
+Public Sub A()
+    MsgBox "a \u2192 b"
+End Sub
+""")
+        self.assertEqual(len(r), 1, r)
+        self.assertIn("1250", r[0])
+
+    def test_slovenske_znaky_a_uvodzovky_su_v_poriadku(self):
+        r = kontrola(m1="""
+Public Sub A()
+    MsgBox "Služobná cesta „x“ ľščťžýáíéúäôň"
+End Sub
+""")
+        self.assertEqual(r, [])
+
+
 class Balik(unittest.TestCase):
     def test_moduly_balika_prechadzaju_bez_nalezu(self):
         chyby, _ = kv.skontroluj(os.path.join(os.path.dirname(HERE), "access", "moduly"))

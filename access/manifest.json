@@ -1,6 +1,6 @@
 {
-  "balik": "2.14.1",
-  "vytvorene": "2026-11-05 13:39:31",
+  "balik": "2.14.2",
+  "vytvorene": "2026-11-05 14:49:29",
   "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
   "zrusene": [
     "modExportLovableConfig",
@@ -27,9 +27,9 @@
     },
     "mod_02_DBFImport": {
       "subor": "moduly/mod_02_DBFImport.bas",
-      "verzia": "2.6.0",
-      "sha256": "a833ddd299fa1dac70fde93c0119541412f1f3c8ce0f926fadbd1da34eef71df",
-      "obsah_sha256": "972ed90681d15b31d16ffb0d8b3773b561c68e42b907127368333c59fa388fb7"
+      "verzia": "2.7.0",
+      "sha256": "2c95bde29034cc032d6026785e5e4e85fdd4a70e93b66c1b25cd66620ce6876a",
+      "obsah_sha256": "a5f6ab7ac8f5896d9cc9faf2143d0984c8e0fdb87b8af982f47667000f8a2be2"
     },
     "mod_02a_DBFReader": {
       "subor": "moduly/mod_02a_DBFReader.bas",
@@ -123,9 +123,9 @@
     },
     "mod_18_Uzavierka": {
       "subor": "moduly/mod_18_Uzavierka.bas",
-      "verzia": "1.0.0",
-      "sha256": "4058349415cbfb113efb52817efc81ecfc62595d38aa68b47d2863671439a8c4",
-      "obsah_sha256": "99d751432420c9b0abcb6d4b49fec0bcd13516757a051106105bc8d78af37cdb"
+      "verzia": "1.0.1",
+      "sha256": "709b379b6ea328436d436ed179c063eaaa2502736918383dfd2baca8f9092189",
+      "obsah_sha256": "11c2a2673af821e8da02c324ec11aa3853725bcb874d0b863d9922a0065cee68"
     },
     "mod_19_TerminalImport": {
       "subor": "moduly/mod_19_TerminalImport.bas",

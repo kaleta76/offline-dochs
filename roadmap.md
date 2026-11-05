@@ -1,4 +1,6 @@
 # Roadmap
+- [x] Dynamické tlačidlá terminálu podľa Accessu, predvolené tlačidlá a offline záloha; zachovaná fronta razení, 134 testov
+- [ ] Prihlásené overenie dynamických tlačidiel v živej evidencii — automatické prihlásenie nie je dostupné pre účet vlastníka
 - [ ] Osobné číslo pri registrácii, unikátnosť a schvaľované zmeny
 - [ ] Obnova hesla e-mailom alebo správcom; osobné číslo a dočasný PIN
 - [ ] Voliteľné e-mailové upozornenia vedúcich

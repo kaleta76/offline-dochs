@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -43,6 +44,7 @@ function friendly(message: string): string {
 }
 
 export function AccessConfigImport() {
+  const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const seq = useRef(0); // číta sa len naposledy vybraný súbor
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -112,6 +114,7 @@ export function AccessConfigImport() {
         return;
       }
       setDone(result);
+      void queryClient.invalidateQueries({ queryKey: ["terminal-buttons"] });
       reset(true);
       if (fileRef.current) fileRef.current.value = "";
     } catch (error) {

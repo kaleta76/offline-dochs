@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_08_UdalostiDna"
-'@Verzia 1.4.1
+'@Verzia 1.5.0
 Option Compare Database
 Option Explicit
 
@@ -100,6 +100,33 @@ Private mZaokrPrichod As Long     ' krok zaokrúhlenia prvého príchodu dňa (m
 Private mZaokrOdchod As Long      ' krok zaokrúhlenia posledného odchodu dňa (min, 0 = nezaokrúhľuje)
 Private mZaokrSmer As Long        ' 0 príchod nahor a odchod nadol, 1 oba nahor, 2 oba nadol, 3 najbližší
 Private mNezapocitane As Object   ' čísla prerušení, ktorých interval sa nezapočíta (príznak NezapocitavatInterval)
+Private mPrahPrer As Object       ' číslo prerušenia -> vlastná hranica celého dňa v minútach (kontrakt full_day_min)
+Private mDoZakladu As Object      ' čísla prerušení, ktorých započítaný čas sa pripočíta k základu pre prah obeda (counts_to_lunch_base)
+Private mPrepisy As Object        ' pravidlá prepísané režimom (kontraktový kľúč -> hodnota); číta ich, kto ich používa mimo tohto modulu
+Private mRezim As Long            ' režim výpočtu platný pre aktuálny deň (0 = bez režimu, platia základné nastavenia)
+
+' Sada hodnôt, ktoré sa dajú v režime prepísať. Základná sada (bez režimu) a sady režimov sa držia vo vyrovnávacej pamäti;
+' modulové premenné vyššie vždy obsahujú sadu platnú pre aktuálny kontext (NastavRezimVypoctu), takže výpočet dňa ostáva rovnaký.
+Private Type TSada
+    OknoOd As Long
+    OknoDo As Long
+    ObedMin As Long
+    ObedLimit As Long
+    ObedAktivny As Boolean
+    Celodenna As Long
+    ObedRezim As Long
+    ObedMinZazn As Long
+    ZaokrPrichod As Long
+    ZaokrOdchod As Long
+    ZaokrSmer As Long
+    Nezapocitane As Object
+    PrahPrer As Object
+    DoZakladu As Object
+    Prepisy As Object
+End Type
+Private mZaklad As TSada
+Private mSad(1 To 99) As TSada
+Private mSadHot(1 To 99) As Boolean
 
 '-------------------------------------------------------------------------------
 ' Zahodí cache parametrov (volať po zmene nastavení alebo pravidiel).
@@ -156,8 +183,214 @@ Private Sub NacitajParametre()
             rsN.Close
         End If
     End If
+
+    ' vlastnosti prerušení z číselníka (kontrakt 1.5.0); bez stĺpca alebo bez nastavenia sú slovníky prázdne = doterajšie správanie
+    Set mPrahPrer = CreateObject("Scripting.Dictionary")
+    Set mDoZakladu = CreateObject("Scripting.Dictionary")
+    Set mPrepisy = CreateObject("Scripting.Dictionary")
+    If mod_00_Common.TabulkaExistujeDB(db, "CiselnikPreruseni") Then
+        If mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "PrahCelyDenMin") Then
+            Set rsN = db.OpenRecordset("SELECT Cislo, PrahCelyDenMin FROM CiselnikPreruseni WHERE PrahCelyDenMin >= 1 AND PrahCelyDenMin <= 1440 AND Cislo <> 1 AND Cislo <> 7;", dbOpenSnapshot)
+            Do While Not rsN.EOF
+                mPrahPrer(CLng(rsN!Cislo)) = CLng(rsN!PrahCelyDenMin)
+                rsN.MoveNext
+            Loop
+            rsN.Close
+        End If
+        If mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "DoZakladuObeda") Then
+            Set rsN = db.OpenRecordset("SELECT Cislo FROM CiselnikPreruseni WHERE DoZakladuObeda = True AND Cislo <> 1 AND Cislo <> 7;", dbOpenSnapshot)
+            Do While Not rsN.EOF
+                mDoZakladu(CLng(rsN!Cislo)) = True
+                rsN.MoveNext
+            Loop
+            rsN.Close
+        End If
+    End If
+
+    ' základná sada (bez režimu); sady režimov sa zostavia pri prvom použití
+    Call UlozDoSady(mZaklad)
+    Erase mSadHot
+    mRezim = 0
     mNacitane = True
 End Sub
+
+'-------------------------------------------------------------------------------
+' Kópia hodnôt medzi modulovými premennými a sadou (objekty sa len odovzdajú; sady ich nemenia, režim si vytvorí vlastné kópie).
+'-------------------------------------------------------------------------------
+Private Sub UlozDoSady(ByRef s As TSada)
+    s.OknoOd = mOknoOd
+    s.OknoDo = mOknoDo
+    s.ObedMin = mObedMin
+    s.ObedLimit = mObedLimit
+    s.ObedAktivny = mObedAktivny
+    s.Celodenna = mCelodenna
+    s.ObedRezim = mObedRezim
+    s.ObedMinZazn = mObedMinZazn
+    s.ZaokrPrichod = mZaokrPrichod
+    s.ZaokrOdchod = mZaokrOdchod
+    s.ZaokrSmer = mZaokrSmer
+    Set s.Nezapocitane = mNezapocitane
+    Set s.PrahPrer = mPrahPrer
+    Set s.DoZakladu = mDoZakladu
+    Set s.Prepisy = mPrepisy
+End Sub
+
+Private Sub NacitajZSady(ByRef s As TSada)
+    mOknoOd = s.OknoOd
+    mOknoDo = s.OknoDo
+    mObedMin = s.ObedMin
+    mObedLimit = s.ObedLimit
+    mObedAktivny = s.ObedAktivny
+    mCelodenna = s.Celodenna
+    mObedRezim = s.ObedRezim
+    mObedMinZazn = s.ObedMinZazn
+    mZaokrPrichod = s.ZaokrPrichod
+    mZaokrOdchod = s.ZaokrOdchod
+    mZaokrSmer = s.ZaokrSmer
+    Set mNezapocitane = s.Nezapocitane
+    Set mPrahPrer = s.PrahPrer
+    Set mDoZakladu = s.DoZakladu
+    Set mPrepisy = s.Prepisy
+End Sub
+
+Private Function KopiaSlovnika(ByVal d As Object) As Object
+    Dim k As Variant, n As Object
+    Set n = CreateObject("Scripting.Dictionary")
+    If Not d Is Nothing Then
+        For Each k In d.Keys
+            n(k) = d(k)
+        Next k
+    End If
+    Set KopiaSlovnika = n
+End Function
+
+'-------------------------------------------------------------------------------
+' Režim výpočtu pre nasledujúce výpočty (kontrakt 1.5.0): 0 = základné nastavenia, inak sada základných nastavení s pravidlami
+' a úpravami prerušení z režimu (mod_21_RezimyVypoctu). Volať pred výpočtom každého dňa zamestnanca a po skončení cyklu vrátiť 0,
+' lebo ostatný kód (prehľady, export) číta základné nastavenia. Neexistujúci alebo neplatný režim sa neuplatní (zapíše sa do protokolu).
+'-------------------------------------------------------------------------------
+Public Sub NastavRezimVypoctu(ByVal lRezim As Long)
+    Call NacitajParametre
+    If lRezim < 1 Or lRezim > 99 Then lRezim = 0
+    If lRezim = mRezim Then Exit Sub
+    If lRezim = 0 Then
+        Call NacitajZSady(mZaklad)
+        mRezim = 0
+        Exit Sub
+    End If
+    If Not mSadHot(lRezim) Then Call ZostavSaduRezimu(lRezim)
+    If mSadHot(lRezim) Then
+        Call NacitajZSady(mSad(lRezim))
+        mRezim = lRezim
+    Else
+        Call NacitajZSady(mZaklad)
+        mRezim = 0
+    End If
+End Sub
+
+Public Function AktualnyRezim() As Long
+    AktualnyRezim = mRezim
+End Function
+
+'-------------------------------------------------------------------------------
+' Zostaví a uloží sadu režimu: základná sada s prepísanými pravidlami a úpravami prerušení. Pri chybe režimu sadu neuloží.
+'-------------------------------------------------------------------------------
+Private Sub ZostavSaduRezimu(ByVal lRezim As Long)
+    Dim db As DAO.Database, rs As DAO.Recordset, strChyba As String, lC As Long, strTyp As String
+    On Error GoTo Chyba
+    Set db = CurrentDb
+    strChyba = mod_21_RezimyVypoctu.ChybaRezimu(db, lRezim)
+    If Len(strChyba) > 0 Then
+        Call mod_00_Common.ZapisLog("mod_08_UdalostiDna.ZostavSaduRezimu", "WARN", "Režim č. " & lRezim & " sa neuplatní: " & strChyba)
+        Exit Sub
+    End If
+    Call NacitajZSady(mZaklad)
+    Set mNezapocitane = KopiaSlovnika(mZaklad.Nezapocitane)
+    Set mPrahPrer = KopiaSlovnika(mZaklad.PrahPrer)
+    Set mDoZakladu = KopiaSlovnika(mZaklad.DoZakladu)
+    Set mPrepisy = CreateObject("Scripting.Dictionary")
+
+    Set rs = db.OpenRecordset("SELECT Kluc, Hodnota FROM RezimyPravidla WHERE RezimID = " & lRezim & ";", dbOpenSnapshot)
+    Do While Not rs.EOF
+        Call PouziPravidloRezimu(CStr(rs!Kluc), CLng(rs!Hodnota))
+        rs.MoveNext
+    Loop
+    rs.Close
+
+    Set rs = db.OpenRecordset("SELECT CisloPreruseni, TypVypoctu, PrahCelyDenMin, DoZakladuObeda FROM RezimyPreruseni WHERE RezimID = " & lRezim & ";", dbOpenSnapshot)
+    Do While Not rs.EOF
+        lC = CLng(rs!CisloPreruseni)
+        strTyp = CStr(Nz(rs!TypVypoctu, ""))
+        If strTyp = "UNPAID" Then
+            mNezapocitane(lC) = True
+        ElseIf strTyp = "COUNTED" Then
+            If mNezapocitane.Exists(lC) Then mNezapocitane.Remove lC
+        End If
+        If Not IsNull(rs!PrahCelyDenMin) Then mPrahPrer(lC) = CLng(rs!PrahCelyDenMin)
+        If Not IsNull(rs!DoZakladuObeda) Then
+            If CLng(rs!DoZakladuObeda) = 1 Then
+                mDoZakladu(lC) = True
+            ElseIf mDoZakladu.Exists(lC) Then
+                mDoZakladu.Remove lC
+            End If
+        End If
+        rs.MoveNext
+    Loop
+    rs.Close
+
+    Call UlozDoSady(mSad(lRezim))
+    mSadHot(lRezim) = True
+    Call NacitajZSady(mZaklad)
+    Exit Sub
+Chyba:
+    Call mod_00_Common.ZapisLog("mod_08_UdalostiDna.ZostavSaduRezimu", "ERROR", "Režim č. " & lRezim & ": " & Err.Description)
+    mSadHot(lRezim) = False
+    Call NacitajZSady(mZaklad)
+End Sub
+
+'-------------------------------------------------------------------------------
+' Prepíše jednu hodnotu v modulových premenných podľa kontraktového kľúča pravidla.
+' Pravidlá, ktoré tento modul nepoužíva (automatické opravy, odchod bez dôvodu), ostanú len v mPrepisy.
+'-------------------------------------------------------------------------------
+Private Sub PouziPravidloRezimu(ByVal strKluc As String, ByVal l As Long)
+    Select Case strKluc
+        Case "work_window_start_min"
+            mOknoOd = l
+        Case "work_window_end_min"
+            mOknoDo = l
+        Case "full_day_obstacle_min"
+            mCelodenna = l
+        Case "auto_lunch_enabled"
+            mObedAktivny = (l <> 0)
+        Case "auto_lunch_trigger_min"
+            mObedLimit = l
+        Case "auto_lunch_deduct_min"
+            mObedMin = l
+        Case "lunch_recorded_mode"
+            mObedRezim = l
+        Case "lunch_min_min"
+            mObedMinZazn = l
+        Case "rounding_in_min"
+            mZaokrPrichod = l
+        Case "rounding_out_min"
+            mZaokrOdchod = l
+        Case "rounding_mode"
+            mZaokrSmer = l
+    End Select
+    mPrepisy(strKluc) = l
+End Sub
+
+'-------------------------------------------------------------------------------
+' Je pravidlo prepísané režimom platným pre aktuálny deň? Ak áno, vráti True a hodnotu v lHodnota (pre kód mimo tohto modulu).
+'-------------------------------------------------------------------------------
+Public Function RezimPrepisuje(ByVal strKluc As String, ByRef lHodnota As Long) As Boolean
+    Call NacitajParametre
+    If mPrepisy Is Nothing Then Exit Function
+    If mPrepisy.Exists(strKluc) Then
+        lHodnota = CLng(mPrepisy(strKluc))
+        RezimPrepisuje = True
+    End If
+End Function
 
 '-------------------------------------------------------------------------------
 ' Interval tohto prerušenia sa nezapočíta ani do práce, ani do prekážok dňa (neplatený odchod, kontrakt calc UNPAID).
@@ -166,6 +399,29 @@ Public Function JeNezapocitavane(ByVal lCislo As Long) As Boolean
     Call NacitajParametre
     If mNezapocitane Is Nothing Then Exit Function
     JeNezapocitavane = mNezapocitane.Exists(lCislo)
+End Function
+
+'-------------------------------------------------------------------------------
+' Od akej dĺžky jedného intervalu prerušenia sa započíta celý denný fond: vlastná hranica prerušenia (alebo režimu), inak spoločná.
+'-------------------------------------------------------------------------------
+Public Function PrmPrahPrerusenia(ByVal lCislo As Long) As Long
+    Call NacitajParametre
+    If Not mPrahPrer Is Nothing Then
+        If mPrahPrer.Exists(lCislo) Then
+            PrmPrahPrerusenia = CLng(mPrahPrer(lCislo))
+            Exit Function
+        End If
+    End If
+    PrmPrahPrerusenia = mCelodenna
+End Function
+
+'-------------------------------------------------------------------------------
+' Pripočíta sa započítaný čas tohto prerušenia k základu pre prah obeda (counts_to_lunch_base)?
+'-------------------------------------------------------------------------------
+Public Function JeDoZakladuObeda(ByVal lCislo As Long) As Boolean
+    Call NacitajParametre
+    If mDoZakladu Is Nothing Then Exit Function
+    JeDoZakladuObeda = mDoZakladu.Exists(lCislo)
 End Function
 
 Public Function PrmOknoOd() As Long
@@ -522,7 +778,7 @@ Public Function TrvanieIntervalu(ByVal lCislo As Long, ByVal lZ As Long, ByVal l
         TrvanieIntervalu = 0
     Else
         t = lK - lZ
-        If t >= PrmCelodennaPrekazka() Then t = lFond
+        If t >= PrmPrahPrerusenia(lCislo) Then t = lFond
         TrvanieIntervalu = t
     End If
 End Function
@@ -531,7 +787,7 @@ End Function
 ' Súčty dňa podľa pravidiel enginu: odpracované (po odpočte auto-obeda) a započítané prekážky.
 '-------------------------------------------------------------------------------
 Public Sub SumarDna(ByRef r As TVysledokDna, ByVal lFond As Long, ByRef lOdpr As Long, ByRef lPrek As Long)
-    Dim i As Long, bObed As Boolean, lObedSkut As Long
+    Dim i As Long, bObed As Boolean, lObedSkut As Long, lT As Long, lPrekZakl As Long, lZaklad As Long
     lOdpr = 0: lPrek = 0
     For i = 1 To r.nIv
         Select Case r.Iv(i).Cislo
@@ -541,17 +797,25 @@ Public Sub SumarDna(ByRef r As TVysledokDna, ByVal lFond As Long, ByRef lOdpr As
                 bObed = True
                 If r.Iv(i).Kon > r.Iv(i).Zac Then lObedSkut = lObedSkut + (r.Iv(i).Kon - r.Iv(i).Zac)
             Case Else
-                lPrek = lPrek + TrvanieIntervalu(r.Iv(i).Cislo, r.Iv(i).Zac, r.Iv(i).Kon, lFond)
+                lT = TrvanieIntervalu(r.Iv(i).Cislo, r.Iv(i).Zac, r.Iv(i).Kon, lFond)
+                lPrek = lPrek + lT
+                If JeDoZakladuObeda(r.Iv(i).Cislo) Then lPrekZakl = lPrekZakl + lT
         End Select
     Next i
     Call NacitajParametre
+    ' Základ pre prah obeda: odpracovaný čas a započítaný čas prerušení s príznakom "do základu obeda" (kontrakt counts_to_lunch_base).
+    ' Bez takého prerušenia je základ rovný odpracovanému času, ako doteraz.
+    lZaklad = lOdpr + lPrekZakl
     ' Prah (parameter Obed od) platí od uvedenej hodnoty vrátane: pri 360 min už 6:00 práce obed zahŕňa, 5:59 ešte nie.
-    If mObedAktivny And lFond > 0 And lOdpr >= mObedLimit And Not bObed Then lOdpr = lOdpr - mObedMin
+    If mObedAktivny And lFond > 0 And lZaklad >= mObedLimit And Not bObed Then
+        lOdpr = lOdpr - mObedMin
+        If lOdpr < 0 And lPrekZakl > 0 Then lOdpr = 0
+    End If
     ' razený obed (kontrakt lunch_recorded_mode): 0 = skutočný čas (obed nie je práca, nič sa neupravuje),
     ' 1 = najmenej mObedMinZazn (kratší obed sa dorovná odpočtom), 2 = vždy presne mObedMinZazn.
     ' Upravuje sa len deň, v ktorom práca spolu s obedom dosiahne ten istý prah ako automatický obed
     ' (kratšia zmena na prestávku nárok nemá, taký obed sa počíta skutočným časom).
-    If bObed And mObedRezim > 0 And (lOdpr + lObedSkut) >= mObedLimit Then
+    If bObed And mObedRezim > 0 And (lZaklad + lObedSkut) >= mObedLimit Then
         If mObedRezim = 1 Then
             If lObedSkut < mObedMinZazn Then lOdpr = lOdpr - (mObedMinZazn - lObedSkut)
         Else

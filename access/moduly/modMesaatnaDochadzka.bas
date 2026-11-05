@@ -1,5 +1,5 @@
 Attribute VB_Name = "modMesaatnaDochadzka"
-'@Verzia 2.8.0
+'@Verzia 2.9.0
 Option Compare Database
 Option Explicit
 
@@ -85,10 +85,11 @@ Private Sub GenerujDniAIntervaly(ByRef db As DAO.Database, ByVal strOC As String
     Dim r As TVysledokDna, k As TKontextMesiaca
     Dim rsIv As DAO.Recordset, rsDni As DAO.Recordset
     Dim dDen As Date, lFond As Long, lOdpr As Long, lPrek As Long, lSpolu As Long, lSaldo As Long, lPrieb As Long
-    Dim strAn As String, bAuto As Boolean, bMaAuto As Boolean, bMaAnom As Boolean
+    Dim strAn As String, bAuto As Boolean, bMaAuto As Boolean, bMaAnom As Boolean, lRez() As Long
 
     n = mod_08_UdalostiDna.NacitajUdalosti(db, strOC, DateSerial(iRok, iMesiac, 1), DateSerial(iRok, iMesiac + 1, 1), u)
     Call mod_08_UdalostiDna.NacitajKontextMesiaca(db, strOC, iRok, iMesiac, k)
+    Call mod_21_RezimyVypoctu.RezimyMesiaca(db, strOC, iRok, iMesiac, lRez)      ' režim výpočtu pre každý deň mesiaca (0 = bez režimu)
 
     Set rsIv = db.OpenRecordset("SELECT * FROM DochadzkaIntervaly WHERE ID = 0;", dbOpenDynaset, dbAppendOnly)
     Set rsDni = db.OpenRecordset("SELECT * FROM DochadzkaDni WHERE ID = 0;", dbOpenDynaset, dbAppendOnly)
@@ -99,6 +100,7 @@ Private Sub GenerujDniAIntervaly(ByRef db As DAO.Database, ByVal strOC As String
     For iDen = 1 To k.PocetDni
         dDen = DateSerial(iRok, iMesiac, iDen)
         lFond = k.Fond(iDen)
+        Call mod_08_UdalostiDna.NastavRezimVypoctu(lRez(iDen))     ' pravidlá a úpravy prerušení platné v tento deň
         Do While i <= n
             If u(i).Datum < dDen Then
                 i = i + 1
@@ -153,9 +155,11 @@ Private Sub GenerujDniAIntervaly(ByRef db As DAO.Database, ByVal strOC As String
         rsDni.Update
     Next iDen
 
+    Call mod_08_UdalostiDna.NastavRezimVypoctu(0)
     rsIv.Close: rsDni.Close
     Exit Sub
 Err_Handler:
+    Call mod_08_UdalostiDna.NastavRezimVypoctu(0)
     Call ZapisChybuDoTabulky("GenerujDniAIntervaly", Err.Number, Err.Description, "OsobneCislo=" & strOC)
 End Sub
 

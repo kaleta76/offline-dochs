@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_Tab_Prerusenia"
-'@Verzia 2.9.0
+'@Verzia 2.10.0
 Option Compare Database
 Option Explicit
 
@@ -50,9 +50,9 @@ Public Sub BuildUI(ByVal strFrmName As String, ByVal strPageName As String)
 
     Set ctl = CreateControl(strFrmName, acListBox, acDetail, strPageName, "", 500, 1450, 5600, 2500)
     ctl.Name = "lstPrerusenia"
-    ctl.ColumnCount = 6
+    ctl.ColumnCount = 7
     ctl.ColumnHeads = True
-    ctl.ColumnWidths = "500;2000;900;700;700;700"
+    ctl.ColumnWidths = "500;1500;900;700;700;700;500"
     ctl.BoundColumn = 1
     ctl.RowSourceType = "Table/Query"
     ctl.AfterUpdate = "=PrerusenieVyberUI()"
@@ -91,42 +91,77 @@ Public Sub BuildUI(ByVal strFrmName As String, ByVal strPageName As String)
     Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 5050, 9500, 300)
     ctl.Name = "lblPrerStav": ctl.Caption = "": ctl.ForeColor = RGB(100, 100, 100): ctl.FontSize = 8
 
-    ' --- 2. SEKCIA: PARAMETRE VÝPOČTU ---
+    ' --- 1b. TLAČIDLO A PRÍZNAKY PRE TERMINÁL (pre prerušenie vybrané vyššie; ukladá ich tlačidlo Uložiť) ---
     Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 5450, 9500, 300)
+    ctl.Caption = "Tlačidlo a príznaky pre terminál (platia pre prerušenie vybrané hore; uloží ich tlačidlo Uložiť)"
+    ctl.FontBold = True: ctl.FontSize = 9: ctl.ForeColor = RGB(15, 30, 90)
+
+    Set ctl = CreateControl(strFrmName, acCheckBox, acDetail, strPageName, "", 500, 5830, 300, 300)
+    ctl.Name = "chkPrerTlacidlo"
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 850, 5820, 4300, 400)
+    ctl.Caption = "Tlačidlo v termináli (dôvod odchodu; Príchod a Odchod sú vždy)": ctl.FontSize = 8
+    Call Pole(strFrmName, strPageName, 500, 6200, "Text tlačidla:", "txtPrerTlacText", 2400)
+    Call Pole(strFrmName, strPageName, 500, 6600, "Poradie 1-99:", "txtPrerTlacPoradie", 700)
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 7040, 1300, 280)
+    ctl.Caption = "Ikona:"
+    Set ctl = CreateControl(strFrmName, acComboBox, acDetail, strPageName, "", 1800, 7000, 1900, 320)
+    ctl.Name = "cboPrerIkona"
+    ctl.RowSourceType = "Value List"
+    ctl.RowSource = "doctor;family;trip;errand;private;lunch;home;other"
+
+    Set ctl = CreateControl(strFrmName, acCheckBox, acDetail, strPageName, "", 5300, 5830, 300, 300)
+    ctl.Name = "chkPrerZiadost"
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 5650, 5820, 4350, 400)
+    ctl.Caption = "Zamestnanec môže požiadať vopred (žiadosť v termináli)": ctl.FontSize = 8
+    Set ctl = CreateControl(strFrmName, acCheckBox, acDetail, strPageName, "", 5300, 6230, 300, 300)
+    ctl.Name = "chkPrerSchvalenie"
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 5650, 6220, 4350, 400)
+    ctl.Caption = "Deň s týmto dôvodom schvaľuje vedúci": ctl.FontSize = 8
+    Set ctl = CreateControl(strFrmName, acCheckBox, acDetail, strPageName, "", 5300, 6630, 300, 300)
+    ctl.Name = "chkPrerCelyDen"
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 5650, 6620, 4350, 400)
+    ctl.Caption = "Len na celý deň (dovolenka, PN), bez tlačidla": ctl.FontSize = 8
+    Set ctl = CreateControl(strFrmName, acCheckBox, acDetail, strPageName, "", 5300, 7030, 300, 300)
+    ctl.Name = "chkPrerNezapocitat"
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 5650, 7020, 4350, 400)
+    ctl.Caption = "Interval sa nezapočíta do práce (neplatený odchod)": ctl.FontSize = 8
+
+    ' --- 2. SEKCIA: PARAMETRE VÝPOČTU ---
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 7550, 9500, 300)
     ctl.Caption = "2. Parametre výpočtu odpracovaného času"
     ctl.FontBold = True: ctl.FontSize = 10: ctl.ForeColor = RGB(15, 30, 90)
 
-    Call Pole(strFrmName, strPageName, 500, 5800, "Okno práce od:", "txtOknoOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 5800, "do:", "txtOknoDo", 800)
-    Call Pole(strFrmName, strPageName, 5500, 5800, "Obed (min):", "txtParObedMin", 700)
-    Call Pole(strFrmName, strPageName, 500, 6200, "Obed od (min):", "txtParObedLimit", 800)
-    Call Pole(strFrmName, strPageName, 3000, 6200, "Celodenná:", "txtParCelodenna", 800)
+    Call Pole(strFrmName, strPageName, 500, 7900, "Okno práce od:", "txtOknoOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 7900, "do:", "txtOknoDo", 800)
+    Call Pole(strFrmName, strPageName, 5500, 7900, "Obed (min):", "txtParObedMin", 700)
+    Call Pole(strFrmName, strPageName, 500, 8300, "Obed od (min):", "txtParObedLimit", 800)
+    Call Pole(strFrmName, strPageName, 3000, 8300, "Celodenná:", "txtParCelodenna", 800)
 
-    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 5500, 6200, 4500, 300)
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 5500, 8300, 4500, 300)
     ctl.Caption = "(obed sa odpočíta, ak práca > limit a nebol pípnutý)": ctl.FontSize = 8: ctl.ForeColor = RGB(100, 100, 100)
 
-    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 7500, 5750, 2500, 420)
+    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 7500, 7850, 2500, 420)
     btn.Name = "btnUlozParametre": btn.Caption = "Uložiť parametre": btn.FontBold = True: btn.ForeColor = RGB(0, 100, 0)
     btn.OnClick = "=UlozParametreVypoctuUI()"
 
     ' --- 3. SEKCIA: ČASOVÝ PROFIL STREDISKA ---
-    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 6800, 9500, 300)
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 8900, 9500, 300)
     ctl.Caption = "3. Časový profil strediska (pružný čas a obedné okno)"
     ctl.FontBold = True: ctl.FontSize = 10: ctl.ForeColor = RGB(15, 30, 90)
 
-    Call Pole(strFrmName, strPageName, 500, 7150, "Základný čas od:", "txtZaklOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 7150, "do:", "txtZaklDo", 800)
-    Call Pole(strFrmName, strPageName, 500, 7550, "Pružný ráno od:", "txtVolRanoOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 7550, "do:", "txtVolRanoDo", 800)
-    Call Pole(strFrmName, strPageName, 500, 7950, "Pružný popol. od:", "txtVolPoobOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 7950, "do:", "txtVolPoobDo", 800)
-    Call Pole(strFrmName, strPageName, 500, 8350, "Služ. cesta od:", "txtSlceOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 8350, "do:", "txtSlceDo", 800)
-    Call Pole(strFrmName, strPageName, 500, 8750, "Obedné okno od:", "txtObedOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 8750, "do:", "txtObedDo", 800)
-    Call Pole(strFrmName, strPageName, 5500, 8750, "Trvanie (min):", "txtObedMin", 700)
+    Call Pole(strFrmName, strPageName, 500, 9250, "Základný čas od:", "txtZaklOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 9250, "do:", "txtZaklDo", 800)
+    Call Pole(strFrmName, strPageName, 500, 9650, "Pružný ráno od:", "txtVolRanoOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 9650, "do:", "txtVolRanoDo", 800)
+    Call Pole(strFrmName, strPageName, 500, 10050, "Pružný popol. od:", "txtVolPoobOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 10050, "do:", "txtVolPoobDo", 800)
+    Call Pole(strFrmName, strPageName, 500, 10450, "Služ. cesta od:", "txtSlceOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 10450, "do:", "txtSlceDo", 800)
+    Call Pole(strFrmName, strPageName, 500, 10850, "Obedné okno od:", "txtObedOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 10850, "do:", "txtObedDo", 800)
+    Call Pole(strFrmName, strPageName, 5500, 10850, "Trvanie (min):", "txtObedMin", 700)
 
-    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 500, 9350, 4600, 450)
+    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 500, 11450, 4600, 450)
     btn.Name = "btnUlozitOU"
     btn.Caption = "Uložiť časový profil strediska"
     btn.FontBold = True: btn.ForeColor = RGB(0, 100, 0)
@@ -215,6 +250,7 @@ Public Function PrerusenieVyberUI() As Boolean
     Dim frm As Form, rs As DAO.Recordset
     Set frm = Forms!frmHlavnaKonzola
     If IsNull(frm!lstPrerusenia.Value) Then Exit Function
+    Call mod_10_Konfiguracia.ZabezpecStlpceKonfiguracie(CurrentDb)
     Set rs = CurrentDb.OpenRecordset("SELECT * FROM CiselnikPreruseni WHERE Cislo = " & CLng(frm!lstPrerusenia.Value) & ";", dbOpenSnapshot)
     If Not rs.EOF Then
         frm!txtPrerCislo = rs!Cislo
@@ -223,6 +259,7 @@ Public Function PrerusenieVyberUI() As Boolean
         frm!txtPrerKodZ = rs!KodZaciatok
         frm!txtPrerKodK = rs!KodKoniec
         frm!chkPrerAutoKoniec = CBool(Nz(rs!AutoKoniecDoKoncaSmeny, False))
+        Call NacitajPriznaky(frm, rs)
     End If
     rs.Close
     PrerusenieVyberUI = True
@@ -244,7 +281,55 @@ Public Function PrerusenieNoveUI() As Boolean
     frm!txtPrerKodZ = lK
     frm!txtPrerKodK = lK + 1
     frm!chkPrerAutoKoniec = False
+    Call VycistiPriznaky(frm)
     PrerusenieNoveUI = True
+End Function
+
+'-------------------------------------------------------------------------------
+' Tlačidlo a príznaky pre terminál (karta 5, blok "Tlačidlo a príznaky pre terminál")
+'-------------------------------------------------------------------------------
+Private Sub VycistiPriznaky(ByRef frm As Form)
+    On Error Resume Next
+    frm!chkPrerTlacidlo = False
+    frm!txtPrerTlacText = Null
+    frm!txtPrerTlacPoradie = Null
+    frm!cboPrerIkona = Null
+    frm!chkPrerZiadost = False
+    frm!chkPrerSchvalenie = False
+    frm!chkPrerCelyDen = False
+    frm!chkPrerNezapocitat = False
+End Sub
+
+Private Sub NacitajPriznaky(ByRef frm As Form, ByRef rs As DAO.Recordset)
+    On Error Resume Next
+    Dim strIkona As String, strTlacText As String, lPoradie As Long
+    strIkona = CStr(Nz(rs!TerminalIkona, ""))
+    strTlacText = CStr(Nz(rs!TerminalText, ""))
+    lPoradie = CLng(Nz(rs!TerminalPoradie, 0))
+    frm!chkPrerTlacidlo = CBool(Nz(rs!TerminalTlacidlo, False))
+    If Len(strTlacText) > 0 Then frm!txtPrerTlacText = strTlacText Else frm!txtPrerTlacText = Null
+    If lPoradie > 0 Then frm!txtPrerTlacPoradie = lPoradie Else frm!txtPrerTlacPoradie = Null
+    If Len(strIkona) > 0 Then frm!cboPrerIkona = strIkona Else frm!cboPrerIkona = Null
+    frm!chkPrerZiadost = CBool(Nz(rs!TerminalZiadost, False))
+    frm!chkPrerSchvalenie = CBool(Nz(rs!VyzadujeSchvalenie, False))
+    frm!chkPrerCelyDen = CBool(Nz(rs!LenCelyDen, False))
+    frm!chkPrerNezapocitat = CBool(Nz(rs!NezapocitavatInterval, False))
+End Sub
+
+' Skontroluje príznaky z formulára (bez zápisu). Vráti chybovú správu, prázdna = v poriadku.
+Private Function KontrolaPriznakovZFormulara(ByRef frm As Form) As String
+    KontrolaPriznakovZFormulara = mod_10_Konfiguracia.ChybaPriznakov(CLng(Val(Nz(frm!txtPrerCislo, 0))), CBool(Nz(frm!chkPrerTlacidlo, False)), _
+        CStr(Nz(frm!txtPrerTlacText, "")), CLng(Val(Nz(frm!txtPrerTlacPoradie, 0))), CStr(Nz(frm!cboPrerIkona, "")), _
+        CBool(Nz(frm!chkPrerZiadost, False)), CBool(Nz(frm!chkPrerSchvalenie, False)), CBool(Nz(frm!chkPrerCelyDen, False)), _
+        CBool(Nz(frm!chkPrerNezapocitat, False)))
+End Function
+
+' Uloží príznaky z formulára k už uloženému prerušeniu. Vráti chybovú správu, prázdna = OK.
+Private Function UlozPriznakyZFormulara(ByRef frm As Form) As String
+    UlozPriznakyZFormulara = mod_10_Konfiguracia.UlozPriznakyPrerusenia(CLng(Val(Nz(frm!txtPrerCislo, 0))), CBool(Nz(frm!chkPrerTlacidlo, False)), _
+        CStr(Nz(frm!txtPrerTlacText, "")), CLng(Val(Nz(frm!txtPrerTlacPoradie, 0))), CStr(Nz(frm!cboPrerIkona, "")), _
+        CBool(Nz(frm!chkPrerZiadost, False)), CBool(Nz(frm!chkPrerSchvalenie, False)), CBool(Nz(frm!chkPrerCelyDen, False)), _
+        CBool(Nz(frm!chkPrerNezapocitat, False)))
 End Function
 
 Public Function PrerusenieUlozUI() As Boolean
@@ -255,10 +340,22 @@ Public Function PrerusenieUlozUI() As Boolean
         MsgBox "Číselník ešte neexistuje - najprv použite INICIALIZOVAŤ PREDVOLENÚ KONFIGURÁCIU.", vbExclamation, "Prerušenia"
         Exit Function
     End If
+    ' príznaky sa skontrolujú pred zápisom, aby chyba v nich nenechala prerušenie uložené len napoly
+    strErr = KontrolaPriznakovZFormulara(frm)
+    If Len(strErr) > 0 Then
+        MsgBox strErr, vbExclamation, "Prerušenia - tlačidlo a príznaky"
+        Exit Function
+    End If
     strErr = mod_10_Konfiguracia.UlozPrerusenie(CLng(Val(Nz(frm!txtPrerCislo, 0))), CStr(Nz(frm!txtPrerNazov, "")), CStr(Nz(frm!txtPrerSkratka, "")), _
                                                  CLng(Val(Nz(frm!txtPrerKodZ, 0))), CLng(Val(Nz(frm!txtPrerKodK, 0))), CBool(Nz(frm!chkPrerAutoKoniec, False)))
     If Len(strErr) > 0 Then
         MsgBox strErr, vbExclamation, "Prerušenia"
+        Exit Function
+    End If
+    strErr = UlozPriznakyZFormulara(frm)
+    If Len(strErr) > 0 Then
+        Call PrerusenieObnovUI
+        MsgBox "Prerušenie bolo uložené, ale tlačidlo a príznaky nie:" & vbCrLf & vbCrLf & strErr, vbExclamation, "Prerušenia - tlačidlo a príznaky"
         Exit Function
     End If
     Call PrerusenieObnovUI

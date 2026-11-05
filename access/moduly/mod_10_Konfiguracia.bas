@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_10_Konfiguracia"
-'@Verzia 1.1.0
+'@Verzia 1.2.0
 Option Compare Database
 Option Explicit
 
@@ -21,7 +21,13 @@ Option Explicit
 ' - StavKonfiguracie()                        : Textový prehľad stavu konfigurácie.
 ' - ZoznamPreruseniSQL()                       : SQL pre zoznam prerušení v UI.
 ' - UlozPrerusenie / ZmazPrerusenie            : Úprava jedného prerušenia a jeho kódov razení.
+' - UlozPriznakyPrerusenia(...)               : Tlačidlo terminálu a príznaky prerušenia (kontrakt 1.3.0 a 1.4.0), s kontrolou a kódom terminála.
+' - ChybaPriznakov(...) / ChybaTlacidiel(db)   : Kontrola príznakov jedného prerušenia a všetkých tlačidiel naraz (volá ju aj export).
+' - PlatnaIkona(ikona) / TextTlacidla(...)     : Zatvorený zoznam ikon a text tlačidla (vlastný text, inak názov prerušenia).
 '===============================================================================
+
+Public Const MAX_TLACIDIEL As Long = 12
+Public Const MAX_TEXT_TLACIDLA As Long = 24
 
 ' Predvolené prerušenia: Cislo|Nazov|Skratka|Predvolba|KodZ|TextZ|KodK|TextK|AutoKoniec(1/0)
 Private Function PredvolenePreruseniaDef() As Variant
@@ -87,6 +93,15 @@ End Sub
 Public Sub ZabezpecStlpceKonfiguracie(ByRef db As DAO.Database)
     Call PridajStlpec(db, "CiselnikPreruseni", "AutoKoniecDoKoncaSmeny", "YESNO")
     Call PridajStlpec(db, "CiselnikPreruseni", "ZapocitavatDoPrace", "YESNO")
+    ' tlačidlo terminálu a príznaky prerušenia (kontrakt 1.3.0 a 1.4.0); prázdne = doterajšie správanie
+    Call PridajStlpec(db, "CiselnikPreruseni", "TerminalTlacidlo", "YESNO")
+    Call PridajStlpec(db, "CiselnikPreruseni", "TerminalText", "TEXT(24)")
+    Call PridajStlpec(db, "CiselnikPreruseni", "TerminalPoradie", "LONG")
+    Call PridajStlpec(db, "CiselnikPreruseni", "TerminalIkona", "TEXT(20)")
+    Call PridajStlpec(db, "CiselnikPreruseni", "TerminalZiadost", "YESNO")
+    Call PridajStlpec(db, "CiselnikPreruseni", "VyzadujeSchvalenie", "YESNO")
+    Call PridajStlpec(db, "CiselnikPreruseni", "LenCelyDen", "YESNO")
+    Call PridajStlpec(db, "CiselnikPreruseni", "NezapocitavatInterval", "YESNO")
     Call PridajStlpec(db, "Sviatky", "Rok", "LONG")
 End Sub
 
@@ -339,7 +354,8 @@ End Function
 ' SQL pre zoznam prerušení v UI (prvý stĺpec = Cislo).
 '-------------------------------------------------------------------------------
 Public Function ZoznamPreruseniSQL() As String
-    ZoznamPreruseniSQL = "SELECT Cislo, Nazov, NazovSkratka, KodZaciatok, KodKoniec, IIf(AutoKoniecDoKoncaSmeny, 'áno', '') AS AutoKon " & _
+    ZoznamPreruseniSQL = "SELECT Cislo, Nazov, NazovSkratka, KodZaciatok, KodKoniec, IIf(AutoKoniecDoKoncaSmeny, 'áno', '') AS AutoKon, " & _
+                         "IIf(TerminalTlacidlo, 'áno', '') AS Tlacidlo " & _
                          "FROM CiselnikPreruseni ORDER BY Cislo;"
 End Function
 
@@ -439,6 +455,209 @@ Public Function ZmazPrerusenie(ByVal lCislo As Long) As String
     Exit Function
 Chyba:
     ZmazPrerusenie = Err.Description
+End Function
+
+'===============================================================================
+' TLAČIDLO TERMINÁLU A PRÍZNAKY PRERUŠENIA (kontrakt 1.3.0 a 1.4.0)
+' Všetko je voliteľné: prerušenie bez príznakov sa správa ako doteraz a export o ňom neuvedie nič navyše.
+'   TerminalTlacidlo      : prerušenie má v termináli vlastné tlačidlo (Príchod a Odchod sú vždy, č. 1 tlačidlo nemá),
+'   TerminalText/Poradie/Ikona : text (najviac 24 znakov, inak názov prerušenia), poradie 1 až 99, ikona zo zatvoreného zoznamu,
+'   TerminalZiadost       : zamestnanec smie o prerušenie požiadať vopred (napr. plánovaná služobná cesta),
+'   VyzadujeSchvalenie    : deň s týmto dôvodom je nepotvrdený, kým ho vedúci neschváli,
+'   LenCelyDen            : zadáva sa len na celý deň (dovolenka, PN), preto nemôže mať tlačidlo,
+'   NezapocitavatInterval : interval sa nezapočíta ani do práce, ani do prekážok dňa (kontrakt calc UNPAID).
+'===============================================================================
+
+' Ikona tlačidla: zatvorený zoznam, ktorý pozná terminál (kontrakt 1.4.0).
+Public Function PlatnaIkona(ByVal strIkona As String) As Boolean
+    Select Case LCase$(Trim$(strIkona))
+        Case "doctor", "family", "trip", "errand", "private", "lunch", "home", "other"
+            PlatnaIkona = True
+    End Select
+End Function
+
+' Text tlačidla, ako ho uvidí zamestnanec: vlastný text, inak názov prerušenia.
+Public Function TextTlacidla(ByVal strText As String, ByVal strNazov As String) As String
+    strText = Trim$(strText)
+    If Len(strText) = 0 Then strText = Trim$(strNazov)
+    TextTlacidla = strText
+End Function
+
+'-------------------------------------------------------------------------------
+' Kontrola príznakov jedného prerušenia. Vráti chybovú správu (prázdna = v poriadku). Pravidlá sú rovnaké ako v kontrakte 1.4.0.
+'-------------------------------------------------------------------------------
+Public Function ChybaPriznakov(ByVal lCislo As Long, ByVal bTlac As Boolean, ByVal strText As String, ByVal lPoradie As Long, _
+                               ByVal strIkona As String, ByVal bZiadost As Boolean, ByVal bSchval As Boolean, _
+                               ByVal bCelyDen As Boolean, ByVal bNezapocitat As Boolean) As String
+    Dim i As Long, lZnak As Long
+    strText = Trim$(strText)
+    strIkona = LCase$(Trim$(strIkona))
+    If lCislo = 1 Then
+        If bTlac Or bZiadost Or bSchval Or bCelyDen Or bNezapocitat Then
+            ChybaPriznakov = "Prerušenie 1 (práca) nemá tlačidlo ani príznaky: terminál má pevné tlačidlá Príchod a Odchod."
+        End If
+        Exit Function
+    End If
+    If bNezapocitat And lCislo = 7 Then
+        ChybaPriznakov = "Obed (č. 7) sa nedá označiť ako nezapočítaný: jeho trvanie sa odčíta od práce a vypína automatický obed."
+        Exit Function
+    End If
+    If bTlac And bCelyDen Then
+        ChybaPriznakov = "Tlačidlo zapisuje odchod a návrat, preto sa nedá spojiť s príznakom „Len na celý deň“ (dovolenka, PN)."
+        Exit Function
+    End If
+    If bTlac Then
+        If Len(strText) > MAX_TEXT_TLACIDLA Then
+            ChybaPriznakov = "Text tlačidla môže mať najviac " & MAX_TEXT_TLACIDLA & " znakov (zadaných je " & Len(strText) & ")."
+            Exit Function
+        End If
+        For i = 1 To Len(strText)
+            lZnak = AscW(Mid$(strText, i, 1))
+            If lZnak >= 0 And lZnak < 32 Then
+                ChybaPriznakov = "Text tlačidla nesmie obsahovať riadiace znaky (napr. tabulátor)."
+                Exit Function
+            End If
+        Next i
+        If lPoradie < 0 Or lPoradie > 99 Then
+            ChybaPriznakov = "Poradie tlačidla musí byť 1 až 99 (alebo prázdne)."
+            Exit Function
+        End If
+        If Len(strIkona) > 0 And Not PlatnaIkona(strIkona) Then
+            ChybaPriznakov = "Ikona '" & strIkona & "' nie je v zozname (doctor, family, trip, errand, private, lunch, home, other)."
+            Exit Function
+        End If
+    End If
+End Function
+
+'-------------------------------------------------------------------------------
+' Uloží tlačidlo a príznaky jedného (už uloženého) prerušenia. Pri zapnutom tlačidle zabezpečí práve jeden kód terminála
+' (ak žiadny nie je, vznikne PRER<číslo>), dá najviac 12 tlačidiel a rôzne texty. Vráti chybovú správu (prázdna = OK).
+'-------------------------------------------------------------------------------
+Public Function UlozPriznakyPrerusenia(ByVal lCislo As Long, ByVal bTlac As Boolean, ByVal strText As String, ByVal lPoradie As Long, _
+                                       ByVal strIkona As String, ByVal bZiadost As Boolean, ByVal bSchval As Boolean, _
+                                       ByVal bCelyDen As Boolean, ByVal bNezapocitat As Boolean) As String
+    On Error GoTo Chyba
+    Dim db As DAO.Database, rs As DAO.Recordset, rsO As DAO.Recordset, strErr As String
+    Dim strMoj As String, lPocetKodov As Long, strKod As String
+
+    strText = Trim$(strText)
+    strIkona = LCase$(Trim$(strIkona))
+    strErr = ChybaPriznakov(lCislo, bTlac, strText, lPoradie, strIkona, bZiadost, bSchval, bCelyDen, bNezapocitat)
+    If Len(strErr) > 0 Then UlozPriznakyPrerusenia = strErr: Exit Function
+
+    Set db = CurrentDb
+    Call ZabezpecStlpceKonfiguracie(db)
+    Set rs = db.OpenRecordset("SELECT * FROM CiselnikPreruseni WHERE Cislo = " & lCislo & ";", dbOpenDynaset)
+    If rs.EOF Then
+        rs.Close
+        UlozPriznakyPrerusenia = "Prerušenie " & lCislo & " ešte neexistuje, najprv ho uložte."
+        Exit Function
+    End If
+
+    If bTlac Then
+        strMoj = LCase$(TextTlacidla(strText, CStr(Nz(rs!Nazov, ""))))
+        If DCount("*", "CiselnikPreruseni", "TerminalTlacidlo = True AND Cislo <> " & lCislo) >= MAX_TLACIDIEL Then
+            rs.Close
+            UlozPriznakyPrerusenia = "Tlačidiel pre terminál môže byť najviac " & MAX_TLACIDIEL & ". Najprv jedno vypnite."
+            Exit Function
+        End If
+        Set rsO = db.OpenRecordset("SELECT Cislo, Nazov, TerminalText FROM CiselnikPreruseni WHERE TerminalTlacidlo = True AND Cislo <> " & lCislo & ";", dbOpenSnapshot)
+        Do While Not rsO.EOF
+            If LCase$(TextTlacidla(CStr(Nz(rsO!TerminalText, "")), CStr(Nz(rsO!Nazov, "")))) = strMoj Then
+                strErr = "Tlačidlo s textom '" & strMoj & "' už má prerušenie " & CLng(rsO!Cislo) & ". Zadajte iný text."
+            End If
+            rsO.MoveNext
+        Loop
+        rsO.Close
+        If Len(strErr) > 0 Then
+            rs.Close
+            UlozPriznakyPrerusenia = strErr
+            Exit Function
+        End If
+
+        ' práve jeden kód terminála pre prerušenie (kontrakt: tlačidlo potrebuje práve jeden kód v terminal_code_map)
+        Call mod_19_TerminalImport.ZabezpecTabulky(db)
+        lPocetKodov = DCount("*", "TerminalMapaKodov", "CisloPreruseni = " & lCislo)
+        If lPocetKodov > 1 Then
+            rs.Close
+            UlozPriznakyPrerusenia = "Prerušenie " & lCislo & " má v tabuľke TerminalMapaKodov " & lPocetKodov & " kódov terminála, tlačidlo potrebuje práve jeden. Ponechajte jeden."
+            Exit Function
+        End If
+        If lPocetKodov = 0 Then
+            strKod = "PRER" & lCislo
+            If DCount("*", "TerminalMapaKodov", "Kod = " & mod_00_Common.SqlText(strKod)) > 0 Then
+                rs.Close
+                UlozPriznakyPrerusenia = "Kód terminála " & strKod & " už patrí inému prerušeniu. Upravte tabuľku TerminalMapaKodov."
+                Exit Function
+            End If
+            db.Execute "INSERT INTO TerminalMapaKodov (Kod, CisloPreruseni, Poznamka) VALUES (" & mod_00_Common.SqlText(strKod) & ", " & lCislo & ", " & _
+                       mod_00_Common.SqlText("tlačidlo terminálu (vytvorené z príznakov prerušenia)") & ")", dbFailOnError
+        End If
+    End If
+
+    rs.Edit
+    rs!TerminalTlacidlo = bTlac
+    If bTlac And Len(strText) > 0 Then rs!TerminalText = strText Else rs!TerminalText = Null
+    If bTlac And lPoradie > 0 Then rs!TerminalPoradie = lPoradie Else rs!TerminalPoradie = Null
+    If bTlac And Len(strIkona) > 0 Then rs!TerminalIkona = strIkona Else rs!TerminalIkona = Null
+    rs!TerminalZiadost = bZiadost
+    rs!VyzadujeSchvalenie = bSchval
+    rs!LenCelyDen = bCelyDen
+    rs!NezapocitavatInterval = bNezapocitat
+    rs.Update
+    rs.Close
+
+    Call mod_08_UdalostiDna.ObnovParametre
+    Call mod_00_Common.ZapisLog("Konfigurácia", "INFO", "Uložené príznaky prerušenia " & lCislo & IIf(bTlac, " (tlačidlo)", "") & IIf(bNezapocitat, " (nezapočítať)", ""))
+    Exit Function
+Chyba:
+    UlozPriznakyPrerusenia = Err.Description
+End Function
+
+'-------------------------------------------------------------------------------
+' Kontrola všetkých prerušení pred exportom konfigurácie: príznaky každého prerušenia, najviac 12 tlačidiel,
+' práve jeden kód terminála pre každé tlačidlo a rôzne texty tlačidiel. Vráti zoznam chýb po riadkoch (prázdny = v poriadku).
+'-------------------------------------------------------------------------------
+Public Function ChybaTlacidiel(ByRef db As DAO.Database) As String
+    On Error GoTo Chyba
+    Dim rs As DAO.Recordset, dic As Object, s As String, strErr As String, strText As String
+    Dim lC As Long, lPocet As Long, lKodov As Long
+    Dim bTlac As Boolean, bZia As Boolean, bSch As Boolean, bCely As Boolean, bNez As Boolean, bMapa As Boolean
+
+    If Not mod_00_Common.TabulkaExistujeDB(db, "CiselnikPreruseni") Then Exit Function
+    If Not mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "TerminalTlacidlo") Then Exit Function
+    bMapa = mod_00_Common.TabulkaExistujeDB(db, "TerminalMapaKodov")
+    Set dic = CreateObject("Scripting.Dictionary")
+    Set rs = db.OpenRecordset("SELECT * FROM CiselnikPreruseni ORDER BY Cislo;", dbOpenSnapshot)
+    Do While Not rs.EOF
+        lC = CLng(rs!Cislo)
+        bTlac = CBool(Nz(rs!TerminalTlacidlo, False))
+        bZia = CBool(Nz(rs!TerminalZiadost, False))
+        bSch = CBool(Nz(rs!VyzadujeSchvalenie, False))
+        bCely = CBool(Nz(rs!LenCelyDen, False))
+        bNez = CBool(Nz(rs!NezapocitavatInterval, False))
+        strErr = ChybaPriznakov(lC, bTlac, CStr(Nz(rs!TerminalText, "")), CLng(Nz(rs!TerminalPoradie, 0)), CStr(Nz(rs!TerminalIkona, "")), bZia, bSch, bCely, bNez)
+        If Len(strErr) > 0 Then s = s & "Prerušenie " & lC & ": " & strErr & vbCrLf
+        If bTlac And lC <> 1 Then
+            lPocet = lPocet + 1
+            lKodov = 0
+            If bMapa Then lKodov = DCount("*", "TerminalMapaKodov", "CisloPreruseni = " & lC)
+            If lKodov <> 1 Then s = s & "Prerušenie " & lC & ": tlačidlo potrebuje práve jeden kód v tabuľke TerminalMapaKodov (je ich " & lKodov & ")." & vbCrLf
+            strText = LCase$(TextTlacidla(CStr(Nz(rs!TerminalText, "")), CStr(Nz(rs!Nazov, ""))))
+            If dic.Exists(strText) Then
+                s = s & "Prerušenia " & CLng(dic(strText)) & " a " & lC & " majú tlačidlo s rovnakým textom '" & strText & "'." & vbCrLf
+            Else
+                dic(strText) = lC
+            End If
+        End If
+        rs.MoveNext
+    Loop
+    rs.Close
+    If lPocet > MAX_TLACIDIEL Then s = s & "Tlačidiel pre terminál je " & lPocet & ", najviac " & MAX_TLACIDIEL & "." & vbCrLf
+    ChybaTlacidiel = s
+    Exit Function
+Chyba:
+    ChybaTlacidiel = "Kontrola tlačidiel zlyhala: " & Err.Description & vbCrLf
 End Function
 
 '-------------------------------------------------------------------------------

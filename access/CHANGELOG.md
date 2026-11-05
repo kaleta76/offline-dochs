@@ -1,5 +1,29 @@
 # Dochádzka – zmeny
 
+## Balík 2.14.0
+Karta 5 vie nastaviť tlačidlo pre terminál a príznaky prerušení; konfigurácia pre terminál ich prenáša (kontrakt 1.3.0 a 1.4.0, strana Accessu, 1. časť).
+- **Súvislosť**: kontrakt vo verziách 1.3.0 a 1.4.0 opisuje tlačidlá odchodu v termináli (text, poradie, ikona) a príznaky prerušenia (žiadosť vopred, schvaľovanie, len celý deň, nezapočítaný interval),
+  ale Access ich nemal kde nastaviť ani exportovať. Všetko je voliteľné: prerušenie bez príznakov sa počíta a exportuje presne ako doteraz.
+- **`mod_UI_Tab_Prerusenia` 2.10.0**: nový blok „Tlačidlo a príznaky pre terminál“ pod číselníkom prerušení (platí pre prerušenie vybrané v zozname, ukladá ho tlačidlo Uložiť):
+  Tlačidlo v termináli, Text (najviac 24 znakov), Poradie 1 až 99, Ikona (zoznam doctor, family, trip, errand, private, lunch, home, other),
+  Môže požiadať vopred, Schvaľuje vedúci, Len na celý deň, Nezapočíta sa do práce. Zoznam prerušení má nový stĺpec „Tlačidlo“. Príznaky sa pred uložením prerušenia skontrolujú,
+  takže chyba v nich nenechá prerušenie uložené len čiastočne. Karta je o 2100 twipov vyššia (sekcie 2 a 3 sú nižšie); na malej obrazovke sa formulár posúva.
+- **`mod_10_Konfiguracia` 1.2.0**: osem nových voliteľných stĺpcov v číselníku prerušení (doplnia sa samy), `UlozPriznakyPrerusenia`, `ChybaPriznakov`, `ChybaTlacidiel`.
+  Pravidlá zodpovedajú kontraktu: č. 1 nemá tlačidlo ani príznaky, najviac 12 tlačidiel, rôzne texty, každé tlačidlo práve jeden kód terminála
+  (ak nemá žiadny, vznikne `PRER` a číslo prerušenia v tabuľke TerminalMapaKodov), „Len na celý deň“ sa nedá spojiť s tlačidlom, „Nezapočíta sa do práce“ sa nedá dať obedu (č. 7).
+- **`mod_20_KonfiguraciaExport` 1.1.0**: do prerušení pribudnú kľúče `terminal_button`, `terminal_label`, `terminal_order`, `terminal_icon`, `terminal_request`, `needs_approval`, `full_day_only`
+  a `calc` = `UNPAID` – vždy len tie, ktoré správca nastavil. Pred zostavením súboru sa všetky prerušenia skontrolujú; pri chybe súbor nevznikne a správa povie, ktoré prerušenie opraviť
+  (terminál by nezhodný súbor aj tak odmietol).
+- **`mod_08_UdalostiDna` 1.3.0**: prerušenie s príznakom „Nezapočíta sa do práce“ má trvanie 0, takže sa nezapočíta ani do práce, ani do prekážok dňa (neplatený odchod). Prerušenia č. 1 a č. 7 to neovplyvní,
+  bez príznaku sa výpočet nemení.
+- **`mod_UI_PomocnikTexty` 1.3.0**: pomocník karty 5 opisuje tlačidlo a príznaky. Dva nové riadky posunú poradie nasledujúcich riadkov pomocníka; riadok, ktorý ste v tabuľke PomocnikTexty upravili ručne
+  (Upravene = Áno), môže po obnove textov skončiť pri inom riadku.
+- **Čo to nerieši**: terminál zatiaľ nové kľúče len prijme a overí; zobrazenie tlačidiel a výpočet `UNPAID` v termináli sa doplnia po rozhodnutí o spoločnom výpočte (D1).
+  Pravidlá výpočtu (obed, zaokrúhľovanie, auto-oprava) a okno práce po mesiacoch a fondoch sú ďalšie časti (2.15.0 a ďalej). Pred prvým exportom s tlačidlami musí byť overenie konfigurácie
+  na strane databázy terminálu rozšírené o nové kľúče (balík, ktorý spúšťa vlastník).
+- **Neoverené v skutočnom Accesse**: nový kód prešiel `tools/kontrola_vba.py` (0 nálezov), ale nespúšťal sa. Chýba overenie vzhľadu a výšky karty 5, ukladania príznakov a exportu na reálnych údajoch.
+  Pri chybe pošlite text hlásenia s názvom procedúry.
+
 ## Balík 2.13.0
 Tlačidlo INICIALIZOVAŤ PREDVOLENÚ KONFIGURÁCIU (karta 5) vytvorí aj pracovný fond, šablónu pravidiel a kalendár a priradí ich zamestnancom.
 - **Súvislosť**: v novej prázdnej databáze (nainštalovanej bez importu zo staršej) neboli žiadne fondy, šablóny ani kalendáre, takže dialóg „Priradiť fond, pravidlá a úväzok označeným…“

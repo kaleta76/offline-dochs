@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_20_KonfiguraciaExport"
-'@Verzia 1.0.1
+'@Verzia 1.1.0
 Option Compare Database
 Option Explicit
 
@@ -12,7 +12,9 @@ Option Explicit
 '
 '        Export je NADMNOŽINA pôvodnej konfigurácie (schema_version 1): ostávajú rules, interruptions, punch_codes
 '        a holidays, pribúda
-'          - interruptions[].calc    ako sa interval prerušenia počíta do dňa (WORK / LUNCH / COUNTED),
+'          - interruptions[].calc    ako sa interval prerušenia počíta do dňa (WORK / LUNCH / COUNTED / UNPAID),
+'          - interruptions[] voliteľne terminal_button, terminal_label, terminal_order, terminal_icon, terminal_request,
+'                                    needs_approval, full_day_only (kontrakt 1.3.0 a 1.4.0; len keď ich správca nastavil),
 '          - terminal_code_map       kódy razení terminála (WORK, DOCTOR, ...) -> čísla prerušení v Accesse,
 '          - funds, templates        názvy fondov a pravidlá prerušení (parametre) po mesiacoch,
 '          - employees[].months[]    pre každého zamestnanca a mesiac okna: úväzok, priradenie a PLÁN DNÍ
@@ -197,13 +199,14 @@ End Function
 ' Číselník prerušení; do slovníka dicPrer uloží čísla prerušení (na kontrolu odkazov v ďalších sekciách).
 Private Function SekciaPreruseni(ByRef db As DAO.Database, ByVal dicPrer As Object) As String
     Dim rs As DAO.Recordset, s As String, b As Boolean, c As Long
-    Dim bAK As Boolean, bFond As Boolean, bPrac As Boolean, bDov As Boolean
+    Dim bAK As Boolean, bFond As Boolean, bPrac As Boolean, bDov As Boolean, bTerm As Boolean, bNezap As Boolean
     s = "  ""interruptions"": [" & vbCrLf
     If mod_00_Common.TabulkaExistujeDB(db, "CiselnikPreruseni") Then
         bAK = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "AutoKoniecDoKoncaSmeny")
         bFond = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "ZapocitavatDoFondu")
         bPrac = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "ZapocitavatDoPrace")
         bDov = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "OdpocitavatZDovolenky")
+        bTerm = mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "TerminalTlacidlo") And mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "NezapocitavatInterval")
         Set rs = db.OpenRecordset("SELECT * FROM CiselnikPreruseni ORDER BY Cislo;", dbOpenSnapshot)
         b = True
         Do While Not rs.EOF
@@ -211,14 +214,16 @@ Private Function SekciaPreruseni(ByRef db As DAO.Database, ByVal dicPrer As Obje
             dicPrer(c) = True
             If Not b Then s = s & "," & vbCrLf
             b = False
+            bNezap = PoleBool(rs, "NezapocitavatInterval", bTerm)
             s = s & "    { ""code"": " & c & ", ""name"": " & J(CStr(Nz(rs!Nazov, ""))) & ", ""short_name"": " & J(CStr(Nz(rs!NazovSkratka, ""))) & _
                     ", ""start_punch_code"": " & CLng(Nz(rs!KodZaciatok, 0)) & ", ""end_punch_code"": " & CLng(Nz(rs!KodKoniec, 0)) & _
                     ", ""is_work"": " & JB(c = 1) & ", ""is_lunch"": " & JB(c = 7) & _
                     ", ""auto_end_of_shift"": " & JB(PoleBool(rs, "AutoKoniecDoKoncaSmeny", bAK)) & _
-                    ", ""calc"": " & J(TypVypoctu(c)) & _
+                    ", ""calc"": " & J(TypVypoctu(c, bNezap)) & _
                     ", ""counts_to_fund"": " & JB(PoleBool(rs, "ZapocitavatDoFondu", bFond)) & _
                     ", ""counts_to_work"": " & JB(PoleBool(rs, "ZapocitavatDoPrace", bPrac)) & _
-                    ", ""deducts_leave"": " & JB(PoleBool(rs, "OdpocitavatZDovolenky", bDov)) & " }"
+                    ", ""deducts_leave"": " & JB(PoleBool(rs, "OdpocitavatZDovolenky", bDov)) & _
+                    PriznakyTerminalu(rs, bTerm, c) & " }"
             rs.MoveNext
         Loop
         rs.Close
@@ -230,17 +235,44 @@ End Function
 '-------------------------------------------------------------------------------
 ' Ako sa interval prerušenia počíta do dňa. Zodpovedá mod_08_UdalostiDna.TrvanieIntervalu a SumarDna:
 '   č. 1 práca (oreže sa oknom práce), č. 7 obed (skutočné trvanie, jeho prítomnosť vypína automatický obed),
-'   ostatné prerušenia: skutočné trvanie; od hranice celodennej prekážky sa započíta denný fond dňa.
+'   ostatné prerušenia: skutočné trvanie; od hranice celodennej prekážky sa započíta denný fond dňa,
+'   prerušenie s príznakom NezapocitavatInterval (UNPAID, kontrakt 1.4.0): interval sa nezapočíta (mod_08.JeNezapocitavane).
 ' Ak sa počítanie v Accesse zmení (napr. začne sa čítať ZapocitavatDoFondu), pribudne tu nová hodnota a zvýši sa verzia kontraktu.
 '-------------------------------------------------------------------------------
-Private Function TypVypoctu(ByVal c As Long) As String
+Private Function TypVypoctu(ByVal c As Long, ByVal bNezapocitat As Boolean) As String
     If c = 1 Then
         TypVypoctu = "WORK"
     ElseIf c = 7 Then
         TypVypoctu = "LUNCH"
+    ElseIf bNezapocitat Then
+        TypVypoctu = "UNPAID"
     Else
         TypVypoctu = "COUNTED"
     End If
+End Function
+
+'-------------------------------------------------------------------------------
+' Voliteľné kľúče prerušenia pre terminál (kontrakt 1.3.0 a 1.4.0), vkladajú sa len keď ich správca nastavil:
+' terminal_button / terminal_label / terminal_order / terminal_icon (len s tlačidlom), terminal_request, needs_approval, full_day_only.
+' Prerušenie č. 1 ich nemá nikdy. Vráti text začínajúci čiarkou, alebo prázdny reťazec.
+'-------------------------------------------------------------------------------
+Private Function PriznakyTerminalu(ByRef rs As DAO.Recordset, ByVal bStlpce As Boolean, ByVal c As Long) As String
+    Dim s As String, strT As String, strI As String, lP As Long
+    If Not bStlpce Then Exit Function
+    If c = 1 Then Exit Function
+    If CBool(Nz(rs!TerminalTlacidlo, False)) Then
+        s = s & ", ""terminal_button"": true"
+        strT = Trim$(CStr(Nz(rs!TerminalText, "")))
+        If Len(strT) > 0 Then s = s & ", ""terminal_label"": " & J(strT)
+        lP = CLng(Nz(rs!TerminalPoradie, 0))
+        If lP > 0 Then s = s & ", ""terminal_order"": " & Klamp(lP, 1, 99)
+        strI = LCase$(Trim$(CStr(Nz(rs!TerminalIkona, ""))))
+        If Len(strI) > 0 Then s = s & ", ""terminal_icon"": " & J(strI)
+    End If
+    If CBool(Nz(rs!TerminalZiadost, False)) Then s = s & ", ""terminal_request"": true"
+    If CBool(Nz(rs!VyzadujeSchvalenie, False)) Then s = s & ", ""needs_approval"": true"
+    If CBool(Nz(rs!LenCelyDen, False)) Then s = s & ", ""full_day_only"": true"
+    PriznakyTerminalu = s
 End Function
 
 Private Function SekciaKodyRazeni(ByRef db As DAO.Database) As String
@@ -491,7 +523,7 @@ Public Function GenerujKonfiguraciuV2JSON(Optional ByVal lOdYM As Long = 0, Opti
     Dim db As DAO.Database, lDnes As Long, nMes As Long, i As Long, lMes() As Long
     Dim dicPrer As Object, dicFond As Object, dicSab As Object
     Dim sPrer As String, sKody As String, sSv As String, sMapa As String, sZam As String, sFond As String, sSab As String
-    Dim nMesPlanov As Long, s As String
+    Dim nMesPlanov As Long, s As String, strChyba As String
 
     mSprava = ""
     mPocetZam = 0
@@ -499,6 +531,15 @@ Public Function GenerujKonfiguraciuV2JSON(Optional ByVal lOdYM As Long = 0, Opti
     Call mod_08_UdalostiDna.ObnovParametre
     Call mod_16_PravidlaPreruseni.ObnovPravidla
     Call mod_19_TerminalImport.ZabezpecTabulky(db)
+
+    ' tlačidlá a príznaky prerušení: neplatné nastavenie by terminál odmietol, preto sa súbor radšej nevytvorí
+    strChyba = mod_10_Konfiguracia.ChybaTlacidiel(db)
+    If Len(strChyba) > 0 Then
+        Call mod_00_Common.ZapisLog("mod_20_KonfiguraciaExport.GenerujKonfiguraciuV2JSON", "ERROR", "Neplatné tlačidlá alebo príznaky prerušení: " & Replace(strChyba, vbCrLf, " | "))
+        mSprava = "Konfiguráciu sa nepodarilo zostaviť, opravte nastavenie prerušení (karta 5):" & vbCrLf & strChyba
+        GenerujKonfiguraciuV2JSON = ""
+        Exit Function
+    End If
 
     lDnes = Year(Date) * 100 + Month(Date)
     If lOdYM = 0 Then lOdYM = YMPosun(lDnes, -NastavCele("PlanMesiacovDozadu", 1))

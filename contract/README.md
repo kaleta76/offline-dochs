@@ -1,4 +1,4 @@
-# Kontrakt terminál ⇄ Access (verzia 1, doplnky 1.1 až 1.4)
+# Kontrakt terminál ⇄ Access (verzia 1, doplnky 1.1 až 1.5)
 
 Tento priečinok je **jediné miesto, na ktorom sa dohodne rozhranie** medzi terminálom (tento repozitár, vyvíja ho Lovable agent)
 a lokálnym dochádzkovým systémom v Accesse (vyvíja ho Claude). Zmena súborov tu = zmena dohody, preto ide **iba cez pull request**
@@ -74,7 +74,7 @@ v **samostatnom zozname** za rovnaký mesiac (podľa času zneplatneného razeni
 * **Uzavretý mesiac v Accesse:** zneplatnenie sa neaplikuje, ostáva v čakaní do otvorenia mesiaca (rovnako ako razenia).
 * Zlatý súbor: `examples/voids_example.csv`, test `tests/void-export.contract.test.ts`, referencia `reference/void-export.ts`.
 
-## Súbor `dochs_config.json` (kontrakt 1.2.0 až 1.4.0, smer Access → terminál)
+## Súbor `dochs_config.json` (kontrakt 1.2.0 až 1.5.0, smer Access → terminál)
 Access posiela terminálu **hotový výpočtový plán**, aby terminál počítal saldo rovnako ako Access a zamestnanec si ho mohol skontrolovať skôr, než sekretárka mesiac
 opraví, vytlačí a uzavrie. Zásada je „Access rozhoduje, terminál preberá“: terminál nepozná pravidlá fondov, kalendárov ani úväzkov, dostane z nich už vypočítaný
 denný fond. Formát je JSON (UTF-8), schéma `config-export.schema.json` (`schema_version` 2), zlatý súbor `examples/config_example.json`, overovač `tools/verify_config.py`.
@@ -84,14 +84,15 @@ Súbor je **nadmnožina** pôvodnej konfigurácie (`schema_version` 1); kľúče
 |---|---|
 | `config_version`, `generated_at` | poradie verzií (`rrrr.mm.dd.hhmm`); terminál drží najnovšiu a nikdy nevráti staršiu |
 | `rules` | okno práce, hranica celodennej prekážky, automatický obed, predvolený denný fond, `interruption_check_enabled`; od 1.4.0 voliteľne pravidlá obeda, zaokrúhlenia, opráv a lehoty (nižšie) |
-| `interruptions[]` | číselník prerušení; **`calc`** určuje, ako sa interval počíta (nižšie); od 1.3.0 voliteľne `terminal_button`, `terminal_label`, `terminal_order` (tlačidlá terminálu, nižšie); od 1.4.0 voliteľne `terminal_icon`, `terminal_request`, `needs_approval`, `full_day_only` |
+| `interruptions[]` | číselník prerušení; **`calc`** určuje, ako sa interval počíta (nižšie); od 1.3.0 voliteľne `terminal_button`, `terminal_label`, `terminal_order` (tlačidlá terminálu, nižšie); od 1.4.0 voliteľne `terminal_icon`, `terminal_request`, `needs_approval`, `full_day_only`; od 1.5.0 voliteľne `full_day_min`, `counts_to_lunch_base` |
+| `regimes[]` | od 1.5.0 voliteľne **režimy výpočtu** (napr. krízová situácia): pomenovaná sada prepísaných pravidiel a vlastností prerušení (nižšie) |
 | `punch_codes[]` | kódy razení Accessu (číslo, prerušenie, smer Z/K) |
 | `terminal_code_map[]` | kódy razení terminála (`WORK`, `DOCTOR`, …) → číslo prerušenia v Accesse |
 | `holidays[]` | sviatky roka a nasledujúceho roka |
 | `period` | mesiace okna, pre ktoré je plán (zvyčajne predchádzajúci až nasledujúci mesiac) |
 | `funds[]` | názov a typ použitých fondov (informatívne) |
 | `templates[].months[].rules[]` | pravidlá prerušení po mesiacoch: povolený čas, najdlhšie a najkratšie trvanie, minimum odpracovaného času (sedem hodnôt pondelok až nedeľa) |
-| `employees[].months[]` | **plán**: `employment_pct`, `fund_id`, `template_id`, `calendar_id`, `day_types[]` a `expected_min[]` pre každý deň mesiaca; od 1.4.0 voliteľne okno práce `window_start_min` a `window_end_min` |
+| `employees[].months[]` | **plán**: `employment_pct`, `fund_id`, `template_id`, `calendar_id`, `day_types[]` a `expected_min[]` pre každý deň mesiaca; od 1.4.0 voliteľne okno práce `window_start_min` a `window_end_min`; od 1.5.0 voliteľne `regime_ids` (režim výpočtu pre každý deň mesiaca) |
 | `counts` | počet zamestnancov a mesačných plánov v súbore (kontrola úplnosti) |
 
 **Tlačidlá terminálu (kontrakt 1.3.0, voliteľné kľúče prerušenia).** O tom, ktoré prerušenia majú na obrazovke Terminál vlastné tlačidlo, rozhoduje Access (rozhodnutie vlastníka 4. 11. 2026):
@@ -156,6 +157,50 @@ súbor bez nich ostáva platný (test `test_subor_bez_novych_klucov_je_stale_pla
 Databázová kontrola je súkromný SQL balík mimo repozitára; pred prvým súborom s novými kľúčmi ju treba rozšíriť rovnako (`calc` = `UNPAID`, kľúče prerušení, kľúče mesiaca, číselné hodnoty `rules`).
 Access nové kľúče vloží, len keď ich správca nastaví.
 
+### Voliteľné kľúče kontraktu 1.5.0: vlastnosti prerušení a režimy výpočtu
+
+Cieľ (rozhodnutie vlastníka 5. 11. 2026): o tom, **ako sa ktoré prerušenie počíta**, nerozhoduje názov ani číslo prerušenia, ale parametre, ktoré nastavuje správca (HR) v tabuľkách Accessu;
+my určujeme len počiatočné hodnoty. Zodpovednosť za nastavenie nesie správca. Terminál parametre z Accessu prevezme a počíta rovnako (zásada „Access rozhoduje, terminál preberá“).
+Všetky kľúče nižšie sú **voliteľné**; chýbajúci kľúč = správanie 1.4.0, takže súbor 1.4.0 ostáva platný a nezmenený. Terminál ich zatiaľ len **prijme a overí**;
+použitie vo výpočte (`src/lib/engine.ts`) je samostatná zmena (etapa 2) a overí sa proti výsledkom Accessu.
+Č. 1 (`is_work`, `calc` `WORK`) a č. 7 (`is_lunch`, `calc` `LUNCH`) ostávajú pevné čísla; uvoľnenie čísel je mimo tejto verzie.
+
+**`interruptions[]`** (len pre `calc` = `COUNTED`; zmysel majú až pri skutočnom počítaní, preto pre `WORK`, `LUNCH` a `UNPAID` ide o chybu, výnimkou je `counts_to_lunch_base = false`, ktoré je neškodné):
+
+| kľúč | hodnoty | predvolené | význam |
+|---|---|---|---|
+| `full_day_min` | 1 až 1440 | `rules.full_day_obstacle_min` | od akej dĺžky jedného intervalu tohto prerušenia sa započíta celý denný fond dňa (`expected_min`) namiesto skutočného trvania (od tejto hodnoty vrátane, rovnako ako `full_day_obstacle_min`). Umožní napríklad, aby návšteva lekára od 5 hodín bola celý deň, ale iné prerušenie až od 6 hodín |
+| `counts_to_lunch_base` | true/false | false | skutočné trvanie intervalov tohto prerušenia sa pripočíta k odpracovanému času pri posudzovaní, či zamestnanec dosiahol `auto_lunch_trigger_min` (nárok na prestávku). Odpočet obeda ide aj tak z odpracovaného času, nie z času prerušenia. Interval, ktorý sa započítava ako celý deň (dosiahol `full_day_min`), do základu nevstupuje |
+
+Základ pre prah obeda je potom **odpracovaný čas + intervaly prerušení s `counts_to_lunch_base`**; platí rovnako pre automatický obed aj pre `lunch_recorded_mode` 1 a 2
+(kde sa k základu pripočíta aj razený obed, ako dnes). Pri predvolených hodnotách je základ len odpracovaný čas, teda dnešné správanie Accessu.
+
+**`regimes[]`: režim výpočtu na obdobie** (napr. krízová situácia vybraných zamestnancov). Režim je pomenovaná sada prepísaných hodnôt. Access ho priraďuje zamestnancovi na obdobie od–do
+(zadáva ho správca, napr. sekretárka); terminál dostane pre každý deň len číslo režimu a nič nepočíta z dátumov. Zamestnanec zostáva len osobné číslo, názov režimu je bez osobných údajov.
+
+| kľúč | význam |
+|---|---|
+| `id` | číslo režimu 1 až 99, v súbore jedinečné |
+| `name` | názov 1 až 40 znakov bez medzier na kraji, jedinečný bez ohľadu na veľkosť písmen (napr. „Krízový režim“) |
+| `rules` | voliteľné, prepísané hodnoty z `rules`; **uzavretý zoznam**: `work_window_start_min` a `work_window_end_min` (vždy spolu, koniec po začiatku; 0 až 1440 = okno sa nepoužíva), `full_day_obstacle_min`, `auto_lunch_enabled`, `auto_lunch_trigger_min`, `auto_lunch_deduct_min`, `lunch_recorded_mode`, `lunch_min_min`, `unlabeled_out_is_lunch`, `rounding_in_min`, `rounding_out_min`, `rounding_mode`, `auto_repair_mode`, `auto_repair_target`, `auto_repair_cases`. Rozsahy sú rovnaké ako v `rules`. Iný kľúč je chyba (nie upozornenie): terminál by ho potichu ignoroval a počítal by inak ako Access |
+| `interruptions` | voliteľné, úpravy prerušení v dňoch režimu: `{ "code": …, "calc"?, "full_day_min"?, "counts_to_lunch_base"? }`; `calc` len `COUNTED` alebo `UNPAID`; č. 1 a č. 7 sa v režime nemenia (pravidlá obeda sú v `rules`); každá úprava mení aspoň jednu vlastnosť; `full_day_min` a `counts_to_lunch_base = true` platia len pre výsledné `calc` `COUNTED` |
+
+Režim bez `rules` aj `interruptions` nič nemení (upozornenie). Režimov je najviac 20.
+
+**`employees[].months[].regime_ids`**: pole s toľkými číslami, koľko má mesiac dní (rovnako ako `day_types`); číslo režimu z `regimes[].id`, `0` = bez režimu. Access kľúč **vynechá**,
+ak v mesiaci žiadny deň režim nemá (pole samých núl je upozornenie). Obdobie režimu môže presahovať mesiac a Access ho rozpíše po dňoch; obdobia jedného zamestnanca sa neprekrývajú (zabezpečí Access).
+Referenčné rozpísanie je v `tools/build_config_example.py` (vstup `regime_periods` zamestnanca: `{ "regime", "from", "to" }`, krajné dni vrátane).
+
+**Poradie hodnôt pre jeden deň:** `rules` → okno práce zamestnanca v mesiaci (`window_*`, 1.4.0) → hodnoty režimu dňa (`regimes[].rules`; okno režimu prebije okno z fondu);
+vlastnosti prerušení: `interruptions[]` → úpravy režimu dňa. Deň bez režimu sa počíta ako v 1.4.0.
+
+**Zámerne nie je v 1.5.0** (bude samostatná verzia po rozhodnutí vlastníka): najdlhšie trvanie s prevodom prekročenia na iné prerušenie, zaokrúhlenie po prerušeniach, prerušenie cez polnoc,
+priorita prerušenia pred sviatkom, predvoľba a plánovanie neprítomností, mesačný limit súkromných odchodov, kódy pre mzdy a pridelenie režimu podľa roly zamestnanca.
+
+**Nasadenie 1.5.0:** rovnako ako pri 1.3.0 a 1.4.0 súbor s novými kľúčmi prijme len verzia terminálu a databázy, ktorá ich pozná (kľúč `regimes` najvyššej úrovne, kľúče prerušení a `regime_ids` v mesiaci
+majú zakázané neznáme kľúče, preto starší terminál súbor odmietne celý). Databázová kontrola je súkromný SQL balík mimo repozitára; pred prvým súborom s novými kľúčmi ju treba rozšíriť
+(`regimes` s uzavretým zoznamom kľúčov a rozsahmi vyššie, `full_day_min`, `counts_to_lunch_base`, `regime_ids` s dĺžkou podľa mesiaca). Access nové kľúče vloží, len keď ich správca nastaví.
+
 **Typ dňa** (`day_types`) má dve písmená: kalendár (`P` pracovný, `V` voľný, `S` sviatok) a deň v týždni (`P` pondelok až piatok, `V` sobota, `N` nedeľa).
 **Denný fond** (`expected_min`) je v minútach po zohľadnení fondu, fondu podľa dňa v týždni, pevného mesačného fondu (mesačný fond ÷ počet pracovných dní) a úväzku
 (zaokrúhlenie polovice na párne, ako `CLng` vo VBA); `0` je nepracovný deň alebo sviatok. Algoritmus presne opisuje `tools/build_config_example.py`
@@ -164,9 +209,9 @@ Access nové kľúče vloží, len keď ich správca nastaví.
 **Ako sa interval počíta do dňa (`interruptions[].calc`)** – tak, ako to robí Access 2.11 (`mod_08.TrvanieIntervalu`, `SumarDna`):
 * `WORK`: práca (č. 1) sa oreže oknom práce (`work_window_start_min` až `work_window_end_min`);
 * `LUNCH`: obed (č. 7) sa počíta skutočným trvaním; ak v dni obed je, automatický obed sa neodpočíta;
-* `COUNTED`: každé iné prerušenie sa počíta skutočným trvaním; ak trvá `full_day_obstacle_min` a viac, započíta sa **denný fond dňa** (`expected_min`);
+* `COUNTED`: každé iné prerušenie sa počíta skutočným trvaním; ak trvá `full_day_obstacle_min` (od 1.5.0 `full_day_min` prerušenia, ak je uvedené) a viac, započíta sa **denný fond dňa** (`expected_min`);
 * `UNPAID` (od 1.4.0): interval sa nezapočíta ani do práce, ani do fondu dňa;
-* po zostavení dňa sa od práce odpočíta automatický obed (`auto_lunch_deduct_min`), ak je zapnutý, deň má fond, odpracovaný čas dosiahne `auto_lunch_trigger_min` (od tejto hodnoty vrátane; pri 360 je to 6:00, 5:59 ešte nie) a nebol obed;
+* po zostavení dňa sa od práce odpočíta automatický obed (`auto_lunch_deduct_min`), ak je zapnutý, deň má fond, odpracovaný čas (od 1.5.0 spolu s intervalmi prerušení s `counts_to_lunch_base`) dosiahne `auto_lunch_trigger_min` (od tejto hodnoty vrátane; pri 360 je to 6:00, 5:59 ešte nie) a nebol obed;
 * denné saldo = odpracované + započítané prekážky − `expected_min`.
 Neznámu hodnotu `calc` terminál nesmie nahradiť vlastným odhadom: saldo označí ako nepotvrdené a upozorní správcu (Access mohol zmeniť pravidlo a kontrakt dostane novú verziu).
 

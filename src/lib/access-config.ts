@@ -1,4 +1,4 @@
-// Konfigurácia a výpočtový plán z Accessu (kontrakt 1.2.0 až 1.4.0, contract/README.md, docs/KONFIGURACIA-Z-ACCESSU.md).
+// Konfigurácia a výpočtový plán z Accessu (kontrakt 1.2.0 až 1.5.0, contract/README.md, docs/KONFIGURACIA-Z-ACCESSU.md).
 // Čistá logika obrazovky Správa → Konfigurácia z Accessu: kontrola súboru dochs_config.json a spracovanie odpovedí databázy. Nič sa tu nikam nezapisuje.
 //
 // Kontrola je prepis contract/tools/verify_config.py (zlatý súbor contract/examples/config_example.json a testy z neho vychádzajú).
@@ -24,7 +24,7 @@ const TOP_REQ = [
   "employees",
   "counts",
 ];
-const TOP_OPT = ["generated_at"];
+const TOP_OPT = ["generated_at", "regimes"]; // regimes: kontrakt 1.5.0
 const RULES_REQ = [
   "work_window_start_min",
   "work_window_end_min",
@@ -58,6 +58,8 @@ const INT_OPT = [
   "terminal_request",
   "needs_approval",
   "full_day_only",
+  "full_day_min", // kontrakt 1.5.0, len pre calc COUNTED
+  "counts_to_lunch_base", // kontrakt 1.5.0, len pre calc COUNTED
 ];
 /** Príznaky 1.4.0, ktoré nepatria práci (č. 1). */
 const FLAGS_NOT_FOR_WORK = ["terminal_request", "needs_approval", "full_day_only"] as const;
@@ -102,8 +104,34 @@ const MON_KEYS = [
   "day_types",
   "expected_min",
 ];
-/** Kontrakt 1.4.0: voliteľné okno práce zamestnanca v mesiaci (podľa fondu). */
-const MON_OPT = ["window_start_min", "window_end_min"];
+/** Kontrakt 1.4.0: voliteľné okno práce zamestnanca v mesiaci (podľa fondu); 1.5.0: regime_ids (režim výpočtu každého dňa). */
+const MON_OPT = ["window_start_min", "window_end_min", "regime_ids"];
+/**
+ * Kontrakt 1.5.0: režim výpočtu = pomenovaná sada prepísaných pravidiel. Uzavretý zoznam kľúčov: neznámy kľúč by terminál potichu
+ * ignoroval a počítal by inak ako Access, preto je v režime chyba, nie upozornenie.
+ */
+export const MAX_REGIMES = 20;
+export const MAX_REGIME_ID = 99;
+export const MAX_REGIME_NAME = 40;
+const REGIME_RULES_INT: Record<string, readonly [number, number]> = {
+  work_window_start_min: [0, 1440],
+  work_window_end_min: [0, 1440],
+  full_day_obstacle_min: [1, 1440],
+  auto_lunch_trigger_min: [0, 1440],
+  auto_lunch_deduct_min: [0, 600],
+  lunch_recorded_mode: [0, 2],
+  lunch_min_min: [0, 600],
+  rounding_in_min: [0, 60],
+  rounding_out_min: [0, 60],
+  rounding_mode: [0, 3],
+  auto_repair_mode: [0, 9],
+  auto_repair_target: [0, 1],
+  auto_repair_cases: [1, 3],
+};
+const REGIME_RULES_BOOL = ["auto_lunch_enabled", "unlabeled_out_is_lunch"];
+const REGIME_CALC = ["COUNTED", "UNPAID"];
+const REGIME_KEYS = ["id", "name", "rules", "interruptions"];
+const REGIME_INT_KEYS = ["code", "calc", "full_day_min", "counts_to_lunch_base"];
 const RULE_KEYS = [
   "interruption",
   "disabled",
@@ -350,6 +378,20 @@ export function checkAccessConfig(
           E(`prerušenie 1: práca (č. 1) nemá kľúč ${k} (patrí ostatným prerušeniam)`);
       if (it["full_day_only"] === true && it["terminal_button"] === true)
         E(`prerušenie ${c}: full_day_only a terminal_button sa vylučujú (tlačidlo zapisuje odchod a návrat, nie celý deň)`);
+      // kontrakt 1.5.0: vlastnosti počítania; majú zmysel len pre prerušenie, ktoré sa počíta skutočným časom (COUNTED)
+      if ("full_day_min" in it) {
+        const v = it["full_day_min"];
+        if (!(isInt(v) && v >= 1 && v <= 1440))
+          E(`prerušenie ${c}: full_day_min musí byť celé číslo 1 až 1440`);
+        else if (calc !== "COUNTED")
+          E(`prerušenie ${c}: full_day_min patrí len prerušeniu s calc COUNTED`);
+      }
+      if ("counts_to_lunch_base" in it) {
+        if (typeof it["counts_to_lunch_base"] !== "boolean")
+          E(`prerušenie ${c}: counts_to_lunch_base nie je true/false`);
+        else if (it["counts_to_lunch_base"] && calc !== "COUNTED")
+          E(`prerušenie ${c}: counts_to_lunch_base = true patrí len prerušeniu s calc COUNTED`);
+      }
     });
     if (!ints.has(1)) E("v zozname prerušení chýba č. 1 (pracovná doba)");
   }
@@ -452,6 +494,119 @@ export function checkAccessConfig(
     }
   }
   if (buttons > MAX_BUTTONS) E(`tlačidiel pre terminál je ${buttons}, najviac ${MAX_BUTTONS}`);
+
+  // --- režimy výpočtu (kontrakt 1.5.0): pomenovaná sada prepísaných pravidiel, ktorú Access priraďuje zamestnancovi na obdobie
+  const regIds = new Set<number>();
+  if ("regimes" in doc) {
+    let regs: unknown[] = [];
+    if (!Array.isArray(doc["regimes"])) E("regimes nie je pole");
+    else regs = doc["regimes"];
+    if (regs.length > MAX_REGIMES) E(`režimov je ${regs.length}, najviac ${MAX_REGIMES}`);
+    const seenNames = new Map<string, number>();
+    regs.forEach((rg, i) => {
+      if (!isObj(rg)) {
+        E(`regimes[${i}] nie je objekt`);
+        return;
+      }
+      const extra = keysOf(rg).filter((k) => !REGIME_KEYS.includes(k));
+      if (extra.length) E(`regimes[${i}]: neznáme kľúče ${JSON.stringify(extra.sort())}`);
+      const rid = rg["id"];
+      if (!(isInt(rid) && rid >= 1 && rid <= MAX_REGIME_ID)) {
+        E(`regimes[${i}]: id musí byť celé číslo 1 až ${MAX_REGIME_ID}`);
+        return;
+      }
+      if (regIds.has(rid)) E(`režim ${rid} je v zozname dvakrát`);
+      regIds.add(rid);
+      const nm = rg["name"];
+      // eslint-disable-next-line no-control-regex
+      if (!(isStr(nm) && nm.length >= 1 && nm.length <= MAX_REGIME_NAME && nm === nm.trim() && !/[\u0000-\u001f]/.test(nm))) {
+        E(`režim ${rid}: name musí byť text 1 až ${MAX_REGIME_NAME} znakov bez medzier na kraji`);
+      } else {
+        const key = nm.toLowerCase();
+        const first = seenNames.get(key);
+        if (first !== undefined) E(`režimy ${first} a ${rid} majú rovnaký názov '${nm}'`);
+        else seenNames.set(key, rid);
+      }
+      let rr: Obj = {};
+      if ("rules" in rg) {
+        if (isObj(rg["rules"])) rr = rg["rules"];
+        else E(`režim ${rid}: rules nie je objekt`);
+      }
+      for (const [k, v] of Object.entries(rr)) {
+        if (k in REGIME_RULES_INT) {
+          const [lo, hi] = REGIME_RULES_INT[k] as readonly [number, number];
+          if (!(isInt(v) && v >= lo && v <= hi))
+            E(`režim ${rid}: rules.${k} musí byť celé číslo ${lo} až ${hi}`);
+        } else if (REGIME_RULES_BOOL.includes(k)) {
+          if (typeof v !== "boolean") E(`režim ${rid}: rules.${k} nie je true/false`);
+        } else {
+          E(
+            `režim ${rid}: rules.${k} režim nemení (povolené: ${[...Object.keys(REGIME_RULES_INT), ...REGIME_RULES_BOOL].sort().join(", ")})`,
+          );
+        }
+      }
+      if (("work_window_start_min" in rr) !== ("work_window_end_min" in rr)) {
+        E(`režim ${rid}: work_window_start_min a work_window_end_min musia byť spolu`);
+      } else if (
+        isInt(rr["work_window_start_min"]) &&
+        isInt(rr["work_window_end_min"]) &&
+        rr["work_window_end_min"] <= rr["work_window_start_min"]
+      ) {
+        E(`režim ${rid}: koniec okna práce nie je po začiatku`);
+      }
+      let ro: unknown[] = [];
+      if ("interruptions" in rg) {
+        if (Array.isArray(rg["interruptions"])) ro = rg["interruptions"];
+        else E(`režim ${rid}: interruptions nie je pole`);
+      }
+      const seenC = new Set<number>();
+      ro.forEach((o, j) => {
+        if (!isObj(o)) {
+          E(`režim ${rid}: interruptions[${j}] nie je objekt`);
+          return;
+        }
+        const extraO = keysOf(o).filter((k) => !REGIME_INT_KEYS.includes(k));
+        if (extraO.length)
+          E(`režim ${rid}: interruptions[${j}] má neznáme kľúče ${JSON.stringify(extraO.sort())}`);
+        const c = o["code"];
+        if (!(isInt(c) && ints.has(c))) {
+          E(`režim ${rid}: úprava neexistujúceho prerušenia ${JSON.stringify(c)}`);
+          return;
+        }
+        if (seenC.has(c)) E(`režim ${rid}: prerušenie ${c} je upravené dvakrát`);
+        seenC.add(c);
+        const baseCalc = (ints.get(c) as Obj)["calc"];
+        if (baseCalc === "WORK" || baseCalc === "LUNCH") {
+          E(`režim ${rid}: práca (č. 1) a obed (č. 7) sa v režime nemenia; pravidlá obeda sú v rules`);
+          return;
+        }
+        if (!keysOf(o).some((k) => k !== "code" && REGIME_INT_KEYS.includes(k)))
+          E(
+            `režim ${rid}: prerušenie ${c} nič nemení (chýba calc, full_day_min alebo counts_to_lunch_base)`,
+          );
+        if ("calc" in o && !REGIME_CALC.includes(o["calc"] as string))
+          E(`režim ${rid}: prerušenie ${c}: calc musí byť COUNTED alebo UNPAID`);
+        const eff = REGIME_CALC.includes(o["calc"] as string) ? o["calc"] : baseCalc;
+        if ("full_day_min" in o) {
+          const v = o["full_day_min"];
+          if (!(isInt(v) && v >= 1 && v <= 1440))
+            E(`režim ${rid}: prerušenie ${c}: full_day_min musí byť celé číslo 1 až 1440`);
+          else if (eff !== "COUNTED")
+            E(`režim ${rid}: prerušenie ${c}: full_day_min patrí len prerušeniu s calc COUNTED`);
+        }
+        if ("counts_to_lunch_base" in o) {
+          if (typeof o["counts_to_lunch_base"] !== "boolean")
+            E(`režim ${rid}: prerušenie ${c}: counts_to_lunch_base nie je true/false`);
+          else if (o["counts_to_lunch_base"] && eff !== "COUNTED")
+            E(
+              `režim ${rid}: prerušenie ${c}: counts_to_lunch_base = true patrí len prerušeniu s calc COUNTED`,
+            );
+        }
+      });
+      if (keysOf(rr).length === 0 && ro.length === 0)
+        W(`režim ${rid} nič nemení (prázdne rules aj interruptions)`);
+    });
+  }
 
   // --- sviatky
   const hol = new Set<string>();
@@ -678,6 +833,25 @@ export function checkAccessConfig(
         if (!(isInt(mo["calendar_id"]) && mo["calendar_id"] >= 1))
           E(`${lab}: calendar_id nie je kladné celé číslo`);
         const nd = daysInMonth(pm[0], pm[1]);
+        // kontrakt 1.5.0: režim výpočtu pre každý deň mesiaca (0 = bez režimu); Access kľúč vynechá, ak v mesiaci žiaden režim nie je
+        if ("regime_ids" in mo) {
+          const ri = mo["regime_ids"];
+          if (
+            !(
+              Array.isArray(ri) &&
+              ri.length === nd &&
+              ri.every((x) => isInt(x) && x >= 0 && x <= MAX_REGIME_ID)
+            )
+          ) {
+            E(`${lab}: regime_ids musí mať ${nd} celých čísel 0 až ${MAX_REGIME_ID}`);
+          } else {
+            const used = [...new Set(ri as number[])].filter((x) => x !== 0).sort((a, b) => a - b);
+            for (const x of used)
+              if (!regIds.has(x)) E(`${lab}: regime_ids odkazuje na neexistujúci režim ${x}`);
+            if (used.length === 0)
+              W(`${lab}: regime_ids neobsahuje žiaden režim (kľúč sa má vynechať)`);
+          }
+        }
         const dt = mo["day_types"];
         const ex = mo["expected_min"];
         if (!(Array.isArray(dt) && dt.length === nd)) {

@@ -56,7 +56,8 @@
       "terminal_button": true,
       "terminal_label": "Lekár",
       "terminal_order": 1,
-      "terminal_icon": "doctor"
+      "terminal_icon": "doctor",
+      "full_day_min": 300
     },
     {
       "code": 4,
@@ -141,7 +142,8 @@
       "terminal_order": 3,
       "terminal_icon": "trip",
       "terminal_request": true,
-      "needs_approval": true
+      "needs_approval": true,
+      "counts_to_lunch_base": true
     },
     {
       "code": 13,
@@ -174,6 +176,17 @@
       "terminal_label": "Sprievod",
       "terminal_order": 2,
       "terminal_icon": "family"
+    }
+  ],
+  "regimes": [
+    {
+      "id": 1,
+      "name": "Krízový režim",
+      "rules": { "work_window_start_min": 0, "work_window_end_min": 1440, "auto_lunch_enabled": false, "rounding_in_min": 0, "rounding_out_min": 0, "auto_repair_mode": 0 },
+      "interruptions": [
+        { "code": 4, "counts_to_lunch_base": true },
+        { "code": 13, "calc": "COUNTED", "full_day_min": 480 }
+      ]
     }
   ],
   "punch_codes": [
@@ -384,7 +397,8 @@
           "template_id": 2,
           "calendar_id": 1,
           "day_types": ["PP", "PP", "VV", "VN", "PP", "PP", "PP", "PP", "PP", "VV", "VN", "PP", "PP", "PP", "PP", "PP", "VV", "VN", "PP", "PP", "PP", "PP", "PP", "VV", "VN", "PP", "PP", "PP", "PP", "PP", "VV"],
-          "expected_min": [409, 409, 0, 0, 409, 409, 409, 409, 409, 0, 0, 409, 409, 409, 409, 409, 0, 0, 409, 409, 409, 409, 409, 0, 0, 409, 409, 409, 409, 409, 0]
+          "expected_min": [409, 409, 0, 0, 409, 409, 409, 409, 409, 0, 0, 409, 409, 409, 409, 409, 0, 0, 409, 409, 409, 409, 409, 0, 0, 409, 409, 409, 409, 409, 0],
+          "regime_ids": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
         },
         {
           "month": "2026-11",
@@ -393,7 +407,8 @@
           "template_id": 2,
           "calendar_id": 1,
           "day_types": ["SN", "PP", "PP", "PP", "PP", "PP", "VV", "VN", "PP", "PP", "PP", "PP", "PP", "VV", "VN", "PP", "SP", "PP", "PP", "PP", "VV", "VN", "PP", "PP", "PP", "PP", "PP", "VV", "VN", "PP"],
-          "expected_min": [0, 450, 450, 450, 450, 450, 0, 0, 450, 450, 450, 450, 450, 0, 0, 450, 0, 450, 450, 450, 0, 0, 450, 450, 450, 450, 450, 0, 0, 450]
+          "expected_min": [0, 450, 450, 450, 450, 450, 0, 0, 450, 450, 450, 450, 450, 0, 0, 450, 0, 450, 450, 450, 0, 0, 450, 450, 450, 450, 450, 0, 0, 450],
+          "regime_ids": [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         }
       ]
     },

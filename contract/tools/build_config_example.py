@@ -18,7 +18,10 @@ Pravidlá (rovnaké ako v Accesse):
   * Úväzok: fond = round(fond * úväzok / 100) – zaokrúhlenie na najbližšie, polovica na párne (ako VBA CLng).
   * Okno práce (kontrakt 1.4.0): ak platná verzia fondu pre mesiac má "window" [začiatok, koniec] v minútach, mesiac zamestnanca
     dostane window_start_min a window_end_min; inak sa kľúče vynechajú a platí okno z rules.
-  * Voliteľné kľúče rules a prerušení (1.4.0) sa len prepíšu zo vstupu; ich zmysel a rozsahy hlási tools/verify_config.py.
+  * Voliteľné kľúče rules a prerušení (1.4.0, 1.5.0) sa len prepíšu zo vstupu; ich zmysel a rozsahy hlási tools/verify_config.py.
+  * Režimy výpočtu (kontrakt 1.5.0): `regimes` sa prepíšu zo vstupu. Zamestnanec má vo vstupe `regime_periods` (režim a obdobie od-do
+    po dňoch, vrátane oboch dní, môže presahovať mesiac). Mesiac zamestnanca dostane `regime_ids`: pre každý deň číslo režimu, 0 = bez režimu;
+    kľúč sa vynechá, keď v mesiaci nie je žiadny deň s režimom. Obdobia jedného zamestnanca sa nesmú prekrývať (Access to nepripustí).
 
 Použitie:  python3 -I build_config_example.py [vstup.json] [výstup.json]
            python3 -I build_config_example.py --check      (zlatý súbor zodpovedá vstupu; kód 1 ak nie)
@@ -87,6 +90,35 @@ def day_plan(month, fund_ver, cal, holidays, pct):
     return types, fond
 
 
+def check_regime_periods(pn, periods, regime_ids):
+    """Obdobia režimu jedného zamestnanca: existujúci režim, od <= do, bez prekrytia (inak ValueError)."""
+    spans = []
+    for p in periods:
+        if p["regime"] not in regime_ids:
+            raise ValueError(f"{pn}: obdobie odkazuje na neexistujúci režim {p['regime']}")
+        a, b = datetime.date.fromisoformat(p["from"]), datetime.date.fromisoformat(p["to"])
+        if b < a:
+            raise ValueError(f"{pn}: obdobie režimu {p['regime']} končí pred začiatkom")
+        spans.append((a, b, p["regime"]))
+    spans.sort()
+    for (a1, b1, r1), (a2, b2, r2) in zip(spans, spans[1:]):
+        if a2 <= b1:
+            raise ValueError(f"{pn}: obdobia režimov {r1} a {r2} sa prekrývajú")
+
+
+def regime_days(month, periods):
+    """Číslo režimu pre každý deň mesiaca (0 = bez režimu); None, ak v mesiaci nie je žiadny deň s režimom."""
+    y, m = map(int, month.split("-"))
+    nd = calendar.monthrange(y, m)[1]
+    ids = [0] * nd
+    for p in periods:
+        a, b = datetime.date.fromisoformat(p["from"]), datetime.date.fromisoformat(p["to"])
+        for d in range(1, nd + 1):
+            if a <= datetime.date(y, m, d) <= b:
+                ids[d - 1] = p["regime"]
+    return ids if any(ids) else None
+
+
 def resolve_rule(versions, ym):
     v = valid_version(versions, ym)
     if v["interval_days"]:
@@ -116,9 +148,13 @@ def build(inp):
                 rules.append(rr)
             tm.append({"month": mo, "rules": rules})
         templates.append({"id": t["id"], "name": t["name"], "months": tm})
+    regimes = inp.get("regimes")
+    regime_ids = {r["id"] for r in regimes or []}
     employees, n_mon = [], 0
     for e in inp["employees"]:
         em = []
+        periods = e.get("regime_periods", [])
+        check_regime_periods(e["personnel_number"], periods, regime_ids)
         for mo in months:
             a = valid_version(e["assignments"], ym_key(mo))
             fv = valid_version(funds[a["fund"]]["versions"], ym_key(mo))
@@ -127,16 +163,23 @@ def build(inp):
                      "calendar_id": a["calendar"], "day_types": types, "expected_min": fond}
             if fv.get("window"):
                 entry["window_start_min"], entry["window_end_min"] = fv["window"]
+            rd = regime_days(mo, periods)
+            if rd is not None:
+                entry["regime_ids"] = rd
             em.append(entry)
             n_mon += 1
         employees.append({"personnel_number": e["personnel_number"], "months": em})
-    return {
+    out = {
         "schema_version": 2,
         "config_version": inp["config_version"],
         "generated_at": inp["generated_at"],
         "rok": inp["rok"],
         "rules": inp["rules"],
         "interruptions": inp["interruptions"],
+    }
+    if regimes:
+        out["regimes"] = regimes
+    out.update({
         "punch_codes": inp["punch_codes"],
         "holidays": inp["holidays"],
         "period": inp["period"],
@@ -145,7 +188,8 @@ def build(inp):
         "templates": templates,
         "employees": employees,
         "counts": {"employees": len(employees), "employee_months": n_mon},
-    }
+    })
+    return out
 
 
 def fmt(o, lvl=0):

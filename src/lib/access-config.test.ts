@@ -536,6 +536,289 @@ describe("voliteľné kľúče kontraktu 1.4.0", () => {
   });
 });
 
+describe("voliteľné kľúče kontraktu 1.5.0", () => {
+  const it_ = (d: Doc, code: number): Doc => d.interruptions.find((i: Doc) => i.code === code);
+  const reg = (d: Doc): Doc => d.regimes[0];
+  const hasError = (mutate: (d: Doc) => void, part: string, strict = false) => {
+    const d = golden();
+    mutate(d);
+    const errs = check(d, strict).errors;
+    expect(
+      errs.some((e) => e.includes(part)),
+      `hľadané '${part}' nie je v ${JSON.stringify(errs)}`,
+    ).toBe(true);
+  };
+
+  it("súbor bez kľúčov 1.5.0 je stále platný (spätná kompatibilita s 1.4.0)", () => {
+    const d = golden();
+    delete d.regimes;
+    for (const i of d.interruptions as Doc[]) {
+      delete i.full_day_min;
+      delete i.counts_to_lunch_base;
+    }
+    for (const e of d.employees as Doc[]) for (const m of e.months as Doc[]) delete m.regime_ids;
+    const r = check(d, true);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+  it("zlatý súbor používa všetky kľúče 1.5.0", () => {
+    const d = golden();
+    const pouzite = new Set((d.interruptions as Doc[]).flatMap((i) => Object.keys(i)));
+    expect(pouzite.has("full_day_min")).toBe(true);
+    expect(pouzite.has("counts_to_lunch_base")).toBe(true);
+    expect((d.regimes as Doc[]).map((r) => r.id)).toEqual([1]);
+    expect(
+      (d.employees as Doc[]).some((e) => (e.months as Doc[]).some((m) => "regime_ids" in m)),
+    ).toBe(true);
+    expect(check(d, true).errors).toEqual([]);
+  });
+
+  describe("vlastnosti prerušení", () => {
+    it("full_day_min mimo rozsahu alebo zlého typu", () => {
+      for (const zle of [0, 1441, -1, "300", true, 300.5, null])
+        hasError((d) => (it_(d, 2).full_day_min = zle), "full_day_min musí byť celé číslo 1 až 1440");
+    });
+    it("hranice full_day_min sú platné", () => {
+      for (const ok of [1, 1440]) {
+        const d = golden();
+        it_(d, 2).full_day_min = ok;
+        expect(check(d, true).errors).toEqual([]);
+      }
+    });
+    it("full_day_min len pre calc COUNTED", () => {
+      for (const code of [1, 7, 13])
+        hasError((d) => (it_(d, code).full_day_min = 300), "full_day_min patrí len prerušeniu s calc COUNTED");
+    });
+    it("counts_to_lunch_base nie je pravdivostná hodnota", () => {
+      for (const zle of ["true", 1, 0, null])
+        hasError((d) => (it_(d, 12).counts_to_lunch_base = zle), "counts_to_lunch_base nie je true/false");
+    });
+    it("counts_to_lunch_base = true len pre calc COUNTED", () => {
+      for (const code of [1, 7, 13])
+        hasError(
+          (d) => (it_(d, code).counts_to_lunch_base = true),
+          "counts_to_lunch_base = true patrí len prerušeniu s calc COUNTED",
+        );
+    });
+    it("counts_to_lunch_base = false je neškodné aj pri práci", () => {
+      const d = golden();
+      it_(d, 1).counts_to_lunch_base = false;
+      it_(d, 13).counts_to_lunch_base = false;
+      expect(check(d, true).errors).toEqual([]);
+    });
+  });
+
+  describe("režimy výpočtu", () => {
+    it("regimes nie je pole", () => {
+      hasError((d) => (d.regimes = {}), "regimes nie je pole");
+    });
+    it("príliš veľa režimov", () => {
+      hasError((d) => {
+        d.regimes = Array.from({ length: 21 }, (_, i) => ({
+          id: i + 1,
+          name: `R${i + 1}`,
+          rules: { auto_lunch_enabled: false },
+        }));
+      }, "režimov je 21, najviac 20");
+    });
+    it("id režimu", () => {
+      for (const zle of [0, 100, -1, "1", true, 1.5, null])
+        hasError((d) => (reg(d).id = zle), "id musí byť celé číslo 1 až 99");
+    });
+    it("dva režimy s rovnakým id", () => {
+      hasError(
+        (d) => d.regimes.push({ id: 1, name: "Iný", rules: { auto_lunch_enabled: false } }),
+        "režim 1 je v zozname dvakrát",
+      );
+    });
+    it("názov režimu", () => {
+      for (const zly of ["", " Krízový", "Krízový ", "x".repeat(41), "a\nb", 5, null])
+        hasError((d) => (reg(d).name = zly), "name musí byť text 1 až 40 znakov");
+      const d = golden();
+      reg(d).name = "x".repeat(40);
+      expect(check(d).errors).toEqual([]);
+    });
+    it("dva režimy s rovnakým názvom (bez ohľadu na veľkosť písmen)", () => {
+      hasError(
+        (d) => d.regimes.push({ id: 2, name: "KRÍZOVÝ REŽIM", rules: { auto_lunch_enabled: false } }),
+        "majú rovnaký názov",
+      );
+    });
+    it("neznámy kľúč režimu je chyba", () => {
+      hasError((d) => (reg(d).employee = "Ján"), "regimes[0]: neznáme kľúče");
+    });
+    it("režim neprepisuje nepovolené pravidlá", () => {
+      for (const k of [
+        "duplicate_punch_window_min",
+        "default_daily_fund_min",
+        "interruption_check_enabled",
+        "correction_deadline_day",
+        "early_return_ends_interruption",
+        "rounding_in_mn",
+      ])
+        hasError((d) => (reg(d).rules[k] = 1), `rules.${k} režim nemení`);
+    });
+    it("pravidlá režimu mimo rozsahu", () => {
+      const zle: Record<string, unknown[]> = {
+        full_day_obstacle_min: [0, 1441],
+        auto_lunch_trigger_min: [-1, 1441],
+        auto_lunch_deduct_min: [-1, 601],
+        lunch_recorded_mode: [3, -1],
+        lunch_min_min: [601, -1],
+        rounding_in_min: [61, -1],
+        rounding_out_min: [61, -1],
+        rounding_mode: [4, -1],
+        auto_repair_mode: [10, -1],
+        auto_repair_target: [2, -1],
+        auto_repair_cases: [0, 4],
+      };
+      for (const [k, hodnoty] of Object.entries(zle))
+        for (const v of [...hodnoty, "5", true, 1.5, null])
+          hasError((d) => (reg(d).rules[k] = v), `rules.${k} musí byť celé číslo`);
+    });
+    it("pravdivostné pravidlá režimu", () => {
+      for (const k of ["auto_lunch_enabled", "unlabeled_out_is_lunch"])
+        for (const v of ["ano", 1, 0, null])
+          hasError((d) => (reg(d).rules[k] = v), `rules.${k} nie je true/false`);
+    });
+    it("okno režimu len spolu a koniec po začiatku", () => {
+      hasError(
+        (d) => delete reg(d).rules.work_window_end_min,
+        "work_window_start_min a work_window_end_min musia byť spolu",
+      );
+      for (const [a, b] of [
+        [600, 600],
+        [600, 300],
+      ])
+        hasError((d) => {
+          reg(d).rules.work_window_start_min = a;
+          reg(d).rules.work_window_end_min = b;
+        }, "koniec okna práce nie je po začiatku");
+      const d = golden();
+      reg(d).rules.work_window_start_min = 0;
+      reg(d).rules.work_window_end_min = 1440;
+      expect(check(d).errors).toEqual([]);
+    });
+    it("rules režimu nie je objekt", () => {
+      hasError((d) => (reg(d).rules = []), "rules nie je objekt");
+    });
+    it("úprava neexistujúceho prerušenia", () => {
+      hasError(
+        (d) => reg(d).interruptions.push({ code: 99, counts_to_lunch_base: true }),
+        "úprava neexistujúceho prerušenia 99",
+      );
+    });
+    it("práca a obed sa v režime nemenia", () => {
+      for (const code of [1, 7])
+        hasError(
+          (d) => reg(d).interruptions.push({ code, calc: "UNPAID" }),
+          "práca (č. 1) a obed (č. 7) sa v režime nemenia",
+        );
+    });
+    it("prerušenie v režime dvakrát", () => {
+      hasError(
+        (d) => reg(d).interruptions.push({ code: 4, counts_to_lunch_base: false }),
+        "prerušenie 4 je upravené dvakrát",
+      );
+    });
+    it("úprava bez vlastnosti nič nemení", () => {
+      hasError((d) => reg(d).interruptions.push({ code: 2 }), "prerušenie 2 nič nemení");
+    });
+    it("calc v režime je len COUNTED alebo UNPAID", () => {
+      for (const zle of ["WORK", "LUNCH", "work", "", null])
+        hasError((d) => (reg(d).interruptions[1].calc = zle), "calc musí byť COUNTED alebo UNPAID");
+    });
+    it("vlastnosti v režime podľa výslednej hodnoty calc", () => {
+      // č. 13 je v základe UNPAID, režim ho robí COUNTED: full_day_min je platné
+      expect(check(golden()).errors).toEqual([]);
+      // keď režim calc nemení a prerušenie je UNPAID, full_day_min je chyba
+      hasError(
+        (d) => delete reg(d).interruptions[1].calc,
+        "full_day_min patrí len prerušeniu s calc COUNTED",
+      );
+      // režim robí z COUNTED prerušenia UNPAID: counts_to_lunch_base = true je chyba
+      hasError(
+        (d) => (reg(d).interruptions[0].calc = "UNPAID"),
+        "counts_to_lunch_base = true patrí len prerušeniu s calc COUNTED",
+      );
+    });
+    it("vlastnosti v režime mimo rozsahu", () => {
+      for (const zle of [0, 1441, "480", true, null])
+        hasError(
+          (d) => (reg(d).interruptions[1].full_day_min = zle),
+          "full_day_min musí byť celé číslo 1 až 1440",
+        );
+      for (const zle of ["true", 1, null])
+        hasError(
+          (d) => (reg(d).interruptions[0].counts_to_lunch_base = zle),
+          "counts_to_lunch_base nie je true/false",
+        );
+    });
+    it("neznámy kľúč v úprave prerušenia", () => {
+      hasError((d) => (reg(d).interruptions[0].terminal_button = true), "má neznáme kľúče");
+    });
+    it("prázdny režim je upozornenie a v prísnom režime chyba", () => {
+      const d = golden();
+      d.regimes.push({ id: 2, name: "Prázdny" });
+      const r = check(d);
+      expect(r.errors).toEqual([]);
+      expect(r.warnings.some((w) => w.includes("režim 2 nič nemení"))).toBe(true);
+      hasError((x) => x.regimes.push({ id: 2, name: "Prázdny" }), "režim 2 nič nemení", true);
+    });
+  });
+
+  describe("režim v mesiaci zamestnanca", () => {
+    const m_ = (d: Doc, m: string): Doc => mon(d, "9000003", m);
+
+    it("zlý počet dní alebo hodnoty", () => {
+      hasError(
+        (d) => (m_(d, "2026-11").regime_ids = m_(d, "2026-11").regime_ids.slice(0, -1)),
+        "regime_ids musí mať 30 celých čísel 0 až 99",
+      );
+      for (const zle of [-1, 100, "1", true, 1.5, null])
+        hasError(
+          (d) => (m_(d, "2026-11").regime_ids[3] = zle),
+          "regime_ids musí mať 30 celých čísel 0 až 99",
+        );
+      hasError(
+        (d) => (m_(d, "2026-11").regime_ids = "1".repeat(30)),
+        "regime_ids musí mať 30 celých čísel 0 až 99",
+      );
+    });
+    it("odkaz na neexistujúci režim", () => {
+      hasError(
+        (d) => (m_(d, "2026-11").regime_ids[0] = 7),
+        "regime_ids odkazuje na neexistujúci režim 7",
+      );
+    });
+    it("regime_ids bez regimes", () => {
+      hasError((d) => delete d.regimes, "regime_ids odkazuje na neexistujúci režim 1");
+    });
+    it("regime_ids bez režimu je upozornenie a v prísnom režime chyba", () => {
+      const d = golden();
+      m_(d, "2026-11").regime_ids = new Array(30).fill(0);
+      const r = check(d);
+      expect(r.errors).toEqual([]);
+      expect(r.warnings.some((w) => w.includes("neobsahuje žiaden režim"))).toBe(true);
+      hasError(
+        (x) => (m_(x, "2026-11").regime_ids = new Array(30).fill(0)),
+        "neobsahuje žiaden režim",
+        true,
+      );
+    });
+    it("regime_ids majú len mesiace s režimom (obdobie cez hranicu mesiaca)", () => {
+      const d = golden();
+      for (const e of d.employees as Doc[])
+        for (const m of e.months as Doc[])
+          expect("regime_ids" in m, `${e.personnel_number} ${m.month}`).toBe(
+            e.personnel_number === "9000003",
+          );
+      expect(m_(d, "2026-10").regime_ids).toEqual([...new Array(25).fill(0), ...new Array(6).fill(1)]);
+      expect(m_(d, "2026-11").regime_ids).toEqual([...new Array(6).fill(1), ...new Array(24).fill(0)]);
+    });
+  });
+});
+
 describe("kódy razení, mapovanie, sviatky", () => {
   it("kód razenia odkazuje na neexistujúce prerušenie", () => {
     rejects((d) => (d.punch_codes[0].interruption = 99), "neexistujúce prerušenie 99");

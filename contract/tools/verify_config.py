@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Overenie súboru dochs_config.json (konfigurácia a výpočtový plán z Accessu, kontrakt 1.2.0 až 1.4.0, schema_version 2).
+"""Overenie súboru dochs_config.json (konfigurácia a výpočtový plán z Accessu, kontrakt 1.2.0 až 1.5.0, schema_version 2).
 
 Použitie:  python3 -I verify_config.py dochs_config.json [--strict]
 
@@ -11,6 +11,8 @@ Kontroly (chyby ukončia program kódom 1; --strict zmení aj upozornenia na chy
      Tlačidlá terminála (1.3.0, voliteľné): terminal_button / terminal_label / terminal_order, pozri README.md.
      Voliteľné kľúče 1.4.0: v rules lunch_*, rounding_*, auto_repair_*, correction_deadline_day, early_return_ends_interruption,
      unlabeled_out_is_lunch; v prerušeniach calc UNPAID, terminal_icon, terminal_request, needs_approval, full_day_only.
+     Voliteľné kľúče 1.5.0: v prerušeniach full_day_min a counts_to_lunch_base (len pre calc COUNTED); režimy výpočtu `regimes`
+     (jedinečné id, uzavretý zoznam prepisovaných pravidiel, úpravy prerušení) a v mesiaci zamestnanca regime_ids (režim každého dňa).
   4. Plán: každý mesiac zamestnanca leží v okne period, dni majú správny počet (28 až 31 podľa kalendára),
      2. písmeno typu dňa zodpovedá skutočnému dňu v týždni, sviatok z číselníka má 1. písmeno S,
      fond je 0 v dňoch, ktoré nie sú pracovné (V, S), a nepresahuje 1440 minút.
@@ -27,13 +29,14 @@ import sys
 
 TOP_REQ = ["schema_version", "config_version", "rok", "rules", "interruptions", "punch_codes", "holidays",
            "period", "terminal_code_map", "funds", "templates", "employees", "counts"]
-TOP_OPT = ["generated_at"]
+TOP_OPT = ["generated_at", "regimes"]   # regimes: kontrakt 1.5.0
 RULES_REQ = ["work_window_start_min", "work_window_end_min", "full_day_obstacle_min", "auto_lunch_trigger_min",
              "auto_lunch_deduct_min", "auto_lunch_enabled", "duplicate_punch_window_min", "default_daily_fund_min",
              "auto_repair_mode"]
 INT_REQ = ["code", "name", "short_name", "start_punch_code", "end_punch_code", "is_work", "is_lunch", "auto_end_of_shift", "calc"]
 INT_OPT = ["counts_to_fund", "counts_to_work", "deducts_leave", "terminal_button", "terminal_label", "terminal_order",
-           "terminal_icon", "terminal_request", "needs_approval", "full_day_only"]
+           "terminal_icon", "terminal_request", "needs_approval", "full_day_only",
+           "full_day_min", "counts_to_lunch_base"]   # posledné dva: kontrakt 1.5.0, len pre calc COUNTED
 INT_FLAGS_NOT_FOR_WORK = ("terminal_request", "needs_approval", "full_day_only")   # 1.4.0, patria k č. 1 nie
 MAX_BUTTONS = 12
 MAX_LABEL = 24
@@ -46,7 +49,19 @@ ICON_RE = re.compile(r"^[a-z][a-z0-9_]{0,19}$")
 ICONS = {"doctor", "family", "trip", "errand", "private", "lunch", "home", "other"}   # zatvorený zoznam, pozri README.md
 EMP_KEYS = {"personnel_number", "months"}
 MON_KEYS = {"month", "employment_pct", "fund_id", "template_id", "calendar_id", "day_types", "expected_min"}
-MON_OPT = {"window_start_min", "window_end_min"}   # kontrakt 1.4.0
+MON_OPT = {"window_start_min", "window_end_min", "regime_ids"}   # okno: kontrakt 1.4.0, regime_ids: 1.5.0
+# kontrakt 1.5.0: režim výpočtu = pomenovaná sada prepísaných pravidiel; uzavretý zoznam kľúčov (neznámy kľúč by terminál potichu ignoroval
+# a počítal by inak ako Access, preto je v režime chyba, nie upozornenie)
+MAX_REGIMES = 20
+MAX_REGIME_ID = 99
+MAX_REGIME_NAME = 40
+REGIME_RULES_INT = {"work_window_start_min": (0, 1440), "work_window_end_min": (0, 1440), "full_day_obstacle_min": (1, 1440),
+                    "auto_lunch_trigger_min": (0, 1440), "auto_lunch_deduct_min": (0, 600), "lunch_recorded_mode": (0, 2),
+                    "lunch_min_min": (0, 600), "rounding_in_min": (0, 60), "rounding_out_min": (0, 60), "rounding_mode": (0, 3),
+                    "auto_repair_mode": (0, 9), "auto_repair_target": (0, 1), "auto_repair_cases": (1, 3)}
+REGIME_RULES_BOOL = ["auto_lunch_enabled", "unlabeled_out_is_lunch"]
+REGIME_CALC = {"COUNTED", "UNPAID"}
+REGIME_INT_KEYS = {"code", "calc", "full_day_min", "counts_to_lunch_base"}
 RULE_KEYS = {"interruption", "disabled", "allowed_from_min", "allowed_to_min", "max_duration_min", "min_duration_min",
              "min_worked_before_min"}
 MAX_MONTHS = 14
@@ -187,6 +202,17 @@ def check(doc, strict=False):
                     E(f"prerušenie 1: práca (č. 1) nemá kľúč {k} (patrí ostatným prerušeniam)")
             if it.get("full_day_only") is True and it.get("terminal_button") is True:
                 E(f"prerušenie {c}: full_day_only a terminal_button sa vylučujú (tlačidlo zapisuje odchod a návrat, nie celý deň)")
+            # kontrakt 1.5.0: vlastnosti počítania; majú zmysel len pre prerušenie, ktoré sa počíta skutočným časom (COUNTED)
+            if "full_day_min" in it:
+                if not (is_int(it["full_day_min"]) and 1 <= it["full_day_min"] <= 1440):
+                    E(f"prerušenie {c}: full_day_min musí byť celé číslo 1 až 1440")
+                elif calc != "COUNTED":
+                    E(f"prerušenie {c}: full_day_min patrí len prerušeniu s calc COUNTED")
+            if "counts_to_lunch_base" in it:
+                if not isinstance(it["counts_to_lunch_base"], bool):
+                    E(f"prerušenie {c}: counts_to_lunch_base nie je true/false")
+                elif it["counts_to_lunch_base"] and calc != "COUNTED":
+                    E(f"prerušenie {c}: counts_to_lunch_base = true patrí len prerušeniu s calc COUNTED")
         if 1 not in ints:
             E("v zozname prerušení chýba č. 1 (pracovná doba)")
 
@@ -259,6 +285,97 @@ def check(doc, strict=False):
             seen_text.setdefault(key, c)
     if len(buttons) > MAX_BUTTONS:
         E(f"tlačidiel pre terminál je {len(buttons)}, najviac {MAX_BUTTONS}")
+
+    # --- režimy výpočtu (kontrakt 1.5.0): pomenovaná sada prepísaných pravidiel, ktorú Access priraďuje zamestnancovi na obdobie
+    reg_ids = {}
+    if "regimes" in doc:
+        regs = doc["regimes"]
+        if not isinstance(regs, list):
+            E("regimes nie je pole")
+            regs = []
+        if len(regs) > MAX_REGIMES:
+            E(f"režimov je {len(regs)}, najviac {MAX_REGIMES}")
+        seen_names = {}
+        for i, rg in enumerate(regs):
+            if not isinstance(rg, dict):
+                E(f"regimes[{i}] nie je objekt")
+                continue
+            extra = set(rg) - {"id", "name", "rules", "interruptions"}
+            if extra:
+                E(f"regimes[{i}]: neznáme kľúče {sorted(extra)}")
+            rid = rg.get("id")
+            if not (is_int(rid) and 1 <= rid <= MAX_REGIME_ID):
+                E(f"regimes[{i}]: id musí byť celé číslo 1 až {MAX_REGIME_ID}")
+                continue
+            if rid in reg_ids:
+                E(f"režim {rid} je v zozname dvakrát")
+            reg_ids[rid] = rg
+            nm = rg.get("name")
+            if not (isinstance(nm, str) and 1 <= len(nm) <= MAX_REGIME_NAME and nm == nm.strip() and all(ord(ch) >= 32 for ch in nm)):
+                E(f"režim {rid}: name musí byť text 1 až {MAX_REGIME_NAME} znakov bez medzier na kraji")
+            elif nm.casefold() in seen_names:
+                E(f"režimy {seen_names[nm.casefold()]} a {rid} majú rovnaký názov '{nm}'")
+            else:
+                seen_names[nm.casefold()] = rid
+            rr = rg.get("rules", {})
+            if not isinstance(rr, dict):
+                E(f"režim {rid}: rules nie je objekt")
+                rr = {}
+            for k, v in rr.items():
+                if k in REGIME_RULES_INT:
+                    lo, hi = REGIME_RULES_INT[k]
+                    if not (is_int(v) and lo <= v <= hi):
+                        E(f"režim {rid}: rules.{k} musí byť celé číslo {lo} až {hi}")
+                elif k in REGIME_RULES_BOOL:
+                    if not isinstance(v, bool):
+                        E(f"režim {rid}: rules.{k} nie je true/false")
+                else:
+                    E(f"režim {rid}: rules.{k} režim nemení (povolené: {', '.join(sorted(list(REGIME_RULES_INT) + REGIME_RULES_BOOL))})")
+            if ("work_window_start_min" in rr) != ("work_window_end_min" in rr):
+                E(f"režim {rid}: work_window_start_min a work_window_end_min musia byť spolu")
+            elif "work_window_start_min" in rr and is_int(rr["work_window_start_min"]) and is_int(rr["work_window_end_min"]) \
+                    and rr["work_window_end_min"] <= rr["work_window_start_min"]:
+                E(f"režim {rid}: koniec okna práce nie je po začiatku")
+            ro = rg.get("interruptions", [])
+            if not isinstance(ro, list):
+                E(f"režim {rid}: interruptions nie je pole")
+                ro = []
+            seen_c = set()
+            for j, o in enumerate(ro):
+                if not isinstance(o, dict):
+                    E(f"režim {rid}: interruptions[{j}] nie je objekt")
+                    continue
+                extra = set(o) - REGIME_INT_KEYS
+                if extra:
+                    E(f"režim {rid}: interruptions[{j}] má neznáme kľúče {sorted(extra)}")
+                c = o.get("code")
+                if not (is_int(c) and c in ints):
+                    E(f"režim {rid}: úprava neexistujúceho prerušenia {c!r}")
+                    continue
+                if c in seen_c:
+                    E(f"režim {rid}: prerušenie {c} je upravené dvakrát")
+                seen_c.add(c)
+                base_calc = ints[c].get("calc")
+                if base_calc in ("WORK", "LUNCH"):
+                    E(f"režim {rid}: práca (č. 1) a obed (č. 7) sa v režime nemenia; pravidlá obeda sú v rules")
+                    continue
+                if len(set(o) & (REGIME_INT_KEYS - {"code"})) == 0:
+                    E(f"režim {rid}: prerušenie {c} nič nemení (chýba calc, full_day_min alebo counts_to_lunch_base)")
+                if "calc" in o and o["calc"] not in REGIME_CALC:
+                    E(f"režim {rid}: prerušenie {c}: calc musí byť COUNTED alebo UNPAID")
+                eff = o["calc"] if o.get("calc") in REGIME_CALC else base_calc
+                if "full_day_min" in o:
+                    if not (is_int(o["full_day_min"]) and 1 <= o["full_day_min"] <= 1440):
+                        E(f"režim {rid}: prerušenie {c}: full_day_min musí byť celé číslo 1 až 1440")
+                    elif eff != "COUNTED":
+                        E(f"režim {rid}: prerušenie {c}: full_day_min patrí len prerušeniu s calc COUNTED")
+                if "counts_to_lunch_base" in o:
+                    if not isinstance(o["counts_to_lunch_base"], bool):
+                        E(f"režim {rid}: prerušenie {c}: counts_to_lunch_base nie je true/false")
+                    elif o["counts_to_lunch_base"] and eff != "COUNTED":
+                        E(f"režim {rid}: prerušenie {c}: counts_to_lunch_base = true patrí len prerušeniu s calc COUNTED")
+            if not rr and not ro:
+                W(f"režim {rid} nič nemení (prázdne rules aj interruptions)")
 
     # --- sviatky
     hol = set()
@@ -399,6 +516,16 @@ def check(doc, strict=False):
                 if mo["template_id"] not in tmpl_ids:
                     E(f"{lab}: neexistujúca šablóna {mo['template_id']!r}")
                 ndays = calendar.monthrange(*pm)[1]
+                # kontrakt 1.5.0: režim výpočtu pre každý deň mesiaca (0 = bez režimu); Access kľúč vynechá, ak v mesiaci žiaden režim nie je
+                if "regime_ids" in mo:
+                    ri = mo["regime_ids"]
+                    if not (isinstance(ri, list) and len(ri) == ndays and all(is_int(x) and 0 <= x <= MAX_REGIME_ID for x in ri)):
+                        E(f"{lab}: regime_ids musí mať {ndays} celých čísel 0 až {MAX_REGIME_ID}")
+                    else:
+                        for x in sorted(set(ri) - {0} - set(reg_ids)):
+                            E(f"{lab}: regime_ids odkazuje na neexistujúci režim {x}")
+                        if not any(ri):
+                            W(f"{lab}: regime_ids neobsahuje žiaden režim (kľúč sa má vynechať)")
                 dt, ex = mo["day_types"], mo["expected_min"]
                 if not (isinstance(dt, list) and len(dt) == ndays):
                     E(f"{lab}: day_types musí mať {ndays} dní")

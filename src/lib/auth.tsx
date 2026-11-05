@@ -10,7 +10,7 @@ interface AuthCtx {
   ready: boolean;
   roles: Role[];
   profile: { id: string; sap_id: string | null; department: string | null; daily_fund: number; organization_id: string | null } | null;
-  organization: { id: string; name: string; is_test?: boolean } | null;
+  organization: { id: string; name: string; is_test?: boolean | undefined } | null;
   /** Správa o chybe, ak sa údaje o účte (roly, profil, organizácia) nepodarilo načítať; inak null. */
   meError: string | null;
   refetchMe: () => void;

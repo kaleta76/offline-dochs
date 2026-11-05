@@ -12,7 +12,7 @@ function memoryStorage(initial: Record<string, string> = {}): NumberStorage & { 
   const data = { ...initial };
   return {
     data,
-    getItem: (k) => (k in data ? data[k] : null),
+    getItem: (k) => data[k] ?? null,
     setItem: (k, v) => {
       data[k] = String(v);
     },

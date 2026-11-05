@@ -80,7 +80,7 @@ export function AppShell() {
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1">
             <span>
               {isNetworkError(meError)
-                ? <>Údaje o účte sa nepodarilo načítať, preto môžu chýbať ponuky (napríklad Správa). Prehliadač sa nevie spojiť s databázou <strong className="num">{backendHost(import.meta.env.VITE_SUPABASE_URL) || "aplikácie"}</strong>. Skontrolujte pripojenie; v práci môže túto adresu blokovať firewall alebo proxy.</>
+                ? <>Údaje o účte sa nepodarilo načítať, preto môžu chýbať ponuky (napríklad Správa). Prehliadač sa nevie spojiť s databázou <strong className="num">{backendHost(import.meta.env['VITE_SUPABASE_URL']) || "aplikácie"}</strong>. Skontrolujte pripojenie; v práci môže túto adresu blokovať firewall alebo proxy.</>
                 : <>Údaje o účte sa nepodarilo načítať ({meError}), preto môžu chýbať ponuky (napríklad Správa).</>}
             </span>
             <button type="button" onClick={refetchMe} className="font-bold underline underline-offset-4">Skúsiť znova</button>

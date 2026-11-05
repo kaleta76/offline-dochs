@@ -17,14 +17,14 @@ const count = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v 
 export function parseSummary(value: unknown): TestOrganizationSummary | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
-  if (typeof v.name !== "string") return null;
+  if (typeof v['name'] !== "string") return null;
   return {
-    name: v.name,
-    isTest: v.is_test === true,
-    protectedOrganization: v.protected === true,
-    users: count(v.users),
-    punches: count(v.punches),
-    devices: count(v.devices),
+    name: v['name'],
+    isTest: v['is_test'] === true,
+    protectedOrganization: v['protected'] === true,
+    users: count(v['users']),
+    punches: count(v['punches']),
+    devices: count(v['devices']),
   };
 }
 
@@ -51,5 +51,5 @@ export function describeContents(s: Pick<TestOrganizationSummary, "users" | "pun
 /** Odpoveď po zrušení: počty, ktoré vrátila databáza. */
 export function parseDeleteResult(value: unknown): Pick<TestOrganizationSummary, "users" | "punches" | "devices"> {
   const v = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-  return { users: count(v.users), punches: count(v.punches), devices: count(v.devices) };
+  return { users: count(v['users']), punches: count(v['punches']), devices: count(v['devices']) };
 }

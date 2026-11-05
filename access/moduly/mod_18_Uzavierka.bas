@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_18_Uzavierka"
-'@Verzia 1.0.0
+'@Verzia 1.0.1
 Option Compare Database
 Option Explicit
 
@@ -951,8 +951,10 @@ End Function
 ' Import z DBF nahrádza pracovné fondy, pravidlá prerušení, priradenia a kalendáre celým obsahom súborov DBF.
 ' Ak existuje uzavretý mesiac, import nastavení sa nevykoná. Ak boli nastavenia upravované v tejto aplikácii,
 ' opýta sa na potvrdenie (raz za dávku). Vráti True, ak sa import nastavení smie vykonať.
+' bLenDopln = True: import nič neprepisuje ani nemaže (len doplní chýbajúce riadky), takže sa nepýta na prepis ručných úprav;
+' kontrola uzavretých mesiacov platí aj tak.
 '-------------------------------------------------------------------------------
-Public Function PrepisNastaveniPovoleny(ByVal strNazov As String) As Boolean
+Public Function PrepisNastaveniPovoleny(ByVal strNazov As String, Optional ByVal bLenDopln As Boolean = False) As Boolean
     Dim strLok As String
     On Error Resume Next
     If ExistujeUzavrety() Then
@@ -965,6 +967,7 @@ Public Function PrepisNastaveniPovoleny(ByVal strNazov As String) As Boolean
         End If
         Exit Function
     End If
+    If bLenDopln Then PrepisNastaveniPovoleny = True: Exit Function
     If mPrepis = 1 Then PrepisNastaveniPovoleny = True: Exit Function
     If mPrepis = 2 Then
         mBlokImport = mBlokImport & strNazov & vbCrLf

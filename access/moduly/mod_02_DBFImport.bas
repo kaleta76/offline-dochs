@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_02_DBFImport"
-'@Verzia 2.6.0
+'@Verzia 2.7.0
 Option Compare Database
 Option Explicit
 
@@ -30,6 +30,10 @@ Option Explicit
 '   Polia, ktorých význam sa nedal jednoznačne určiť z obrazoviek, sa ukladajú
 '   do stĺpca "Surove" ako text POLE=hodnota; (nič sa nestráca).
 '
+'   Bezpečný import číselníka a parametrov prerušení (2.7.0): číselník sa najprv porovná so súčasným a pri rozdieloch sa raz opýta,
+'   či prepísať hodnotami z Ordata (predvolene ponechať súčasné; chýbajúce prerušenia sa pridajú). Parametre prerušení sa preberajú len
+'   na výslovné Áno, existujúce riadky sa nemažú ani neprepisujú (dopĺňajú sa len chýbajúce). Fondy, kalendár a priradenia sa nemenili.
+'
 '   Čítanie DBF zabezpečuje mod_02a_DBFReader (binárne; dBase III aj dBase 7).
 '===============================================================================
 
@@ -37,6 +41,7 @@ Private mBatch As Boolean
 Private mOdM As Long, mOdR As Long, mDoM As Long, mDoR As Long
 Private mStrukturaOK As Boolean
 Private mFilterOC As Object          ' filter osobných čísel pre import (Nothing / prázdny = všetci)
+Private mPoznamkyImportu As String   ' čo sa pri dávkovom importe rozhodlo (zobrazí sa na konci)
 
 '-------------------------------------------------------------------------------
 ' Zastaraná funkcia pre konverziu kódovania (kódovanie 1250/852 rieši priamo binárny čítač DBF).
@@ -559,7 +564,52 @@ ChybaHandler:
 End Sub
 
 '-------------------------------------------------------------------------------
+' Súčasná hodnota textového poľa a hodnota z Ordata sa líšia (bez ohľadu na medzery na okrajoch, rozlišuje malé/veľké písmená a diakritiku).
+'-------------------------------------------------------------------------------
+Private Function InyText(ByVal vAccess As Variant, ByVal strOrdata As String) As Boolean
+    InyText = (StrComp(Trim$(CStr(Nz(vAccess, ""))), Trim$(strOrdata), vbBinaryCompare) <> 0)
+End Function
+
+'-------------------------------------------------------------------------------
+' Rozdiely medzi prerušením v Accesse (rs) a riadkom z Ordata (p = Array(číslo, názov, skratka, predvolba, kódZ, kódK, textZ, textK, funZ, funK)).
+' Vráti čitateľný zoznam rozdielov ("" = rovnaké); bKody sa nastaví, ak sa líšia kódy razení.
+'-------------------------------------------------------------------------------
+Private Function RozdielPreruseni(ByRef rs As DAO.Recordset, ByVal p As Variant, ByRef bKody As Boolean) As String
+    Dim s As String
+    If InyText(rs!Nazov, CStr(p(1))) Then s = s & "názov „" & Trim$(CStr(Nz(rs!Nazov, ""))) & "“ -> „" & CStr(p(1)) & "“; "
+    If InyText(rs!NazovSkratka, CStr(p(2))) Then s = s & "skratka „" & Trim$(CStr(Nz(rs!NazovSkratka, ""))) & "“ -> „" & CStr(p(2)) & "“; "
+    If InyText(rs!TextPredvolba, CStr(p(3))) Then s = s & "predvoľba „" & Trim$(CStr(Nz(rs!TextPredvolba, ""))) & "“ -> „" & CStr(p(3)) & "“; "
+    If CLng(Nz(rs!KodZaciatok, 0)) <> CLng(p(4)) Or CLng(Nz(rs!KodKoniec, 0)) <> CLng(p(5)) Then
+        s = s & "kódy razení " & CLng(Nz(rs!KodZaciatok, 0)) & "/" & CLng(Nz(rs!KodKoniec, 0)) & " -> " & CLng(p(4)) & "/" & CLng(p(5)) & "; "
+        bKody = True
+    End If
+    If CLng(Nz(rs!FunkciaZaciatok, 0)) <> CLng(p(8)) Or CLng(Nz(rs!FunkciaKoniec, 0)) <> CLng(p(9)) Then
+        s = s & "funkcie razení " & CLng(Nz(rs!FunkciaZaciatok, 0)) & "/" & CLng(Nz(rs!FunkciaKoniec, 0)) & " -> " & CLng(p(8)) & "/" & CLng(p(9)) & "; "
+    End If
+    If InyText(rs!TextZaciatok, CStr(p(6))) Then s = s & "text začiatku „" & Trim$(CStr(Nz(rs!TextZaciatok, ""))) & "“ -> „" & CStr(p(6)) & "“; "
+    If InyText(rs!TextKoniec, CStr(p(7))) Then s = s & "text konca „" & Trim$(CStr(Nz(rs!TextKoniec, ""))) & "“ -> „" & CStr(p(7)) & "“; "
+    If Len(s) > 0 Then s = Left$(s, Len(s) - 2)
+    RozdielPreruseni = s
+End Function
+
+'-------------------------------------------------------------------------------
+' Kód razenia z Ordata už v Accesse patrí inému prerušeniu (kolízia). Vráti text kolízie alebo "".
+'-------------------------------------------------------------------------------
+Private Function KoliziaKodu(ByVal lKod As Long, ByVal lCislo As Long) As String
+    Dim v As Variant
+    If lKod <= 0 Then Exit Function
+    v = DLookup("CisloPreruseni", "KodyRazeni", "KodRazenia = " & lKod)
+    If Not IsNull(v) Then
+        If CLng(v) <> lCislo And CLng(v) > 0 Then KoliziaKodu = "kód razenia " & lKod & " už patrí prerušeniu " & CLng(v)
+    End If
+End Function
+
+'-------------------------------------------------------------------------------
 ' Importuje číselník prerušení a generuje párové kódy razení pre príchody a odchody (cis_preruseni.dbf).
+' Bezpečný import: súbor sa najprv načíta a porovná so súčasným číselníkom v Accesse. Prerušenia, ktoré v Accesse chýbajú, sa pridajú.
+' Ak sa niektoré existujúce prerušenie líši (názov, skratka, texty, kódy razení), ukáže sa zoznam rozdielov a opýta sa RAZ:
+' Áno = prepísať súčasné hodnoty hodnotami z Ordata, Nie (predvolené) = ponechať súčasné. Nové prerušenie, ktorého kód razenia
+' už patrí inému prerušeniu, sa pri odpovedi Nie nepridá.
 '-------------------------------------------------------------------------------
 Public Sub ImportPreruseniDBFPriamo(Optional ByVal CestaKSuboru As String = "")
     On Error GoTo ChybaHandler
@@ -567,6 +617,9 @@ Public Sub ImportPreruseniDBFPriamo(Optional ByVal CestaKSuboru As String = "")
     Dim filePath As String, Cislo As Long, nazov As String
     Dim kodZ As Long, kodK As Long, txtZ As String, txtK As String
     Dim pocetP As Long, pocetK As Long, pfx As String
+    Dim polozky As Collection, p As Variant, strR As String, strKol As String
+    Dim strZoznam As String, strPrompt As String, nRozdiel As Long, nPonechane As Long, nNove As Long, nPreskocene As Long
+    Dim bKody As Boolean, bPrevziat As Boolean, bNove As Boolean, bZapis As Boolean, nRiadkov As Long
 
     Call PripravStrukturu
     filePath = CestaKSuboru
@@ -575,11 +628,10 @@ Public Sub ImportPreruseniDBFPriamo(Optional ByVal CestaKSuboru As String = "")
     If Not DbfOtvor(filePath, t) Then Exit Sub
 
     pfx = IIf(mBatch, "[Krok 3/6] ", "")
-    Call AktualizujProgress(pfx & "Importujem číselník prerušení (cis_preruseni.dbf)...", 0, t.PocetZaznamov)
+    Call AktualizujProgress(pfx & "Načítavam číselník prerušení (cis_preruseni.dbf)...", 0, t.PocetZaznamov)
 
-    Set db = CurrentDb
-    Set rsC = db.OpenRecordset("SELECT * FROM CiselnikPreruseni", dbOpenDynaset)
-
+    ' 1. načítanie súboru do pamäte
+    Set polozky = New Collection
     Do While DbfDalsi(t)
         Cislo = DbfLong(t, "CISLO")
         If Cislo > 0 Then
@@ -590,40 +642,94 @@ Public Sub ImportPreruseniDBFPriamo(Optional ByVal CestaKSuboru As String = "")
             txtK = DbfText(t, "TEXT_KON")
             If Len(txtZ) = 0 Then txtZ = nazov & " - zaciatok"
             If Len(txtK) = 0 Then txtK = nazov & " - koniec"
-
-            rsC.FindFirst "Cislo=" & Cislo
-            If rsC.NoMatch Then
-                rsC.AddNew
-                rsC!Cislo = Cislo
-                rsC!TypVypoctu = "STANDARD"
-            Else
-                rsC.Edit
-            End If
-            rsC!nazov = NV(Left$(nazov, 100))
-            rsC!NazovSkratka = NV(Left$(DbfText(t, "NAZOV_SKR"), 20))
-            rsC!TextPredvolba = NV(Left$(DbfText(t, "TEXT_PRED"), 50))
-            rsC!KodZaciatok = kodZ
-            rsC!TextZaciatok = NV(Left$(txtZ, 50))
-            rsC!FunkciaZaciatok = DbfLong(t, "FUN_ZAC")
-            rsC!KodKoniec = kodK
-            rsC!TextKoniec = NV(Left$(txtK, 50))
-            rsC!FunkciaKoniec = DbfLong(t, "FUN_KON")
-            rsC.Update
-            pocetP = pocetP + 1
-
-            If kodZ > 0 Then Call UlozKodRazenia(db, kodZ, Cislo, "Z", txtZ, nazov): pocetK = pocetK + 1
-            If kodK > 0 Then Call UlozKodRazenia(db, kodK, Cislo, "K", txtK, nazov): pocetK = pocetK + 1
-        End If
-
-        If (t.Prejdenych Mod 15) = 0 Or t.Prejdenych = t.PocetZaznamov Then
-            Call AktualizujProgress(pfx & "Importujem číselník prerušení...", t.Prejdenych, t.PocetZaznamov)
+            polozky.Add Array(Cislo, Left$(nazov, 100), Left$(DbfText(t, "NAZOV_SKR"), 20), Left$(DbfText(t, "TEXT_PRED"), 50), kodZ, kodK, _
+                              Left$(txtZ, 50), Left$(txtK, 50), DbfLong(t, "FUN_ZAC"), DbfLong(t, "FUN_KON"))
         End If
     Loop
+    Call DbfZatvor(t)
+
+    ' 2. porovnanie so súčasným číselníkom
+    Set db = CurrentDb
+    Set rsC = db.OpenRecordset("SELECT * FROM CiselnikPreruseni", dbOpenDynaset)
+    For Each p In polozky
+        nRiadkov = nRiadkov + 1
+        rsC.FindFirst "Cislo=" & CLng(p(0))
+        If rsC.NoMatch Then
+            strR = ""
+            strKol = KoliziaKodu(CLng(p(4)), CLng(p(0)))
+            If Len(strKol) = 0 Then strKol = KoliziaKodu(CLng(p(5)), CLng(p(0)))
+            If Len(strKol) > 0 Then strR = "nové prerušenie: " & strKol
+        Else
+            strR = RozdielPreruseni(rsC, p, bKody)
+        End If
+        If Len(strR) > 0 Then
+            nRozdiel = nRozdiel + 1
+            strZoznam = strZoznam & "č. " & CLng(p(0)) & ": " & strR & vbCrLf
+        End If
+    Next p
+
+    ' 3. jedno rozhodnutie za import (bez rozdielov sa nepýta)
+    bPrevziat = True
+    If nRozdiel > 0 Then
+        Call mod_00_Common.ZapisLog("ImportPreruseniDBFPriamo", "WARN", "Číselník prerušení z Ordata sa líši v " & nRozdiel & " prerušeniach.", strZoznam)
+        strPrompt = "Číselník prerušení z Ordata sa líši od súčasného v Accesse (" & nRozdiel & " z " & nRiadkov & " prerušení):" & vbCrLf & vbCrLf & _
+                    UkazkaRiadkov(strZoznam, 480) & vbCrLf & _
+                    IIf(bKody, "POZOR: líšia sa aj kódy razení. Ak ponecháte súčasné, razenia z Ordata s inými kódmi sa nepriradia k týmto prerušeniam." & vbCrLf & vbCrLf, "") & _
+                    "Áno = prepísať hodnotami z Ordata" & vbCrLf & "Nie = ponechať súčasné (odporúčané); chýbajúce prerušenia sa pridajú" & vbCrLf & _
+                    "(úplný zoznam je v logu)"
+        bPrevziat = (MsgBox(strPrompt, vbQuestion + vbYesNo + vbDefaultButton2, "Import číselníka prerušení z Ordata") = vbYes)
+    End If
+
+    ' 4. zápis
+    Call AktualizujProgress(pfx & "Importujem číselník prerušení...", 0, nRiadkov)
+    For Each p In polozky
+        rsC.FindFirst "Cislo=" & CLng(p(0))
+        bNove = rsC.NoMatch
+        bZapis = True
+        If bNove Then
+            If Not bPrevziat Then
+                If Len(KoliziaKodu(CLng(p(4)), CLng(p(0)))) > 0 Or Len(KoliziaKodu(CLng(p(5)), CLng(p(0)))) > 0 Then bZapis = False
+            End If
+            If bZapis Then
+                rsC.AddNew
+                rsC!Cislo = CLng(p(0))
+                rsC!TypVypoctu = "STANDARD"
+            Else
+                nPreskocene = nPreskocene + 1
+            End If
+        ElseIf bPrevziat Then
+            rsC.Edit
+        Else
+            bZapis = False
+            nPonechane = nPonechane + 1
+        End If
+
+        If bZapis Then
+            rsC!nazov = NV(CStr(p(1)))
+            rsC!NazovSkratka = NV(CStr(p(2)))
+            rsC!TextPredvolba = NV(CStr(p(3)))
+            rsC!KodZaciatok = CLng(p(4))
+            rsC!TextZaciatok = NV(CStr(p(6)))
+            rsC!FunkciaZaciatok = CLng(p(8))
+            rsC!KodKoniec = CLng(p(5))
+            rsC!TextKoniec = NV(CStr(p(7)))
+            rsC!FunkciaKoniec = CLng(p(9))
+            rsC.Update
+            pocetP = pocetP + 1
+            If bNove Then nNove = nNove + 1
+
+            If CLng(p(4)) > 0 Then Call UlozKodRazenia(db, CLng(p(4)), CLng(p(0)), "Z", CStr(p(6)), CStr(p(1))): pocetK = pocetK + 1
+            If CLng(p(5)) > 0 Then Call UlozKodRazenia(db, CLng(p(5)), CLng(p(0)), "K", CStr(p(7)), CStr(p(1))): pocetK = pocetK + 1
+        End If
+    Next p
 
     rsC.Close
-    Call DbfZatvor(t)
     Call DoplnPrerusenieDoDochadzky
-    Call mod_00_Common.ZapisLog("ImportPreruseniDBFPriamo", "INFO", "Číselník prerušení: " & pocetP & " prerušení, " & pocetK & " kódov razení.")
+    Call mod_00_Common.ZapisLog("ImportPreruseniDBFPriamo", "INFO", "Číselník prerušení: zapísaných " & pocetP & " (z toho nových " & nNove & "), ponechaných súčasných " & nPonechane & _
+                                ", nepridaných pre kolíziu kódu " & nPreskocene & ", kódov razení " & pocetK & IIf(nRozdiel > 0, ", rozdiely: " & IIf(bPrevziat, "prevzaté z Ordata", "ponechané súčasné"), "") & ".")
+    If nRozdiel > 0 Then
+        mPoznamkyImportu = mPoznamkyImportu & "Číselník prerušení: " & IIf(bPrevziat, "rozdiely (" & nRozdiel & ") sa prevzali z Ordata.", "rozdiely (" & nRozdiel & ") sa ponechali podľa Accessu; pridaných nových prerušení " & nNove & IIf(nPreskocene > 0, ", nepridaných pre kolíziu kódu " & nPreskocene, "") & ".") & vbCrLf
+    End If
     Call PosunKrok(5)
     Call ZavriProgress
     Exit Sub
@@ -634,6 +740,27 @@ ChybaHandler:
     Call DbfZatvor(t)
     Call ZavriProgress
 End Sub
+
+'-------------------------------------------------------------------------------
+' Prvé riadky zoznamu (najviac lMax znakov), každý skrátený; zvyšok nahradí poznámkou "a ďalších N".
+'-------------------------------------------------------------------------------
+Private Function UkazkaRiadkov(ByVal strZoznam As String, ByVal lMax As Long) As String
+    Dim a() As String, i As Long, s As String, strR As String, nZvysok As Long
+    a = Split(strZoznam, vbCrLf)
+    For i = LBound(a) To UBound(a)
+        If Len(a(i)) > 0 Then
+            strR = a(i)
+            If Len(strR) > 110 Then strR = Left$(strR, 107) & "..."
+            If Len(s) + Len(strR) + 2 > lMax Then
+                nZvysok = nZvysok + 1
+            Else
+                s = s & strR & vbCrLf
+            End If
+        End If
+    Next i
+    If nZvysok > 0 Then s = s & "... a ďalších " & nZvysok & vbCrLf
+    UkazkaRiadkov = s
+End Function
 
 '-------------------------------------------------------------------------------
 ' Zapisuje alebo aktualizuje kód razenia v tabuľkách KodyRazeni a TypyUdalosti.
@@ -810,29 +937,53 @@ ChybaHandler:
 End Sub
 
 '-------------------------------------------------------------------------------
-' Importuje šablóny parametrov výpočtu prerušení a PaM kódov zo súboru cis_parprer.dbf.
+' Importuje parametre prerušení z Ordata (cis_parprer.dbf). Bezpečný import: preberá sa len na výslovné Áno (predvolené je Nie),
+' súčasné riadky sa nemažú ani neprepisujú, dopĺňajú sa len riadky (šablóna, rok, mesiac, prerušenie), ktoré v Accesse ešte nie sú.
+' Pri uzavretých mesiacoch sa import nevykoná (pridané riadky by zmenili parametre uzavretého mesiaca).
 '-------------------------------------------------------------------------------
 Public Sub ImportParametrovPreruseniDBF(ByVal CestaDBF As String)
     If Len(CestaDBF) = 0 Then Exit Sub
     On Error GoTo ChybaHandler
-    If Not mod_18_Uzavierka.PrepisNastaveniPovoleny("pravidlá (parametre) prerušení") Then Exit Sub
-    Dim db As DAO.Database, t As DbfTab, rs As DAO.Recordset
-    Dim pouzite As Object, kluce As Object
+    If Not mod_18_Uzavierka.PrepisNastaveniPovoleny("pravidlá (parametre) prerušení", True) Then Exit Sub
+    Dim db As DAO.Database, t As DbfTab, rs As DAO.Recordset, rsE As DAO.Recordset
+    Dim pouzite As Object, kluce As Object, existujuce As Object
     Dim sablona As Long, rok As Long, mes As Long, cisPrer As Long, kluc As String
-    Dim d As Long, pocet As Long, pfx As String
+    Dim d As Long, pocet As Long, pocetPonechane As Long, pocetSucasne As Long, pfx As String
 
     Call PripravStrukturu
     Call NacitajObdobie
+    Set db = CurrentDb
+    pocetSucasne = DCount("*", "ParametrePreruseni")
+
+    ' súhlas: parametre sa nepreberajú automaticky
+    If MsgBox("Prevziať z Ordata aj parametre prerušení (povolený čas, najdlhšie a najkratšie trvanie prerušení)?" & vbCrLf & vbCrLf & _
+              "Access z nich robí upozornenia v zozname anomálií a posiela ich aj terminálu v konfigurácii (šablóny); vypočítaný čas nemenia. " & _
+              "Zaokrúhlenie a odpočet prestávky z Ordata Access nečíta." & vbCrLf & vbCrLf & _
+              "Súčasné parametre v Accesse (riadkov: " & pocetSucasne & ") sa nemažú ani neprepisujú, doplnia sa len chýbajúce riadky." & vbCrLf & vbCrLf & _
+              "Áno = doplniť z Ordata" & vbCrLf & "Nie = neprebrať (parametre môžete zadať ručne v editore Pravidlá prerušení)", _
+              vbQuestion + vbYesNo + vbDefaultButton2, "Parametre prerušení z Ordata") <> vbYes Then
+        Call mod_00_Common.ZapisLog("ImportParametrovPreruseniDBF", "INFO", "Parametre prerušení z Ordata sa neprevzali (voľba používateľa); súčasných riadkov: " & pocetSucasne)
+        mPoznamkyImportu = mPoznamkyImportu & "Parametre prerušení: neprevzaté (súčasných riadkov " & pocetSucasne & ")." & vbCrLf
+        Exit Sub
+    End If
+
     If Not DbfOtvor(CestaDBF, t) Then Exit Sub
 
     pfx = IIf(mBatch, "[Krok 5/6] ", "")
     Call AktualizujProgress(pfx & "Importujem parametre prerušení (cis_parprer.dbf)...", 0, t.PocetZaznamov)
 
-    Set db = CurrentDb
     Set pouzite = NacitajPouzite("ParPrerKod")
     Set kluce = CreateObject("Scripting.Dictionary")
+    Set existujuce = CreateObject("Scripting.Dictionary")
 
-    db.Execute "DELETE FROM ParametrePreruseni", dbFailOnError
+    ' súčasné riadky sa zapamätajú, aby sa neprepisovali
+    Set rsE = db.OpenRecordset("SELECT Sablona, Rok, Mesiac, CisloPreruseni FROM ParametrePreruseni;", dbOpenSnapshot)
+    Do While Not rsE.EOF
+        existujuce(CLng(Nz(rsE!sablona, 0)) & "|" & CLng(Nz(rsE!rok, 0)) & "|" & CLng(Nz(rsE!Mesiac, 0)) & "|" & CLng(Nz(rsE!CisloPreruseni, 0))) = True
+        rsE.MoveNext
+    Loop
+    rsE.Close
+
     Set rs = db.OpenRecordset("ParametrePreruseni", dbOpenDynaset, dbAppendOnly)
 
     Do While DbfDalsi(t)
@@ -845,43 +996,47 @@ Public Sub ImportParametrovPreruseniDBF(ByVal CestaDBF As String)
             If pouzite.Count = 0 Or pouzite.Exists(CStr(sablona)) Then
                 If JeVObdobi(rok, mes) And Not kluce.Exists(kluc) Then
                     kluce(kluc) = True
-                    rs.AddNew
-                    rs!sablona = sablona
-                    rs!rok = rok
-                    rs!Mesiac = mes
-                    rs!CisloPreruseni = cisPrer
-                    rs!NazovSablony = NV(Left$(DbfText(t, "NAZOV"), 50))
-                    rs!NazovPreruseni = NV(Left$(DbfText(t, "NAZ_PRER"), 50))
-                    
-                    On Error Resume Next
-                    rs!KodPaM = DbfLong(t, "POLE13")
-                    On Error GoTo ChybaHandler
-                    
-                    rs!KonverznaTabulka = DbfLong(t, "POLE14")
-                    rs!IntervalMesiacOdMin = DbfLong(t, "POLE16")
-                    rs!IntervalMesiacDoMin = DbfLong(t, "POLE17")
-                    rs!OdpocitaniePrestavky = DbfBool(t, "POLE15")
-                    rs!ZaokruhlenieZaciatkuKonca = DbfLong(t, "POLE9")
-                    rs!ZaokruhlenieTrvania = DbfLong(t, "POLE10")
-                    rs!MaxTrvanieMesiacMin = DbfLong(t, "POLE11")
-                    rs!PrerusenieAkPrekroceny = DbfLong(t, "POLE12")
-                    rs!MaxTrvanieDniTyzdna = DbfBool(t, "MAXCAS_T")
-                    rs!AutoDopocetTyp = DbfLong(t, "AUTO_DOP")
-                    rs!AutoDopocetCasMin = DbfLong(t, "CAS_DOP")
-                    rs!PredvolbaTyp = DbfLong(t, "PRED_TYP")
-                    rs!PredvolbaCasMin = DbfLong(t, "PRED_CAS")
-                    rs!PredvolbaVolnyDen = DbfBool(t, "PREDAJVOL")
-                    rs!PredvolbaPracSviatok = DbfBool(t, "PREDAJPS")
-                    rs!IntervalDniTyzdna = DbfBool(t, "CASODDOTYZ")
-                    rs!PrevodTyp = DbfLong(t, "TYPPREPAM")
-                    rs!PrevodCasMin = DbfLong(t, "CASPREPAM")
-                    For d = 1 To 7
-                        rs.Fields("MaxTrvanieDen" & d & "Min") = DbfLong(t, "MAXDEN" & d)
-                        rs.Fields("IntervalDen" & d & "OdMin") = DbfLong(t, "CASOD" & d)
-                        rs.Fields("IntervalDen" & d & "DoMin") = DbfLong(t, "CASDO" & d & "|CASODO" & d)
-                    Next d
-                    rs.Update
-                    pocet = pocet + 1
+                    If existujuce.Exists(kluc) Then
+                        pocetPonechane = pocetPonechane + 1
+                    Else
+                        rs.AddNew
+                        rs!sablona = sablona
+                        rs!rok = rok
+                        rs!Mesiac = mes
+                        rs!CisloPreruseni = cisPrer
+                        rs!NazovSablony = NV(Left$(DbfText(t, "NAZOV"), 50))
+                        rs!NazovPreruseni = NV(Left$(DbfText(t, "NAZ_PRER"), 50))
+
+                        On Error Resume Next
+                        rs!KodPaM = DbfLong(t, "POLE13")
+                        On Error GoTo ChybaHandler
+
+                        rs!KonverznaTabulka = DbfLong(t, "POLE14")
+                        rs!IntervalMesiacOdMin = DbfLong(t, "POLE16")
+                        rs!IntervalMesiacDoMin = DbfLong(t, "POLE17")
+                        rs!OdpocitaniePrestavky = DbfBool(t, "POLE15")
+                        rs!ZaokruhlenieZaciatkuKonca = DbfLong(t, "POLE9")
+                        rs!ZaokruhlenieTrvania = DbfLong(t, "POLE10")
+                        rs!MaxTrvanieMesiacMin = DbfLong(t, "POLE11")
+                        rs!PrerusenieAkPrekroceny = DbfLong(t, "POLE12")
+                        rs!MaxTrvanieDniTyzdna = DbfBool(t, "MAXCAS_T")
+                        rs!AutoDopocetTyp = DbfLong(t, "AUTO_DOP")
+                        rs!AutoDopocetCasMin = DbfLong(t, "CAS_DOP")
+                        rs!PredvolbaTyp = DbfLong(t, "PRED_TYP")
+                        rs!PredvolbaCasMin = DbfLong(t, "PRED_CAS")
+                        rs!PredvolbaVolnyDen = DbfBool(t, "PREDAJVOL")
+                        rs!PredvolbaPracSviatok = DbfBool(t, "PREDAJPS")
+                        rs!IntervalDniTyzdna = DbfBool(t, "CASODDOTYZ")
+                        rs!PrevodTyp = DbfLong(t, "TYPPREPAM")
+                        rs!PrevodCasMin = DbfLong(t, "CASPREPAM")
+                        For d = 1 To 7
+                            rs.Fields("MaxTrvanieDen" & d & "Min") = DbfLong(t, "MAXDEN" & d)
+                            rs.Fields("IntervalDen" & d & "OdMin") = DbfLong(t, "CASOD" & d)
+                            rs.Fields("IntervalDen" & d & "DoMin") = DbfLong(t, "CASDO" & d & "|CASODO" & d)
+                        Next d
+                        rs.Update
+                        pocet = pocet + 1
+                    End If
                 End If
             End If
         End If
@@ -893,7 +1048,8 @@ Public Sub ImportParametrovPreruseniDBF(ByVal CestaDBF As String)
 
     rs.Close
     Call DbfZatvor(t)
-    Call mod_00_Common.ZapisLog("ImportParametrovPreruseniDBF", "INFO", "Parametre prerušení: " & pocet)
+    Call mod_00_Common.ZapisLog("ImportParametrovPreruseniDBF", "INFO", "Parametre prerušení: pridaných " & pocet & ", ponechaných súčasných " & pocetPonechane & " (nič sa nemazalo ani neprepísalo).")
+    mPoznamkyImportu = mPoznamkyImportu & "Parametre prerušení: pridaných " & pocet & ", súčasné ponechané (" & pocetPonechane & " zhodných kľúčov)." & vbCrLf
     Call ZavriProgress
     Exit Sub
 ChybaHandler:
@@ -1214,6 +1370,7 @@ Public Sub ImportVsetkychDBFTabuliek()
     mBatch = False
     Call mod_02_DBFImport.ZistiObdobieImportu(mOdM, mOdR, mDoM, mDoR)
     mBatch = True
+    mPoznamkyImportu = ""
     Call mod_18_Uzavierka.ZacniDavkuImportu
 
     Call AktualizujProgress("Štartujem dávkový import zo všetkých DBF súborov...", 0, 0)
@@ -1244,10 +1401,10 @@ Public Sub ImportVsetkychDBFTabuliek()
     If Len(strBlok) = 0 Then Call mod_18_Uzavierka.VymazOznacenieNastaveni
     Call mod_00_Common.ZapisLog("ImportVsetkychDBFTabuliek", "INFO", "Šaržový import dokončený.")
     If Len(strBlok) = 0 Then
-        MsgBox "Kompletný dávkový import bol úspešne dokončený.", vbInformation, "Import dokončený"
+        MsgBox "Kompletný dávkový import bol úspešne dokončený." & IIf(Len(mPoznamkyImportu) > 0, vbCrLf & vbCrLf & mPoznamkyImportu, ""), vbInformation, "Import dokončený"
     Else
         MsgBox "Dávkový import bol dokončený, ale tieto nastavenia sa NEPREPÍSALI (existujú uzavreté mesiace alebo ste prepis nepotvrdili):" & vbCrLf & strBlok & vbCrLf & _
-               "Razenia a zamestnanci sa naimportovali; uzavreté mesiace a ich razenia ostali nezmenené.", vbExclamation, "Import dokončený"
+               "Razenia a zamestnanci sa naimportovali; uzavreté mesiace a ich razenia ostali nezmenené." & IIf(Len(mPoznamkyImportu) > 0, vbCrLf & vbCrLf & mPoznamkyImportu, ""), vbExclamation, "Import dokončený"
     End If
     Exit Sub
 ChybaHandler:

@@ -1,5 +1,22 @@
 # Dochádzka – zmeny
 
+## Balík 2.14.2
+Bezpečný import číselníka a parametrov prerušení z Ordata: nič sa neprepíše ani nezmaže bez výslovného súhlasu.
+- **Súvislosť**: dávkový import z Ordata prepisoval číselník prerušení bez otázky (názov, skratku, texty aj kódy razení existujúceho čísla) a parametre prerušení zmazal a nahral nanovo.
+  Názvy z Ordata sú bez diakritiky („Sluzobna cesta“), takže import by vrátil opravené názvy späť. Teraz sa najprv porovná a rozhoduje sa raz.
+- **`mod_02_DBFImport` 2.7.0, číselník prerušení**: súbor sa načíta do pamäte a porovná so súčasným číselníkom. Prerušenia, ktoré v Accesse chýbajú, sa pridajú. Ak sa niektoré existujúce líši
+  (názov, skratka, predvoľba, texty, kódy alebo funkcie razení), okno ukáže rozdiely (úplný zoznam je v logu) a opýta sa raz: Áno = prepísať hodnotami z Ordata, Nie (predvolené) = ponechať súčasné.
+  Pri Nie sa nové prerušenie, ktorého kód razenia už patrí inému prerušeniu, nepridá (kolízia sa uvedie v zozname). Ak sa líšia kódy razení, okno na to upozorní: razenia z Ordata s inými kódmi
+  sa k prerušeniu nepriradia. Bez rozdielov sa nepýta. Stĺpce tlačidla a príznakov (2.14.0) import nikdy nemení.
+- **`mod_02_DBFImport` 2.7.0, parametre prerušení**: preberajú sa len na výslovné Áno (predvolené je Nie). Súčasné riadky sa nemažú ani neprepisujú, doplnia sa len chýbajúce kombinácie
+  šablóna, rok, mesiac, prerušenie. Okno vysvetlí, že parametre slúžia na upozornenia a posielajú sa terminálu ako šablóny, vypočítaný čas nemenia. Pri uzavretých mesiacoch sa import nevykoná ako doteraz.
+- **`mod_18_Uzavierka` 1.0.1**: `PrepisNastaveniPovoleny` má voliteľný parameter `bLenDopln`: import, ktorý len dopĺňa, kontroluje uzavreté mesiace, ale nepýta sa na prepis ručných úprav
+  (nič sa neprepisuje). Fondy, kalendáre a priradenia sa importujú ako doteraz.
+- Na konci dávkového importu sa vypíše, čo sa rozhodlo (rozdiely v číselníku, parametre).
+- **Čo to nerieši**: samotné razenia z Ordata (kódy, ktoré Access nepozná, sa ako doteraz doplnia ako „NEZNÁME“), fondy, kalendár a priradenia zamestnancov (tie majú ochranu pri ručných úpravách a uzavretých mesiacoch).
+- **Nástroj `tools/kontrola_vba.py`**: nová kontrola znakov mimo kódovej stránky Windows 1250. Inštalátor zapisuje moduly v ANSI kódovej stránke a modul s takým znakom (napríklad šípka) odmietne.
+- **Neoverené v skutočnom Accesse**: nový kód prešiel `tools/kontrola_vba.py` (0 nálezov), ale nespúšťal sa. Overte dávkový import na kópii databázy: číselník s rozdielmi (obe odpovede), parametre (Áno aj Nie).
+
 ## Balík 2.14.1
 Predvolené tlačidlá a príznaky prerušení pre terminál sa nastavia pri inštalácii; hlavičky stĺpcov zoznamu prerušení sú čitateľné.
 - **Súvislosť**: po 2.14.0 sa tlačidlá a príznaky museli prerušenie po prerušení nastaviť ručne na karte 5. Teraz sa nastavia samy, zatiaľ podľa doterajších tlačidiel terminálu;

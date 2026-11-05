@@ -1,5 +1,5 @@
 {
- "_poznamka": "Vymyslené údaje (žiadne osobné údaje). Vstup pre contract/tools/build_config_example.py, ktorý podľa algoritmu Accessu (mod_08.NacitajKontextMesiaca) vypočíta examples/config_example.json. Od kontraktu 1.4.0 obsahuje aj voliteľné kľúče (pravidlá obeda, zaokrúhlenia, opráv; ikony, žiadosti, schvaľovanie a celodenné prerušenia; okno práce podľa fondu).",
+ "_poznamka": "Vymyslené údaje (žiadne osobné údaje). Vstup pre contract/tools/build_config_example.py, ktorý podľa algoritmu Accessu (mod_08.NacitajKontextMesiaca) vypočíta examples/config_example.json. Od kontraktu 1.4.0 obsahuje aj voliteľné kľúče (pravidlá obeda, zaokrúhlenia, opráv; ikony, žiadosti, schvaľovanie a celodenné prerušenia; okno práce podľa fondu); od kontraktu 1.5.0 aj vlastnosti prerušení (full_day_min, counts_to_lunch_base) a režim výpočtu na obdobie (regimes, regime_periods zamestnanca).",
  "config_version": "2026.11.04.1200",
  "generated_at": "2026-11-04T12:00:00",
  "rok": 2026,
@@ -60,7 +60,8 @@
    "terminal_button": true,
    "terminal_label": "Lekár",
    "terminal_order": 1,
-   "terminal_icon": "doctor"
+   "terminal_icon": "doctor",
+   "full_day_min": 300
   },
   {
    "code": 4,
@@ -145,7 +146,8 @@
    "terminal_order": 3,
    "terminal_icon": "trip",
    "terminal_request": true,
-   "needs_approval": true
+   "needs_approval": true,
+   "counts_to_lunch_base": true
   },
   {
    "code": 13,
@@ -178,6 +180,31 @@
    "terminal_label": "Sprievod",
    "terminal_order": 2,
    "terminal_icon": "family"
+  }
+ ],
+ "regimes": [
+  {
+   "id": 1,
+   "name": "Krízový režim",
+   "rules": {
+    "work_window_start_min": 0,
+    "work_window_end_min": 1440,
+    "auto_lunch_enabled": false,
+    "rounding_in_min": 0,
+    "rounding_out_min": 0,
+    "auto_repair_mode": 0
+   },
+   "interruptions": [
+    {
+     "code": 4,
+     "counts_to_lunch_base": true
+    },
+    {
+     "code": 13,
+     "calc": "COUNTED",
+     "full_day_min": 480
+    }
+   ]
   }
  ],
  "punch_codes": [
@@ -790,6 +817,13 @@
      "template": 2,
      "calendar": 1,
      "employment_pct": 100
+    }
+   ],
+   "regime_periods": [
+    {
+     "regime": 1,
+     "from": "2026-10-26",
+     "to": "2026-11-06"
     }
    ]
   },

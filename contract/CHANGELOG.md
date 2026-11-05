@@ -48,3 +48,22 @@
 * Nasadenie: terminál zatiaľ nové kľúče len prijme a overí, ich použitie vo výpočte a v tlačidlách je samostatná zmena. Starší terminál a databáza súbor s novými kľúčmi v prerušeniach a mesiacoch odmietnu;
   databázová časť je súkromný SQL balík a treba ju rozšíriť pred prvým takým súborom. Access nové kľúče vloží, len keď ich správca nastaví.
 * Schválenie vlastníkom repozitára je potrebné (zmena `contract/`).
+
+## 1.5.0 – 2026-11-05 (doplnok, `punches_*.csv` ani `voids_*.csv` sa nemenia; `schema_version` ostáva 2)
+* Princíp (rozhodnutie vlastníka 5. 11. 2026): či a ako sa prerušenie počíta, určujú parametre v Accesse, ktoré nastavuje správca (HR); my dodáme len počiatočné hodnoty.
+  Krízová situácia sa rieši **režimom výpočtu** priradeným zamestnancovi na obdobie, nie pevným pravidlom ani zvláštnym fondom; jeho parametre (aj automatický obed) nastavuje správca.
+* `interruptions[]`: voliteľné `full_day_min` (od akej dĺžky jedného intervalu sa započíta celý denný fond; namiesto `rules.full_day_obstacle_min`) a `counts_to_lunch_base`
+  (čas prerušenia sa pripočíta k základu pre prah obeda). Oba len pre `calc` = `COUNTED`; `counts_to_lunch_base = false` je neškodné všade.
+* Nový voliteľný kľúč najvyššej úrovne `regimes[]` (`id`, `name`, `rules`, `interruptions`): pomenovaná sada prepísaných pravidiel z uzavretého zoznamu (okno práce, obed, zaokrúhlenie, opravy,
+  hranica celodennej prekážky) a úprav prerušení (`calc` COUNTED/UNPAID, `full_day_min`, `counts_to_lunch_base`). Č. 1 a č. 7 sa v režime nemenia. Najviac 20 režimov.
+* `employees[].months[]`: voliteľné `regime_ids` (číslo režimu pre každý deň mesiaca, 0 = bez režimu; Access kľúč vynechá, keď v mesiaci žiaden režim nie je). Terminál nepočíta z dátumov, dostane hotový rozpis dní.
+* Poradie hodnôt dňa: `rules` → okno z fondu (1.4.0) → režim dňa. Súbor 1.4.0 ostáva platný a nezmenený (chýbajúci kľúč = dnešné správanie).
+* Overovač `tools/verify_config.py` a kontrola v aplikácii `src/lib/access-config.ts` majú rovnaké nové kontroly; neznámy kľúč v režime je chyba (nie upozornenie), prázdny režim a `regime_ids` bez režimu sú upozornenie (v `--strict` chyba).
+  Schéma `config-export.schema.json` o nové kľúče rozšírená; zlatý súbor `examples/config_example.json` (+ vstup) používa všetky nové kľúče (vymyslená hodnota režimu, obdobie cez hranicu mesiaca);
+  referenčné rozpísanie obdobia po dňoch je v `tools/build_config_example.py` (prekrývajúce sa obdobia a neexistujúci režim sú chyba vstupu). 43 nových testov v Pythone a 34 v TypeScripte;
+  žiadny existujúci test sa nemenil.
+* Nasadenie: terminál zatiaľ nové kľúče len prijme a overí, ich použitie vo výpočte je samostatná zmena (etapa 2, po schválení Access modelu). Starší terminál a databáza súbor s novými kľúčmi odmietnu;
+  databázová časť je súkromný SQL balík a treba ju rozšíriť pred prvým takým súborom. Access nové kľúče vloží, len keď ich správca nastaví.
+* Zámerne mimo tejto verzie: najdlhšie trvanie s prevodom prekročenia, zaokrúhlenie po prerušeniach, prerušenie cez polnoc, priorita pred sviatkom, predvoľba a plánovanie neprítomností,
+  mesačný limit súkromných odchodov, kódy pre mzdy, pridelenie režimu podľa roly, voľné čísla pre prácu a obed.
+* Schválenie vlastníkom repozitára je potrebné (zmena `contract/`).

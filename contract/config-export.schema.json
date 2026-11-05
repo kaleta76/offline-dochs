@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/kaleta76/offline-dochs/contract/config-export.schema.json",
-  "title": "dochs_config.json – konfigurácia a výpočtový plán z Accessu pre terminál (kontrakt 1.2.0 až 1.4.0, schema_version 2)",
+  "title": "dochs_config.json – konfigurácia a výpočtový plán z Accessu pre terminál (kontrakt 1.2.0 až 1.5.0, schema_version 2)",
   "description": "Smer Access -> terminál. Access je systém, ktorý rozhoduje (fondy, kalendáre, sviatky, úväzky, pravidlá); terminál len preberá hotové výsledky a podľa nich počíta saldo. Súbor NESMIE obsahovať osobné údaje: zamestnanec je len osobné číslo. Nadmnožina schema_version 1 (všetky kľúče verzie 1 ostávajú). Sémantiku a krížové kontroly (dĺžky polí, typ dňa vs. dátum, odkazy) overuje contract/tools/verify_config.py.",
   "type": "object",
   "required": ["schema_version", "config_version", "rok", "rules", "interruptions", "punch_codes", "holidays",
@@ -67,7 +67,60 @@
           "terminal_icon": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,19}$", "description": "kontrakt 1.4.0: ikona tlačidla zo zatvoreného zoznamu v README.md (doctor, family, trip, errand, private, lunch, home, other); neznáma ikona = všeobecná. Len spolu s terminal_button = true." },
           "terminal_request": { "type": "boolean", "description": "kontrakt 1.4.0: true = zamestnanec smie o toto prerušenie požiadať v termináli aj vopred (napr. plánovaná služobná cesta). Neplatí pre č. 1 (práca)." },
           "needs_approval": { "type": "boolean", "description": "kontrakt 1.4.0: true = razenie s týmto dôvodom terminál prijme, ale deň je nepotvrdený, kým ho vedúci neschváli. Neplatí pre č. 1 (práca)." },
-          "full_day_only": { "type": "boolean", "description": "kontrakt 1.4.0: true = prerušenie sa zadáva len na celý deň (dovolenka, PN), nie ako odchod a návrat; nemá tlačidlo. Neplatí pre č. 1 (práca)." }
+          "full_day_only": { "type": "boolean", "description": "kontrakt 1.4.0: true = prerušenie sa zadáva len na celý deň (dovolenka, PN), nie ako odchod a návrat; nemá tlačidlo. Neplatí pre č. 1 (práca)." },
+          "full_day_min": { "type": "integer", "minimum": 1, "maximum": 1440, "description": "kontrakt 1.5.0: od akej dĺžky intervalu tohto prerušenia sa započíta celý denný fond dňa (expected_min) namiesto skutočného trvania; bez kľúča platí rules.full_day_obstacle_min. Len pre calc COUNTED." },
+          "counts_to_lunch_base": { "type": "boolean", "description": "kontrakt 1.5.0: true = skutočné trvanie intervalov tohto prerušenia sa pripočíta k odpracovanému času pri posudzovaní nároku na automatický obed (rules.auto_lunch_trigger_min); odpočet obeda ide aj tak z odpracovaného času. Predvolené false (dnešné správanie). Len pre calc COUNTED." }
+        },
+        "additionalProperties": false
+      }
+    },
+    "regimes": {
+      "type": "array",
+      "maxItems": 20,
+      "description": "kontrakt 1.5.0: režimy výpočtu (napr. krízová situácia). Režim je pomenovaná sada prepísaných pravidiel a vlastností prerušení; Access ho priraďuje zamestnancovi na obdobie od-do a terminálu pošle pre každý deň len číslo režimu (employees[].months[].regime_ids). Bez kľúča alebo bez režimu v dni platí rules a interruptions ako v 1.4.0.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1, "maximum": 99 },
+          "name": { "type": "string", "minLength": 1, "maxLength": 40, "description": "názov režimu bez osobných údajov; v súbore jedinečný (bez ohľadu na veľkosť písmen)" },
+          "rules": {
+            "type": "object",
+            "description": "prepísané pravidlá z rules; uzavretý zoznam, iný kľúč je chyba (terminál by ho potichu ignoroval a počítal by inak ako Access). Okno práce len spolu a koniec po začiatku.",
+            "properties": {
+              "work_window_start_min": { "type": "integer", "minimum": 0, "maximum": 1440 },
+              "work_window_end_min": { "type": "integer", "minimum": 0, "maximum": 1440 },
+              "full_day_obstacle_min": { "type": "integer", "minimum": 1, "maximum": 1440 },
+              "auto_lunch_enabled": { "type": "boolean" },
+              "auto_lunch_trigger_min": { "type": "integer", "minimum": 0, "maximum": 1440 },
+              "auto_lunch_deduct_min": { "type": "integer", "minimum": 0, "maximum": 600 },
+              "lunch_recorded_mode": { "type": "integer", "minimum": 0, "maximum": 2 },
+              "lunch_min_min": { "type": "integer", "minimum": 0, "maximum": 600 },
+              "unlabeled_out_is_lunch": { "type": "boolean" },
+              "rounding_in_min": { "type": "integer", "minimum": 0, "maximum": 60 },
+              "rounding_out_min": { "type": "integer", "minimum": 0, "maximum": 60 },
+              "rounding_mode": { "type": "integer", "minimum": 0, "maximum": 3 },
+              "auto_repair_mode": { "type": "integer", "minimum": 0, "maximum": 9 },
+              "auto_repair_target": { "type": "integer", "minimum": 0, "maximum": 1 },
+              "auto_repair_cases": { "type": "integer", "minimum": 1, "maximum": 3 }
+            },
+            "additionalProperties": false
+          },
+          "interruptions": {
+            "type": "array",
+            "description": "úpravy vlastností prerušení v dňoch režimu; č. 1 (práca) a č. 7 (obed) sa v režime nemenia. Každá úprava mení aspoň jednu vlastnosť; full_day_min a counts_to_lunch_base = true majú zmysel len pre výsledné calc COUNTED.",
+            "items": {
+              "type": "object",
+              "required": ["code"],
+              "properties": {
+                "code": { "type": "integer", "minimum": 1 },
+                "calc": { "enum": ["COUNTED", "UNPAID"] },
+                "full_day_min": { "type": "integer", "minimum": 1, "maximum": 1440 },
+                "counts_to_lunch_base": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          }
         },
         "additionalProperties": false
       }
@@ -204,7 +257,12 @@
                   "description": "denný fond zamestnanca v minútach po zohľadnení fondu, dňa v týždni, pevného mesačného fondu a úväzku; 0 = nepracovný deň alebo sviatok"
                 },
                 "window_start_min": { "type": "integer", "minimum": 0, "maximum": 1440, "description": "kontrakt 1.4.0: okno práce tohto zamestnanca v tomto mesiaci (podľa jeho fondu); platí namiesto rules.work_window_start_min. Vždy spolu s window_end_min; bez nich platí okno z rules." },
-                "window_end_min": { "type": "integer", "minimum": 0, "maximum": 1440, "description": "kontrakt 1.4.0: koniec okna práce, pozri window_start_min; musí byť po začiatku." }
+                "window_end_min": { "type": "integer", "minimum": 0, "maximum": 1440, "description": "kontrakt 1.4.0: koniec okna práce, pozri window_start_min; musí byť po začiatku." },
+                "regime_ids": {
+                  "type": "array", "minItems": 28, "maxItems": 31,
+                  "items": { "type": "integer", "minimum": 0, "maximum": 99 },
+                  "description": "kontrakt 1.5.0: číslo režimu výpočtu (regimes[].id) pre každý deň mesiaca, 0 = bez režimu. Access kľúč vynechá, keď v mesiaci nie je žiadny deň s režimom. Dĺžka poľa sa kontroluje voči mesiacu v tools/verify_config.py."
+                }
               },
               "additionalProperties": false
             }

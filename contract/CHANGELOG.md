@@ -36,3 +36,15 @@
   Access (stĺpce v číselníku prerušení, okno Prerušenia a export `mod_20`) sa upraví samostatným balíkom po schválení tohto kontraktu.
 * Schválenie vlastníkom repozitára je potrebné (zmena `contract/`).
 
+## 1.4.0 – 2026-11-05 (doplnok, `punches_*.csv` ani `voids_*.csv` sa nemenia; `schema_version` ostáva 2)
+* Nastavenia z dotazníka pre vedenie bez zásahu do kódu: všetky nové kľúče sú **voliteľné**, chýbajúci kľúč = dnešné správanie, súbor 1.3.0 ostáva platný a nezmenený.
+* `rules` (len čísla a true/false, ako doteraz): `lunch_recorded_mode`, `lunch_min_min`, `unlabeled_out_is_lunch`, `rounding_in_min`, `rounding_out_min`, `rounding_mode`,
+  `auto_repair_target`, `auto_repair_cases`, `correction_deadline_day`, `early_return_ends_interruption`.
+* `interruptions[]`: nová hodnota `calc` = `UNPAID` (interval sa nezapočíta), voliteľne `terminal_icon` (len s tlačidlom, zatvorený zoznam ikon), `terminal_request`, `needs_approval`, `full_day_only` (nie pre č. 1; `full_day_only` sa vylučuje s tlačidlom).
+* `employees[].months[]`: voliteľné okno práce `window_start_min` a `window_end_min` (vždy spolu, koniec po začiatku), keď platná verzia fondu okno určuje.
+* Overovač `tools/verify_config.py` a kontrola v aplikácii `src/lib/access-config.ts` majú rovnaké nové kontroly; neznámy kľúč v `rules` a neznáma ikona sú upozornenie (v `--strict` chyba), `lunch_min_min` bez režimu 1 alebo 2 je upozornenie.
+* Zlatý súbor `examples/config_example.json` (+ vstup, referenčný výpočet `tools/build_config_example.py` o okno z verzie fondu) používa všetky nové kľúče; 24 nových testov v Pythone a 22 v TypeScripte.
+  Jediný existujúci test, ktorý sa upravil: „súbor bez tlačidiel je stále platný“ pri odoberaní tlačidiel odoberá aj `terminal_icon`, lebo ikona patrí k tlačidlu.
+* Nasadenie: terminál zatiaľ nové kľúče len prijme a overí, ich použitie vo výpočte a v tlačidlách je samostatná zmena. Starší terminál a databáza súbor s novými kľúčmi v prerušeniach a mesiacoch odmietnu;
+  databázová časť je súkromný SQL balík a treba ju rozšíriť pred prvým takým súborom. Access nové kľúče vloží, len keď ich správca nastaví.
+* Schválenie vlastníkom repozitára je potrebné (zmena `contract/`).

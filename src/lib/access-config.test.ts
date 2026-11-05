@@ -196,6 +196,7 @@ describe("tlačidlá terminálu (kontrakt 1.3.0)", () => {
       delete i.terminal_button;
       delete i.terminal_label;
       delete i.terminal_order;
+      delete i.terminal_icon; // ikona (1.4.0) patrí k tlačidlu, preto sa s ním odoberá
     }
     const r = check(d, true);
     expect(r.errors).toEqual([]);
@@ -280,6 +281,258 @@ describe("tlačidlá terminálu (kontrakt 1.3.0)", () => {
         d.terminal_code_map.push({ code: `X${n}`, interruption: n });
       }
     }, "tlačidiel pre terminál je 17, najviac 12");
+  });
+});
+
+describe("voliteľné kľúče kontraktu 1.4.0", () => {
+  const it_ = (d: Doc, code: number): Doc => d.interruptions.find((i: Doc) => i.code === code);
+  const NOVE_PRAVIDLA = [
+    "lunch_recorded_mode",
+    "lunch_min_min",
+    "unlabeled_out_is_lunch",
+    "rounding_in_min",
+    "rounding_out_min",
+    "rounding_mode",
+    "auto_repair_target",
+    "auto_repair_cases",
+    "correction_deadline_day",
+    "early_return_ends_interruption",
+  ];
+  const NOVE_PRIZNAKY = ["terminal_icon", "terminal_request", "needs_approval", "full_day_only"];
+  const hasError = (mutate: (d: Doc) => void, part: string, strict = false) => {
+    const d = golden();
+    mutate(d);
+    const errs = check(d, strict).errors;
+    expect(
+      errs.some((e) => e.includes(part)),
+      `hľadané '${part}' nie je v ${JSON.stringify(errs)}`,
+    ).toBe(true);
+  };
+
+  it("súbor bez nových kľúčov je stále platný (spätná kompatibilita s 1.3.0)", () => {
+    const d = golden();
+    for (const k of NOVE_PRAVIDLA) delete d.rules[k];
+    for (const i of d.interruptions as Doc[]) {
+      for (const k of NOVE_PRIZNAKY) delete i[k];
+      if (i.calc === "UNPAID") i.calc = "COUNTED";
+    }
+    for (const e of d.employees as Doc[])
+      for (const m of e.months as Doc[]) {
+        delete m.window_start_min;
+        delete m.window_end_min;
+      }
+    const r = check(d, true);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+  it("zlatý súbor používa všetky nové kľúče", () => {
+    const d = golden();
+    for (const k of NOVE_PRAVIDLA) expect(d.rules).toHaveProperty(k);
+    const pouzite = new Set((d.interruptions as Doc[]).flatMap((i) => Object.keys(i)));
+    for (const k of NOVE_PRIZNAKY) expect(pouzite.has(k)).toBe(true);
+    expect((d.interruptions as Doc[]).some((i) => i.calc === "UNPAID")).toBe(true);
+  });
+
+  describe("pravidlá", () => {
+    it("mimo rozsahu alebo zlého typu", () => {
+      const zle: Record<string, unknown[]> = {
+        lunch_recorded_mode: [3, -1, "1", true, 1.5],
+        lunch_min_min: [601, -1, "30"],
+        rounding_in_min: [61, -1, "5"],
+        rounding_out_min: [61, -1, false],
+        rounding_mode: [4, -1, "0"],
+        auto_repair_target: [2, -1, true],
+        auto_repair_cases: [0, 4, "3"],
+        correction_deadline_day: [32, -1, "5"],
+      };
+      for (const [k, hodnoty] of Object.entries(zle))
+        for (const v of hodnoty)
+          hasError((d) => (d.rules[k] = v), `rules.${k} musí byť celé číslo`);
+    });
+    it("hranice rozsahov sú platné", () => {
+      const horne = {
+        lunch_recorded_mode: 2,
+        lunch_min_min: 600,
+        rounding_in_min: 60,
+        rounding_out_min: 60,
+        rounding_mode: 3,
+        auto_repair_target: 1,
+        auto_repair_cases: 1,
+        correction_deadline_day: 31,
+      };
+      const dolne = {
+        lunch_recorded_mode: 0,
+        rounding_in_min: 0,
+        rounding_out_min: 0,
+        rounding_mode: 0,
+        auto_repair_target: 0,
+        auto_repair_cases: 3,
+        correction_deadline_day: 0,
+      };
+      for (const hodnoty of [horne, dolne]) {
+        const d = golden();
+        if (hodnoty === dolne) delete d.rules.lunch_min_min;
+        Object.assign(d.rules, hodnoty);
+        const r = check(d, true);
+        expect(r.errors).toEqual([]);
+      }
+    });
+    it("pravdivostné pravidlo nie je číslo ani text", () => {
+      for (const k of [
+        "unlabeled_out_is_lunch",
+        "early_return_ends_interruption",
+        "interruption_check_enabled",
+      ])
+        for (const v of ["ano", 1, 0])
+          hasError((d) => (d.rules[k] = v), `rules.${k} nie je true/false`);
+    });
+    it("minúty obeda bez režimu 1 alebo 2 sú upozornenie a v prísnom režime chyba", () => {
+      const d = golden();
+      d.rules.lunch_recorded_mode = 0;
+      const r = check(d);
+      expect(r.errors).toEqual([]);
+      expect(r.warnings.some((w) => w.includes("lunch_min_min sa nepoužije"))).toBe(true);
+      hasError((x) => (x.rules.lunch_recorded_mode = 0), "lunch_min_min sa nepoužije", true);
+      delete d.rules.lunch_recorded_mode; // bez kľúča platí predvolené 0
+      expect(check(d).warnings.some((w) => w.includes("lunch_min_min sa nepoužije"))).toBe(true);
+    });
+    it("neznámy kľúč pravidiel (preklep) je upozornenie a v prísnom režime chyba", () => {
+      const d = golden();
+      d.rules.rounding_in_mn = 5;
+      const r = check(d);
+      expect(r.errors).toEqual([]);
+      expect(r.warnings.some((w) => w.includes("neznámy kľúč 'rounding_in_mn'"))).toBe(true);
+      hasError((x) => (x.rules.rounding_in_mn = 5), "neznámy kľúč 'rounding_in_mn'", true);
+    });
+  });
+
+  describe("prerušenia", () => {
+    it("nezapočítaný interval UNPAID je platný, ale nepatrí práci ani obedu", () => {
+      expect(it_(golden(), 13).calc).toBe("UNPAID");
+      expect(check(golden()).errors).toEqual([]);
+      hasError((d) => (it_(d, 1).calc = "UNPAID"), "WORK patrí");
+      hasError((d) => (it_(d, 7).calc = "UNPAID"), "LUNCH patrí");
+    });
+    it("ikony zlatého súboru", () => {
+      const d = golden();
+      const ikony = Object.fromEntries(
+        (d.interruptions as Doc[]).filter((i) => "terminal_icon" in i).map((i) => [i.code, i.terminal_icon]),
+      );
+      expect(ikony).toEqual({ 2: "doctor", 4: "errand", 12: "trip", 16: "family" });
+    });
+    it("ikona zlého tvaru", () => {
+      for (const zla of ["", "Doctor", "doctor\n", "d-r", "1abc", "x".repeat(21), 5, null])
+        hasError(
+          (d) => (it_(d, 2).terminal_icon = zla),
+          "terminal_icon musí byť názov z malých písmen",
+        );
+    });
+    it("neznáma ikona je upozornenie a v prísnom režime chyba", () => {
+      const d = golden();
+      it_(d, 2).terminal_icon = "rocket";
+      const r = check(d);
+      expect(r.errors).toEqual([]);
+      expect(r.warnings.some((w) => w.includes("neznáma ikona 'rocket'"))).toBe(true);
+      hasError((x) => (it_(x, 2).terminal_icon = "rocket"), "neznáma ikona 'rocket'", true);
+    });
+    it("ikona patrí len prerušeniu s tlačidlom", () => {
+      hasError(
+        (d) => (it_(d, 8).terminal_icon = "home"),
+        "terminal_icon patrí len prerušeniu s terminal_button = true",
+      );
+    });
+    it("príznaky nie sú pravdivostné hodnoty", () => {
+      for (const k of ["terminal_request", "needs_approval", "full_day_only"])
+        hasError((d) => (it_(d, 8)[k] = "ano"), `prerušenie 8: ${k} nie je true/false`);
+    });
+    it("práca (č. 1) nemá príznaky; false je neškodné", () => {
+      for (const k of ["terminal_request", "needs_approval", "full_day_only"]) {
+        hasError((d) => (it_(d, 1)[k] = true), `práca (č. 1) nemá kľúč ${k}`);
+        const d = golden();
+        it_(d, 1)[k] = false;
+        expect(check(d).errors).toEqual([]);
+      }
+    });
+    it("celodenné prerušenie nemá tlačidlo", () => {
+      hasError(
+        (d) => (it_(d, 2).full_day_only = true),
+        "prerušenie 2: full_day_only a terminal_button sa vylučujú",
+      );
+    });
+    it("žiadosť a schvaľovanie nezávisia od tlačidla", () => {
+      const d = golden();
+      expect(it_(d, 12)).toMatchObject({
+        terminal_button: true,
+        terminal_request: true,
+        needs_approval: true,
+      });
+      expect(it_(d, 8).terminal_button).toBeUndefined();
+      expect(check(d).errors).toEqual([]);
+    });
+  });
+
+  describe("okno práce v mesiaci", () => {
+    const mon_ = (d: Doc, pn: string, m: string): Doc =>
+      d.employees
+        .find((e: Doc) => e.personnel_number === pn)
+        .months.find((x: Doc) => x.month === m);
+
+    it("okno má len zamestnanec s fondom, ktorý okno určuje", () => {
+      const d = golden();
+      for (const [pn, ma] of [
+        ["9000004", true],
+        ["9000001", false],
+        ["9000002", false],
+        ["9000003", false],
+      ] as const)
+        for (const m of ["2026-10", "2026-11"]) {
+          const x = mon_(d, pn, m);
+          expect("window_start_min" in x, `${pn} ${m}`).toBe(ma);
+          expect("window_end_min" in x, `${pn} ${m}`).toBe(ma);
+        }
+      expect(mon_(d, "9000004", "2026-11")).toMatchObject({
+        window_start_min: 420,
+        window_end_min: 960,
+      });
+    });
+    it("vždy obe hodnoty spolu", () => {
+      hasError(
+        (d) => delete mon_(d, "9000004", "2026-10").window_end_min,
+        "window_start_min a window_end_min musia byť spolu",
+      );
+      hasError(
+        (d) => (mon_(d, "9000001", "2026-10").window_end_min = 1020),
+        "window_start_min a window_end_min musia byť spolu",
+      );
+    });
+    it("mimo rozsahu alebo zlého typu", () => {
+      for (const zle of [-1, 1441, "420", true, 420.5, null])
+        hasError(
+          (d) => (mon_(d, "9000004", "2026-10").window_start_min = zle),
+          "musia byť celé čísla 0 až 1440",
+        );
+    });
+    it("koniec okna nie je po začiatku", () => {
+      for (const [a, b] of [
+        [960, 960],
+        [960, 420],
+      ])
+        hasError((d) => {
+          const m = mon_(d, "9000004", "2026-10");
+          m.window_start_min = a;
+          m.window_end_min = b;
+        }, "koniec okna práce nie je po začiatku");
+    });
+    it("okno na celý deň (0 až 1440) je platné", () => {
+      const d = golden();
+      const m = mon_(d, "9000001", "2026-10");
+      m.window_start_min = 0;
+      m.window_end_min = 1440;
+      expect(check(d).errors).toEqual([]);
+    });
+    it("iný kľúč v mesiaci ostáva zakázaný", () => {
+      hasError((d) => (mon_(d, "9000001", "2026-10").window_start = 420), "nepovolené kľúče");
+    });
   });
 });
 

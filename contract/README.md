@@ -1,4 +1,4 @@
-# Kontrakt terminál ⇄ Access (verzia 1, doplnky 1.1, 1.2 a 1.3)
+# Kontrakt terminál ⇄ Access (verzia 1, doplnky 1.1 až 1.4)
 
 Tento priečinok je **jediné miesto, na ktorom sa dohodne rozhranie** medzi terminálom (tento repozitár, vyvíja ho Lovable agent)
 a lokálnym dochádzkovým systémom v Accesse (vyvíja ho Claude). Zmena súborov tu = zmena dohody, preto ide **iba cez pull request**
@@ -74,7 +74,7 @@ v **samostatnom zozname** za rovnaký mesiac (podľa času zneplatneného razeni
 * **Uzavretý mesiac v Accesse:** zneplatnenie sa neaplikuje, ostáva v čakaní do otvorenia mesiaca (rovnako ako razenia).
 * Zlatý súbor: `examples/voids_example.csv`, test `tests/void-export.contract.test.ts`, referencia `reference/void-export.ts`.
 
-## Súbor `dochs_config.json` (kontrakt 1.2.0 a 1.3.0, smer Access → terminál)
+## Súbor `dochs_config.json` (kontrakt 1.2.0 až 1.4.0, smer Access → terminál)
 Access posiela terminálu **hotový výpočtový plán**, aby terminál počítal saldo rovnako ako Access a zamestnanec si ho mohol skontrolovať skôr, než sekretárka mesiac
 opraví, vytlačí a uzavrie. Zásada je „Access rozhoduje, terminál preberá“: terminál nepozná pravidlá fondov, kalendárov ani úväzkov, dostane z nich už vypočítaný
 denný fond. Formát je JSON (UTF-8), schéma `config-export.schema.json` (`schema_version` 2), zlatý súbor `examples/config_example.json`, overovač `tools/verify_config.py`.
@@ -83,15 +83,15 @@ Súbor je **nadmnožina** pôvodnej konfigurácie (`schema_version` 1); kľúče
 | časť | obsah |
 |---|---|
 | `config_version`, `generated_at` | poradie verzií (`rrrr.mm.dd.hhmm`); terminál drží najnovšiu a nikdy nevráti staršiu |
-| `rules` | okno práce, hranica celodennej prekážky, automatický obed, predvolený denný fond, `interruption_check_enabled` |
-| `interruptions[]` | číselník prerušení; **`calc`** určuje, ako sa interval počíta (nižšie); od 1.3.0 voliteľne `terminal_button`, `terminal_label`, `terminal_order` (tlačidlá terminálu, nižšie) |
+| `rules` | okno práce, hranica celodennej prekážky, automatický obed, predvolený denný fond, `interruption_check_enabled`; od 1.4.0 voliteľne pravidlá obeda, zaokrúhlenia, opráv a lehoty (nižšie) |
+| `interruptions[]` | číselník prerušení; **`calc`** určuje, ako sa interval počíta (nižšie); od 1.3.0 voliteľne `terminal_button`, `terminal_label`, `terminal_order` (tlačidlá terminálu, nižšie); od 1.4.0 voliteľne `terminal_icon`, `terminal_request`, `needs_approval`, `full_day_only` |
 | `punch_codes[]` | kódy razení Accessu (číslo, prerušenie, smer Z/K) |
 | `terminal_code_map[]` | kódy razení terminála (`WORK`, `DOCTOR`, …) → číslo prerušenia v Accesse |
 | `holidays[]` | sviatky roka a nasledujúceho roka |
 | `period` | mesiace okna, pre ktoré je plán (zvyčajne predchádzajúci až nasledujúci mesiac) |
 | `funds[]` | názov a typ použitých fondov (informatívne) |
 | `templates[].months[].rules[]` | pravidlá prerušení po mesiacoch: povolený čas, najdlhšie a najkratšie trvanie, minimum odpracovaného času (sedem hodnôt pondelok až nedeľa) |
-| `employees[].months[]` | **plán**: `employment_pct`, `fund_id`, `template_id`, `calendar_id`, `day_types[]` a `expected_min[]` pre každý deň mesiaca |
+| `employees[].months[]` | **plán**: `employment_pct`, `fund_id`, `template_id`, `calendar_id`, `day_types[]` a `expected_min[]` pre každý deň mesiaca; od 1.4.0 voliteľne okno práce `window_start_min` a `window_end_min` |
 | `counts` | počet zamestnancov a mesačných plánov v súbore (kontrola úplnosti) |
 
 **Tlačidlá terminálu (kontrakt 1.3.0, voliteľné kľúče prerušenia).** O tom, ktoré prerušenia majú na obrazovke Terminál vlastné tlačidlo, rozhoduje Access (rozhodnutie vlastníka 4. 11. 2026):
@@ -109,6 +109,53 @@ terminál ukáže predvolené tlačidlá zabudované v aplikácii: Lekár, Sprie
 Prerušenia, ktoré sa dávajú na celý deň (dovolenka, PN, ošetrovanie a pod.), tlačidlo mať nemusia; zadávajú sa žiadosťou o opravu, ktorú schváli vedúci, alebo priamo v Accesse.
 **Nasadenie:** súbor s novými kľúčmi prijme len verzia terminálu a databázy, ktorá ich pozná. Access ich preto vloží, len keď má aspoň jedno prerušenie nastavené (predvolene žiadne).
 
+### Voliteľné kľúče kontraktu 1.4.0: nastavenia z Accessu bez zásahu do kódu
+
+Cieľ (rozhodnutie vlastníka 5. 11. 2026): väčšinu volieb z dotazníka pre vedenie nastaví správca v Accesse a terminál ich len preberie, bez novej verzie programu.
+Všetky kľúče nižšie sú **voliteľné**. Chýbajúci kľúč znamená predvolenú hodnotu, ktorá je dnešné správanie, takže súbor 1.3.0 ostáva platný a nezmenený.
+Access kľúč vloží, len keď ho správca nastavil. Hodnoty v `rules` sú ako doteraz len čísla a `true`/`false`; výber z možností má číselný kód.
+Terminál nové kľúče zatiaľ len **prijme a overí**. Ako ich použije výpočet (`src/lib/engine.ts`) a tlačidlá, je samostatná zmena podľa Accessu; do tej doby platí správanie terminálu ako doteraz.
+
+**`rules`**
+
+| kľúč | hodnoty | predvolené | význam |
+|---|---|---|---|
+| `lunch_recorded_mode` | 0, 1, 2 | 0 | obed, ktorý zamestnanec odrazil (č. 7 alebo odchod bez dôvodu, ak je `unlabeled_out_is_lunch`): 0 skutočný čas, 1 najmenej `lunch_min_min`, 2 vždy presne `lunch_min_min` |
+| `lunch_min_min` | 0 až 600 | 30 | minúty obeda pre režim 1 a 2; bez režimu 1 alebo 2 sa nepoužije (overovač upozorní) |
+| `unlabeled_out_is_lunch` | true/false | true | `true`: Odchod bez dôvodu a neskorší Príchod v ten istý deň je obed; `false`: je to odchod a nový príchod (Access: `TerminalOdchodBezDovodu`) |
+| `rounding_in_min` | 0 až 60 | 0 | prvý príchod dňa sa zaokrúhli na násobok týchto minút; 0 nezaokrúhľuje |
+| `rounding_out_min` | 0 až 60 | 0 | posledný odchod dňa sa zaokrúhli na násobok týchto minút; 0 nezaokrúhľuje |
+| `rounding_mode` | 0 až 3 | 0 | smer: 0 príchod nahor a odchod nadol (ako dnes v termináli, v neprospech zamestnanca), 1 oba nahor, 2 oba nadol, 3 na najbližší násobok |
+| `auto_repair_target` | 0, 1 | 0 | kam sa dopĺňa zabudnuté razenie: 0 tak, aby sa deň vyrovnal na denný fond, 1 do konca okna práce (platí, keď `auto_repair_mode` > 0) |
+| `auto_repair_cases` | 1 až 3 | 3 | prípady opráv, súčet bitov: 1 zabudnutý odchod z práce, 2 zabudnutý návrat z prerušenia, 3 oba |
+| `correction_deadline_day` | 0 až 31 | 0 | do ktorého dňa nasledujúceho mesiaca sa smie žiadať o opravu; 0 bez lehoty |
+| `early_return_ends_interruption` | true/false | true | `true`: Príchod pred plánovaným koncom prerušenia ho skončí a zvyšok dňa je práca; `false`: deň ostane celý ako prerušenie (dotazník 4.5) |
+
+Neznámy kľúč v `rules` overovač nehlási ako chybu (Access môže časom pridať ďalšie), ale ako upozornenie: zachytí preklep, napr. `rounding_in_mn`. V prísnom režime (`--strict`) je to chyba.
+
+**`interruptions[]`**
+
+| kľúč | hodnoty | význam |
+|---|---|---|
+| `calc` = `UNPAID` | nová hodnota | interval sa nezapočíta ani do práce, ani do fondu dňa (napr. nepočítaný súkromný odchod). Platí pre iné prerušenie než č. 1 a č. 7. Starší terminál hodnotu nepozná a podľa pravidla pri `calc` nižšie saldo neráta, ale upozorní správcu |
+| `terminal_icon` | názov ikony | ikona tlačidla zo zatvoreného zoznamu: `doctor`, `family`, `trip`, `errand`, `private`, `lunch`, `home`, `other`; názov z malých písmen, číslic a `_` (najviac 20 znakov). Neznámy názov terminál nahradí všeobecnou ikonou a overovač upozorní. Len spolu s `terminal_button = true` |
+| `terminal_request` | true/false | zamestnanec smie o prerušenie požiadať v termináli aj vopred (napr. plánovaná služobná cesta). Nie pre č. 1 |
+| `needs_approval` | true/false | razenie s týmto dôvodom sa prijme, ale deň je nepotvrdený, kým ho vedúci neschváli. Nie pre č. 1 |
+| `full_day_only` | true/false | prerušenie sa zadáva len na celý deň (dovolenka, PN), nie ako odchod a návrat; preto nemá tlačidlo (`terminal_button = true` s ním ide proti sebe). Nie pre č. 1 |
+
+**`employees[].months[]`: okno práce podľa fondu**
+
+| kľúč | hodnoty | význam |
+|---|---|---|
+| `window_start_min`, `window_end_min` | 0 až 1440, koniec po začiatku, vždy spolu | okno práce zamestnanca v tomto mesiaci namiesto `rules.work_window_start_min` a `rules.work_window_end_min`. Access ich vloží, keď platná verzia jeho fondu okno určuje; inak chýbajú a platí okno z `rules`. Okno 0 až 1440 znamená „okno sa nepoužíva“ |
+
+Referenčný výpočet: `tools/build_config_example.py` (fond s `window` vo verzii platnej pre mesiac). Zlatý súbor `examples/config_example.json` používa všetky nové kľúče (vymyslené hodnoty),
+súbor bez nich ostáva platný (test `test_subor_bez_novych_klucov_je_stale_platny` v oboch jazykoch).
+
+**Nasadenie 1.4.0:** rovnako ako pri 1.3.0 súbor s novými kľúčmi prijme len verzia terminálu a databázy, ktorá ich pozná (`prerušenia` a `mesiac` v pláne majú zakázané neznáme kľúče, preto starší terminál súbor odmietne celý).
+Databázová kontrola je súkromný SQL balík mimo repozitára; pred prvým súborom s novými kľúčmi ju treba rozšíriť rovnako (`calc` = `UNPAID`, kľúče prerušení, kľúče mesiaca, číselné hodnoty `rules`).
+Access nové kľúče vloží, len keď ich správca nastaví.
+
 **Typ dňa** (`day_types`) má dve písmená: kalendár (`P` pracovný, `V` voľný, `S` sviatok) a deň v týždni (`P` pondelok až piatok, `V` sobota, `N` nedeľa).
 **Denný fond** (`expected_min`) je v minútach po zohľadnení fondu, fondu podľa dňa v týždni, pevného mesačného fondu (mesačný fond ÷ počet pracovných dní) a úväzku
 (zaokrúhlenie polovice na párne, ako `CLng` vo VBA); `0` je nepracovný deň alebo sviatok. Algoritmus presne opisuje `tools/build_config_example.py`
@@ -118,6 +165,7 @@ Prerušenia, ktoré sa dávajú na celý deň (dovolenka, PN, ošetrovanie a pod
 * `WORK`: práca (č. 1) sa oreže oknom práce (`work_window_start_min` až `work_window_end_min`);
 * `LUNCH`: obed (č. 7) sa počíta skutočným trvaním; ak v dni obed je, automatický obed sa neodpočíta;
 * `COUNTED`: každé iné prerušenie sa počíta skutočným trvaním; ak trvá `full_day_obstacle_min` a viac, započíta sa **denný fond dňa** (`expected_min`);
+* `UNPAID` (od 1.4.0): interval sa nezapočíta ani do práce, ani do fondu dňa;
 * po zostavení dňa sa od práce odpočíta automatický obed (`auto_lunch_deduct_min`), ak je zapnutý, deň má fond, odpracovaný čas je nad `auto_lunch_trigger_min` a nebol obed;
 * denné saldo = odpracované + započítané prekážky − `expected_min`.
 Neznámu hodnotu `calc` terminál nesmie nahradiť vlastným odhadom: saldo označí ako nepotvrdené a upozorní správcu (Access mohol zmeniť pravidlo a kontrakt dostane novú verziu).

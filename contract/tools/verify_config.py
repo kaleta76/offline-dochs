@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Overenie súboru dochs_config.json (konfigurácia a výpočtový plán z Accessu, kontrakt 1.2.0 a 1.3.0, schema_version 2).
+"""Overenie súboru dochs_config.json (konfigurácia a výpočtový plán z Accessu, kontrakt 1.2.0 až 1.4.0, schema_version 2).
 
 Použitie:  python3 -I verify_config.py dochs_config.json [--strict]
 
@@ -9,9 +9,12 @@ Kontroly (chyby ukončia program kódom 1; --strict zmení aj upozornenia na chy
   3. Číselníky: prerušenia (jedinečné čísla, calc WORK iba pre č. 1, LUNCH iba pre č. 7), kódy razení (odkazujú na existujúce
      prerušenie, smer Z/K zodpovedá začiatku/koncu prerušenia), mapovanie kódov terminála, sviatky (platné dátumy, bez duplicít).
      Tlačidlá terminála (1.3.0, voliteľné): terminal_button / terminal_label / terminal_order, pozri README.md.
+     Voliteľné kľúče 1.4.0: v rules lunch_*, rounding_*, auto_repair_*, correction_deadline_day, early_return_ends_interruption,
+     unlabeled_out_is_lunch; v prerušeniach calc UNPAID, terminal_icon, terminal_request, needs_approval, full_day_only.
   4. Plán: každý mesiac zamestnanca leží v okne period, dni majú správny počet (28 až 31 podľa kalendára),
      2. písmeno typu dňa zodpovedá skutočnému dňu v týždni, sviatok z číselníka má 1. písmeno S,
      fond je 0 v dňoch, ktoré nie sú pracovné (V, S), a nepresahuje 1440 minút.
+     Voliteľné okno práce v mesiaci (1.4.0): window_start_min a window_end_min vždy spolu, koniec po začiatku.
   5. Odkazy: fund_id, template_id existujú; pravidlá šablón odkazujú na existujúce prerušenia; pravidlá len pre mesiace okna.
   6. Úplnosť: counts.employees a counts.employee_months zodpovedajú obsahu (zachytí orezaný alebo poškodený súbor).
 Výstup: kód 0 = v poriadku, 1 = chyba. Nič nemení, len číta. Používa len štandardnú knižnicu Pythonu.
@@ -29,12 +32,21 @@ RULES_REQ = ["work_window_start_min", "work_window_end_min", "full_day_obstacle_
              "auto_lunch_deduct_min", "auto_lunch_enabled", "duplicate_punch_window_min", "default_daily_fund_min",
              "auto_repair_mode"]
 INT_REQ = ["code", "name", "short_name", "start_punch_code", "end_punch_code", "is_work", "is_lunch", "auto_end_of_shift", "calc"]
-INT_OPT = ["counts_to_fund", "counts_to_work", "deducts_leave", "terminal_button", "terminal_label", "terminal_order"]
+INT_OPT = ["counts_to_fund", "counts_to_work", "deducts_leave", "terminal_button", "terminal_label", "terminal_order",
+           "terminal_icon", "terminal_request", "needs_approval", "full_day_only"]
+INT_FLAGS_NOT_FOR_WORK = ("terminal_request", "needs_approval", "full_day_only")   # 1.4.0, patria k č. 1 nie
 MAX_BUTTONS = 12
 MAX_LABEL = 24
-CALC = {"WORK", "LUNCH", "COUNTED"}
+CALC = {"WORK", "LUNCH", "COUNTED", "UNPAID"}
+# kontrakt 1.4.0: voliteľné kľúče rules. Celé čísla (rozsah) alebo true/false; chýbajúci kľúč = predvolená hodnota (dnešné správanie).
+RULES_OPT_INT = {"lunch_recorded_mode": (0, 2), "lunch_min_min": (0, 600), "rounding_in_min": (0, 60), "rounding_out_min": (0, 60),
+                 "rounding_mode": (0, 3), "auto_repair_target": (0, 1), "auto_repair_cases": (1, 3), "correction_deadline_day": (0, 31)}
+RULES_OPT_BOOL = ["interruption_check_enabled", "unlabeled_out_is_lunch", "early_return_ends_interruption"]
+ICON_RE = re.compile(r"^[a-z][a-z0-9_]{0,19}$")
+ICONS = {"doctor", "family", "trip", "errand", "private", "lunch", "home", "other"}   # zatvorený zoznam, pozri README.md
 EMP_KEYS = {"personnel_number", "months"}
 MON_KEYS = {"month", "employment_pct", "fund_id", "template_id", "calendar_id", "day_types", "expected_min"}
+MON_OPT = {"window_start_min", "window_end_min"}   # kontrakt 1.4.0
 RULE_KEYS = {"interruption", "disabled", "allowed_from_min", "allowed_to_min", "max_duration_min", "min_duration_min",
              "min_worked_before_min"}
 MAX_MONTHS = 14
@@ -102,6 +114,20 @@ def check(doc, strict=False):
                 E("rules: koniec okna práce nie je po začiatku")
         if is_int(rules.get("full_day_obstacle_min")) and not 1 <= rules["full_day_obstacle_min"] <= 1440:
             E("rules.full_day_obstacle_min mimo 1 až 1440")
+        # kontrakt 1.4.0: voliteľné kľúče (chýbajúci kľúč = predvolená hodnota, dnešné správanie)
+        for k, (lo, hi) in RULES_OPT_INT.items():
+            if k in rules and not (is_int(rules[k]) and lo <= rules[k] <= hi):
+                E(f"rules.{k} musí byť celé číslo {lo} až {hi}")
+        for k in RULES_OPT_BOOL:
+            if k in rules and not isinstance(rules[k], bool):
+                E(f"rules.{k} nie je true/false")
+        mode = rules.get("lunch_recorded_mode", 0)
+        if is_int(rules.get("lunch_min_min")) and is_int(mode) and mode == 0:
+            W("rules.lunch_min_min sa nepoužije, kým lunch_recorded_mode nie je 1 alebo 2")
+        known = set(RULES_REQ) | set(RULES_OPT_INT) | set(RULES_OPT_BOOL)
+        for k in rules:
+            if k not in known:
+                W(f"rules: neznámy kľúč '{k}' (terminál ho ignoruje)")
 
     # --- prerušenia
     ints = {}
@@ -145,6 +171,22 @@ def check(doc, strict=False):
                 E(f"prerušenie {c}: terminal_order musí byť celé číslo 1 až 99")
             if it.get("terminal_button") is not True and ("terminal_label" in it or "terminal_order" in it):
                 E(f"prerušenie {c}: terminal_label a terminal_order patria len prerušeniu s terminal_button = true")
+            # kontrakt 1.4.0
+            if "terminal_icon" in it:
+                ic = it["terminal_icon"]
+                if not (isinstance(ic, str) and ICON_RE.fullmatch(ic)):
+                    E(f"prerušenie {c}: terminal_icon musí byť názov z malých písmen, číslic a podčiarkovníka (najviac 20 znakov)")
+                elif ic not in ICONS:
+                    W(f"prerušenie {c}: neznáma ikona '{ic}', terminál ukáže všeobecnú")
+                if it.get("terminal_button") is not True:
+                    E(f"prerušenie {c}: terminal_icon patrí len prerušeniu s terminal_button = true")
+            for k in INT_FLAGS_NOT_FOR_WORK:
+                if k in it and not isinstance(it[k], bool):
+                    E(f"prerušenie {c}: {k} nie je true/false")
+                elif it.get(k) is True and c == 1:
+                    E(f"prerušenie 1: práca (č. 1) nemá kľúč {k} (patrí ostatným prerušeniam)")
+            if it.get("full_day_only") is True and it.get("terminal_button") is True:
+                E(f"prerušenie {c}: full_day_only a terminal_button sa vylučujú (tlačidlo zapisuje odchod a návrat, nie celý deň)")
         if 1 not in ints:
             E("v zozname prerušení chýba č. 1 (pracovná doba)")
 
@@ -326,7 +368,7 @@ def check(doc, strict=False):
                     E(f"{pn}: mesiac nie je objekt")
                     continue
                 miss = MON_KEYS - set(mo)
-                extra = set(mo) - MON_KEYS
+                extra = set(mo) - MON_KEYS - MON_OPT
                 if miss:
                     E(f"{lab}: chýbajú kľúče {sorted(miss)}")
                     continue
@@ -343,6 +385,15 @@ def check(doc, strict=False):
                 seen_mon.add(pm)
                 if not (is_int(mo["employment_pct"]) and 1 <= mo["employment_pct"] <= 200):
                     E(f"{lab}: employment_pct mimo 1 až 200")
+                # kontrakt 1.4.0: okno práce zamestnanca v mesiaci (podľa fondu), vždy obe hodnoty spolu
+                if ("window_start_min" in mo) != ("window_end_min" in mo):
+                    E(f"{lab}: window_start_min a window_end_min musia byť spolu")
+                elif "window_start_min" in mo:
+                    ws, we = mo["window_start_min"], mo["window_end_min"]
+                    if not (is_int(ws) and is_int(we) and 0 <= ws <= 1440 and 0 <= we <= 1440):
+                        E(f"{lab}: window_start_min a window_end_min musia byť celé čísla 0 až 1440")
+                    elif we <= ws:
+                        E(f"{lab}: koniec okna práce nie je po začiatku")
                 if mo["fund_id"] not in fund_ids:
                     E(f"{lab}: neexistujúci fond {mo['fund_id']!r}")
                 if mo["template_id"] not in tmpl_ids:

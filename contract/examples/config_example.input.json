@@ -1,5 +1,5 @@
 {
- "_poznamka": "Vymyslené údaje (žiadne osobné údaje). Vstup pre contract/tools/build_config_example.py, ktorý podľa algoritmu Accessu (mod_08.NacitajKontextMesiaca) vypočíta examples/config_example.json.",
+ "_poznamka": "Vymyslené údaje (žiadne osobné údaje). Vstup pre contract/tools/build_config_example.py, ktorý podľa algoritmu Accessu (mod_08.NacitajKontextMesiaca) vypočíta examples/config_example.json. Od kontraktu 1.4.0 obsahuje aj voliteľné kľúče (pravidlá obeda, zaokrúhlenia, opráv; ikony, žiadosti, schvaľovanie a celodenné prerušenia; okno práce podľa fondu).",
  "config_version": "2026.11.04.1200",
  "generated_at": "2026-11-04T12:00:00",
  "rok": 2026,
@@ -17,7 +17,17 @@
   "duplicate_punch_window_min": 10,
   "default_daily_fund_min": 450,
   "auto_repair_mode": 0,
-  "interruption_check_enabled": true
+  "interruption_check_enabled": true,
+  "lunch_recorded_mode": 1,
+  "lunch_min_min": 30,
+  "unlabeled_out_is_lunch": true,
+  "rounding_in_min": 5,
+  "rounding_out_min": 5,
+  "rounding_mode": 0,
+  "auto_repair_target": 0,
+  "auto_repair_cases": 3,
+  "correction_deadline_day": 5,
+  "early_return_ends_interruption": true
  },
  "interruptions": [
   {
@@ -49,7 +59,8 @@
    "deducts_leave": false,
    "terminal_button": true,
    "terminal_label": "Lekár",
-   "terminal_order": 1
+   "terminal_order": 1,
+   "terminal_icon": "doctor"
   },
   {
    "code": 4,
@@ -66,7 +77,8 @@
    "deducts_leave": false,
    "terminal_button": true,
    "terminal_label": "Služobné vzdialenie",
-   "terminal_order": 4
+   "terminal_order": 4,
+   "terminal_icon": "errand"
   },
   {
    "code": 7,
@@ -94,7 +106,10 @@
    "calc": "COUNTED",
    "counts_to_fund": false,
    "counts_to_work": false,
-   "deducts_leave": true
+   "deducts_leave": true,
+   "terminal_request": true,
+   "needs_approval": true,
+   "full_day_only": true
   },
   {
    "code": 11,
@@ -108,7 +123,9 @@
    "calc": "COUNTED",
    "counts_to_fund": false,
    "counts_to_work": false,
-   "deducts_leave": false
+   "deducts_leave": false,
+   "terminal_request": true,
+   "full_day_only": true
   },
   {
    "code": 12,
@@ -125,7 +142,10 @@
    "deducts_leave": false,
    "terminal_button": true,
    "terminal_label": "Služobná cesta",
-   "terminal_order": 3
+   "terminal_order": 3,
+   "terminal_icon": "trip",
+   "terminal_request": true,
+   "needs_approval": true
   },
   {
    "code": 13,
@@ -136,7 +156,7 @@
    "is_work": false,
    "is_lunch": false,
    "auto_end_of_shift": true,
-   "calc": "COUNTED",
+   "calc": "UNPAID",
    "counts_to_fund": false,
    "counts_to_work": false,
    "deducts_leave": false
@@ -156,7 +176,8 @@
    "deducts_leave": false,
    "terminal_button": true,
    "terminal_label": "Sprievod",
-   "terminal_order": 2
+   "terminal_order": 2,
+   "terminal_icon": "family"
   }
  ],
  "punch_codes": [
@@ -469,6 +490,10 @@
       300,
       0,
       0
+     ],
+     "window": [
+      420,
+      960
      ]
     }
    ]

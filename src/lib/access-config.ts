@@ -1,11 +1,11 @@
-// Konfigurácia a výpočtový plán z Accessu (kontrakt 1.2.0, contract/README.md, docs/KONFIGURACIA-Z-ACCESSU.md).
+// Konfigurácia a výpočtový plán z Accessu (kontrakt 1.2.0 až 1.4.0, contract/README.md, docs/KONFIGURACIA-Z-ACCESSU.md).
 // Čistá logika obrazovky Správa → Konfigurácia z Accessu: kontrola súboru dochs_config.json a spracovanie odpovedí databázy. Nič sa tu nikam nezapisuje.
 //
 // Kontrola je prepis contract/tools/verify_config.py (zlatý súbor contract/examples/config_example.json a testy z neho vychádzajú).
 // Databáza kontrolu opakuje a je rozhodujúca; kontrola v aplikácii existuje preto, aby správca videl všetky chyby naraz a pochopiteľne.
 // Pár pravidiel je v databáze prísnejších než v Pythone (rok, text generated_at, dĺžky textov, verzia z budúcnosti), tu sú zrkadlené.
 
-export const CALC_VALUES = ["WORK", "LUNCH", "COUNTED"] as const;
+export const CALC_VALUES = ["WORK", "LUNCH", "COUNTED", "UNPAID"] as const;
 export const MAX_WINDOW_MONTHS = 14;
 export const MAX_FILE_BYTES = 30_000_000;
 
@@ -54,7 +54,41 @@ const INT_OPT = [
   "terminal_button",
   "terminal_label",
   "terminal_order",
+  "terminal_icon",
+  "terminal_request",
+  "needs_approval",
+  "full_day_only",
 ];
+/** Príznaky 1.4.0, ktoré nepatria práci (č. 1). */
+const FLAGS_NOT_FOR_WORK = ["terminal_request", "needs_approval", "full_day_only"] as const;
+/** Kontrakt 1.4.0: voliteľné kľúče rules. Celé čísla v rozsahu [od, do]; chýbajúci kľúč = predvolená hodnota (dnešné správanie). */
+const RULES_OPT_INT: Record<string, readonly [number, number]> = {
+  lunch_recorded_mode: [0, 2],
+  lunch_min_min: [0, 600],
+  rounding_in_min: [0, 60],
+  rounding_out_min: [0, 60],
+  rounding_mode: [0, 3],
+  auto_repair_target: [0, 1],
+  auto_repair_cases: [1, 3],
+  correction_deadline_day: [0, 31],
+};
+const RULES_OPT_BOOL = [
+  "interruption_check_enabled",
+  "unlabeled_out_is_lunch",
+  "early_return_ends_interruption",
+];
+const RE_ICON = /^[a-z][a-z0-9_]{0,19}$/;
+/** Zatvorený zoznam ikon tlačidiel (contract/README.md); neznáma ikona = upozornenie, terminál ukáže všeobecnú. */
+export const KNOWN_ICONS = [
+  "doctor",
+  "family",
+  "trip",
+  "errand",
+  "private",
+  "lunch",
+  "home",
+  "other",
+] as const;
 export const MAX_BUTTONS = 12;
 export const MAX_LABEL = 24;
 const PUNCH_KEYS = ["code", "interruption", "direction", "label"];
@@ -68,6 +102,8 @@ const MON_KEYS = [
   "day_types",
   "expected_min",
 ];
+/** Kontrakt 1.4.0: voliteľné okno práce zamestnanca v mesiaci (podľa fondu). */
+const MON_OPT = ["window_start_min", "window_end_min"];
 const RULE_KEYS = [
   "interruption",
   "disabled",
@@ -202,11 +238,24 @@ export function checkAccessConfig(
     for (const [k, v] of Object.entries(rules))
       if (typeof v !== "number" && typeof v !== "boolean")
         E(`rules.${k}: smie obsahovať len čísla a hodnoty true/false`);
-    if (
-      "interruption_check_enabled" in rules &&
-      typeof rules["interruption_check_enabled"] !== "boolean"
-    )
-      E("rules.interruption_check_enabled nie je true/false");
+    for (const k of RULES_OPT_BOOL)
+      if (k in rules && typeof rules[k] !== "boolean") E(`rules.${k} nie je true/false`);
+    // kontrakt 1.4.0: voliteľné kľúče (chýbajúci kľúč = predvolená hodnota, dnešné správanie)
+    for (const [k, [lo, hi]] of Object.entries(RULES_OPT_INT)) {
+      const v = rules[k];
+      if (k in rules && !(isInt(v) && v >= lo && v <= hi))
+        E(`rules.${k} musí byť celé číslo ${lo} až ${hi}`);
+    }
+    const lunchMode = "lunch_recorded_mode" in rules ? rules["lunch_recorded_mode"] : 0;
+    if (isInt(rules["lunch_min_min"]) && isInt(lunchMode) && lunchMode === 0)
+      W("rules.lunch_min_min sa nepoužije, kým lunch_recorded_mode nie je 1 alebo 2");
+    for (const k of keysOf(rules))
+      if (
+        !RULES_REQ.includes(k) &&
+        !Object.keys(RULES_OPT_INT).includes(k) &&
+        !RULES_OPT_BOOL.includes(k)
+      )
+        W(`rules: neznámy kľúč '${k}' (terminál ho ignoruje)`);
     if (isInt(rules["auto_lunch_deduct_min"]) && rules["auto_lunch_deduct_min"] > 600)
       E("rules.auto_lunch_deduct_min je najviac 600");
     if (isInt(rules["auto_repair_mode"]) && rules["auto_repair_mode"] > 9)
@@ -269,6 +318,7 @@ export function checkAccessConfig(
         "counts_to_work",
         "deducts_leave",
         "terminal_button",
+        ...FLAGS_NOT_FOR_WORK,
       ])
         if (k in it && typeof it[k] !== "boolean") E(`prerušenie ${c}: ${k} nie je true/false`);
       // tlačidlá terminálu (kontrakt 1.3.0)
@@ -285,6 +335,21 @@ export function checkAccessConfig(
         E(`prerušenie ${c}: terminal_order musí byť celé číslo 1 až 99`);
       if (it["terminal_button"] !== true && ("terminal_label" in it || "terminal_order" in it))
         E(`prerušenie ${c}: terminal_label a terminal_order patria len prerušeniu s terminal_button = true`);
+      // kontrakt 1.4.0
+      if ("terminal_icon" in it) {
+        const ic = it["terminal_icon"];
+        if (!(isStr(ic) && RE_ICON.test(ic)))
+          E(`prerušenie ${c}: terminal_icon musí byť názov z malých písmen, číslic a podčiarkovníka (najviac 20 znakov)`);
+        else if (!(KNOWN_ICONS as readonly string[]).includes(ic))
+          W(`prerušenie ${c}: neznáma ikona '${ic}', terminál ukáže všeobecnú`);
+        if (it["terminal_button"] !== true)
+          E(`prerušenie ${c}: terminal_icon patrí len prerušeniu s terminal_button = true`);
+      }
+      for (const k of FLAGS_NOT_FOR_WORK)
+        if (it[k] === true && c === 1)
+          E(`prerušenie 1: práca (č. 1) nemá kľúč ${k} (patrí ostatným prerušeniam)`);
+      if (it["full_day_only"] === true && it["terminal_button"] === true)
+        E(`prerušenie ${c}: full_day_only a terminal_button sa vylučujú (tlačidlo zapisuje odchod a návrat, nie celý deň)`);
     });
     if (!ints.has(1)) E("v zozname prerušení chýba č. 1 (pracovná doba)");
   }
@@ -577,7 +642,7 @@ export function checkAccessConfig(
           E(`${lab}: chýbajú kľúče ${JSON.stringify(miss)}`);
           continue;
         }
-        const extraM = keysOf(mo).filter((k) => !MON_KEYS.includes(k));
+        const extraM = keysOf(mo).filter((k) => !MON_KEYS.includes(k) && !MON_OPT.includes(k));
         if (extraM.length) {
           E(
             `${lab}: nepovolené kľúče ${JSON.stringify(extraM.sort())} (súbor nesmie niesť osobné údaje)`,
@@ -596,6 +661,16 @@ export function checkAccessConfig(
           !(isInt(mo["employment_pct"]) && mo["employment_pct"] >= 1 && mo["employment_pct"] <= 200)
         )
           E(`${lab}: employment_pct mimo 1 až 200`);
+        // kontrakt 1.4.0: okno práce zamestnanca v mesiaci (podľa fondu), vždy obe hodnoty spolu
+        if (("window_start_min" in mo) !== ("window_end_min" in mo)) {
+          E(`${lab}: window_start_min a window_end_min musia byť spolu`);
+        } else if ("window_start_min" in mo) {
+          const ws = mo["window_start_min"];
+          const we = mo["window_end_min"];
+          if (!(isInt(ws) && isInt(we) && ws >= 0 && ws <= 1440 && we >= 0 && we <= 1440))
+            E(`${lab}: window_start_min a window_end_min musia byť celé čísla 0 až 1440`);
+          else if (we <= ws) E(`${lab}: koniec okna práce nie je po začiatku`);
+        }
         if (!(isInt(mo["fund_id"]) && fundIds.has(mo["fund_id"])))
           E(`${lab}: neexistujúci fond ${JSON.stringify(mo["fund_id"])}`);
         if (!(isInt(mo["template_id"]) && tmplIds.has(mo["template_id"])))

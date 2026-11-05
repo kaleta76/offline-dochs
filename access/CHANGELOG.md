@@ -1,5 +1,14 @@
 # Dochádzka – zmeny
 
+## Balík 2.15.1
+Prah obeda sa počíta od uvedenej hodnoty vrátane a razený obed (najmenej alebo vždy presne) sa uplatní len v dňoch, ktoré prah dosiahnu. Balík obsahuje aj všetko z 2.15.0 (ten sa nenasadzoval).
+- **Prah „Obed od“ vrátane**: predvolená hodnota 360 min znamená, že automatický obed sa odpočíta už pri 6:00 odpracovaných; pri 5:59 ešte nie. Doteraz sa odpočítal až nad 6:00 (presne 6:00 sa neodpočítalo nič). Rovnaké porovnanie používa odhad zabudnutého odchodu v automatickej oprave.
+- **Razený obed len nad prahom**: režim 1 (najmenej zadané minúty) a 2 (vždy presne) sa uplatnia, len ak odpracovaný čas spolu s razeným obedom dosiahne „Obed od“. Kratšia zmena nárok na prestávku nemá, obed v nej sa počíta skutočným časom. Predvolený režim 0 sa nemení.
+- **Zmeny modulov**: `mod_08_UdalostiDna` 1.4.1 (`SumarDna`), `mod_09_AutoOprava` 1.3.1, `mod_10_Konfiguracia` 1.4.1 (text prehľadu), `mod_UI_Tab_Prerusenia` 2.11.1 a `mod_UI_PomocnikTexty` 1.3.2 (popisy), `mod_01_SystemInit` 2.9.1 (popis pravidla pri novej inštalácii; už vytvorený riadok pravidla v tabuľke ostáva s pôvodným textom „viac ako 6 hodín“, výpočet sa riadi hodnotou, nie textom).
+- **Kontrakt**: len text `contract/README.md` (kľúč `lunch_recorded_mode` a výklad `auto_lunch_trigger_min` „od hodnoty vrátane“). Schéma, kľúče ani zlatý súbor sa nemenia. Terminál zatiaľ prah z exportu nepoužíva (vlastné nastavenie `OBED_PO_HODINACH`), takže sa v ňom nič nezmení, kým sa nenapíše výpočet podľa plánu z Accessu.
+- **Dôsledok pre dni presne 6:00**: deň s presne 360 min práce bez pípnutého obeda má teraz odpočítaných 30 min (predtým nič).
+- **Neoverené v skutočnom Accesse**: kód prešiel `tools/kontrola_vba.py`, ale nespúšťal sa. Vyskúšajte na kópii (pracovný deň s fondom, obed 30 min, okno práce 6:00 až 17:00): (1) príchod 7:00, odchod 13:00 bez obeda dá 5:30 (predtým 6:00); odchod 12:59 dá 5:59; (2) razený obed s režimom 1 a 30 min: príchod 7:00, obed 12:00 až 12:20, návrat do 13:10 je spolu 6:10 (práca 5:50 a obed 0:20), výsledok je 5:40; (3) príchod 7:00, obed 10:00 až 10:20, odchod 12:00 je spolu 5:00 (práca 4:40 a obed 0:20), pod prahom, režim 1 nič nedorovná a odpracované je 4:40; (4) pri predvolenom režime 0 ostáva všetko ako v 2.15.0.
+
 ## Balík 2.15.0
 Pravidlá výpočtu na karte 5 (časť 2): razený obed, odchod bez dôvodu, zaokrúhlenie a doplnenie zabudnutých razení. Predvolené hodnoty dávajú rovnaký výsledok ako doteraz.
 - **Súvislosť**: kontrakt 1.4.0 má voliteľné kľúče pravidiel (`lunch_recorded_mode`, `lunch_min_min`, `unlabeled_out_is_lunch`, `rounding_in_min`, `rounding_out_min`, `rounding_mode`, `auto_repair_target`, `auto_repair_cases`). Access ich zatiaľ nepoznal, takže ich nemal čo vyexportovať. Teraz ich Access naozaj používa vo vlastnom výpočte a exportuje, ak sa líšia od predvolených.

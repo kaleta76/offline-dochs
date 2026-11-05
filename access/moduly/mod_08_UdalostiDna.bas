@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_08_UdalostiDna"
-'@Verzia 1.4.0
+'@Verzia 1.4.1
 Option Compare Database
 Option Explicit
 
@@ -545,10 +545,13 @@ Public Sub SumarDna(ByRef r As TVysledokDna, ByVal lFond As Long, ByRef lOdpr As
         End Select
     Next i
     Call NacitajParametre
-    If mObedAktivny And lFond > 0 And lOdpr > mObedLimit And Not bObed Then lOdpr = lOdpr - mObedMin
+    ' Prah (parameter Obed od) platí od uvedenej hodnoty vrátane: pri 360 min už 6:00 práce obed zahŕňa, 5:59 ešte nie.
+    If mObedAktivny And lFond > 0 And lOdpr >= mObedLimit And Not bObed Then lOdpr = lOdpr - mObedMin
     ' razený obed (kontrakt lunch_recorded_mode): 0 = skutočný čas (obed nie je práca, nič sa neupravuje),
-    ' 1 = najmenej mObedMinZazn (kratší obed sa dorovná odpočtom), 2 = vždy presne mObedMinZazn
-    If bObed And mObedRezim > 0 Then
+    ' 1 = najmenej mObedMinZazn (kratší obed sa dorovná odpočtom), 2 = vždy presne mObedMinZazn.
+    ' Upravuje sa len deň, v ktorom práca spolu s obedom dosiahne ten istý prah ako automatický obed
+    ' (kratšia zmena na prestávku nárok nemá, taký obed sa počíta skutočným časom).
+    If bObed And mObedRezim > 0 And (lOdpr + lObedSkut) >= mObedLimit Then
         If mObedRezim = 1 Then
             If lObedSkut < mObedMinZazn Then lOdpr = lOdpr - (mObedMinZazn - lObedSkut)
         Else

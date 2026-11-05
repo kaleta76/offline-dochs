@@ -120,7 +120,7 @@ Terminál nové kľúče zatiaľ len **prijme a overí**. Ako ich použije výpo
 
 | kľúč | hodnoty | predvolené | význam |
 |---|---|---|---|
-| `lunch_recorded_mode` | 0, 1, 2 | 0 | obed, ktorý zamestnanec odrazil (č. 7 alebo odchod bez dôvodu, ak je `unlabeled_out_is_lunch`): 0 skutočný čas, 1 najmenej `lunch_min_min`, 2 vždy presne `lunch_min_min` |
+| `lunch_recorded_mode` | 0, 1, 2 | 0 | obed, ktorý zamestnanec odrazil (č. 7 alebo odchod bez dôvodu, ak je `unlabeled_out_is_lunch`): 0 skutočný čas, 1 najmenej `lunch_min_min`, 2 vždy presne `lunch_min_min`; 1 a 2 sa uplatnia len v dni, kde odpracovaný čas spolu s obedom dosiahne `auto_lunch_trigger_min` (kratšia zmena na prestávku nárok nemá a obed sa počíta skutočným časom) |
 | `lunch_min_min` | 0 až 600 | 30 | minúty obeda pre režim 1 a 2; bez režimu 1 alebo 2 sa nepoužije (overovač upozorní) |
 | `unlabeled_out_is_lunch` | true/false | true | `true`: Odchod bez dôvodu a neskorší Príchod v ten istý deň je obed; `false`: je to odchod a nový príchod (Access: `TerminalOdchodBezDovodu`) |
 | `rounding_in_min` | 0 až 60 | 0 | prvý príchod dňa sa zaokrúhli na násobok týchto minút; 0 nezaokrúhľuje |
@@ -166,7 +166,7 @@ Access nové kľúče vloží, len keď ich správca nastaví.
 * `LUNCH`: obed (č. 7) sa počíta skutočným trvaním; ak v dni obed je, automatický obed sa neodpočíta;
 * `COUNTED`: každé iné prerušenie sa počíta skutočným trvaním; ak trvá `full_day_obstacle_min` a viac, započíta sa **denný fond dňa** (`expected_min`);
 * `UNPAID` (od 1.4.0): interval sa nezapočíta ani do práce, ani do fondu dňa;
-* po zostavení dňa sa od práce odpočíta automatický obed (`auto_lunch_deduct_min`), ak je zapnutý, deň má fond, odpracovaný čas je nad `auto_lunch_trigger_min` a nebol obed;
+* po zostavení dňa sa od práce odpočíta automatický obed (`auto_lunch_deduct_min`), ak je zapnutý, deň má fond, odpracovaný čas dosiahne `auto_lunch_trigger_min` (od tejto hodnoty vrátane; pri 360 je to 6:00, 5:59 ešte nie) a nebol obed;
 * denné saldo = odpracované + započítané prekážky − `expected_min`.
 Neznámu hodnotu `calc` terminál nesmie nahradiť vlastným odhadom: saldo označí ako nepotvrdené a upozorní správcu (Access mohol zmeniť pravidlo a kontrakt dostane novú verziu).
 

@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_10_Konfiguracia"
-'@Verzia 1.4.0
+'@Verzia 1.4.1
 Option Compare Database
 Option Explicit
 
@@ -877,7 +877,7 @@ Public Function StavKonfiguracie() As String
         "Kalendáre: " & PocetRozdielnych("Kalendare", "Cislo") & vbCrLf & _
         "Zamestnanci s priradením fondu: " & PocetRozdielnych("ZamestnanciFondy", "OsobneCislo") & " z " & DCount("*", "Zamestnanci") & vbCrLf & _
         "Okno práce: " & mod_17_FondyPravidla.MinutyNaText(mod_08_UdalostiDna.PrmOknoOd()) & " - " & mod_17_FondyPravidla.MinutyNaText(mod_08_UdalostiDna.PrmOknoDo()) & _
-        ", obed " & mod_08_UdalostiDna.PrmObedMin() & " min po " & mod_08_UdalostiDna.PrmObedLimit() & " min práce bez pípnutého obeda"
+        ", obed " & mod_08_UdalostiDna.PrmObedMin() & " min od " & mod_08_UdalostiDna.PrmObedLimit() & " min práce (vrátane) bez pípnutého obeda"
     ' samostatný príkaz: pri chýbajúcom stĺpci sa preskočí len tento riadok, nie celý prehľad
     s = s & vbCrLf & "Tlačidlá pre terminál: " & DCount("*", "CiselnikPreruseni", "TerminalTlacidlo = True") & " (najviac " & MAX_TLACIDIEL & ")"
     StavKonfiguracie = s

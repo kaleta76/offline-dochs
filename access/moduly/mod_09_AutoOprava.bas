@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_09_AutoOprava"
-'@Verzia 1.3.0
+'@Verzia 1.3.1
 Option Compare Database
 Option Explicit
 
@@ -232,7 +232,7 @@ Private Function JedenNavrh(ByRef ev() As TUdalost, ByVal n As Long, ByVal lFond
         For i = 1 To r.nIv
             If r.Iv(i).Cislo = 7 Then bObed = True
         Next i
-        If lFond > 0 And Not bObed And (lOdpr + lRem) > mod_08_UdalostiDna.PrmObedLimit() Then lNeed = lNeed + lObedMin
+        If lFond > 0 And Not bObed And (lOdpr + lRem) >= mod_08_UdalostiDna.PrmObedLimit() Then lNeed = lNeed + lObedMin
         lKon = r.PracaZac + lNeed
         If lCiel = 1 And lWin > r.PracaZac Then lKon = lWin
         If lKon > lWin And lWin > r.PracaZac Then lKon = lWin

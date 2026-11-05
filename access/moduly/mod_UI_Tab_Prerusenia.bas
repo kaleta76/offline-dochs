@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_Tab_Prerusenia"
-'@Verzia 2.11.0
+'@Verzia 2.11.1
 Option Compare Database
 Option Explicit
 
@@ -204,7 +204,7 @@ Public Sub BuildUI(ByVal strFrmName As String, ByVal strPageName As String)
     Call VolbaSir(strFrmName, strPageName, 500, 10850, "Doplniť opravu:", "cboOpravaCiel", 1500, 2700, LIST_OPRAVA_CIEL)
     Call VolbaSir(strFrmName, strPageName, 4900, 10850, "Prípady:", "cboOpravaPripady", 900, 3700, LIST_OPRAVA_PRIPADY)
     Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 11250, 9500, 420)
-    ctl.Caption = "Zaokrúhľuje sa prvý razený príchod a posledný razený odchod dňa (0 = bez zaokrúhlenia). Doplnenie opráv platí, ak je automatická oprava zapnutá, a netýka sa obeda."
+    ctl.Caption = "Razený obed sa upraví len v dni, keď práca s obedom dosiahne Obed od (sekcia 2). Zaokrúhľuje sa prvý príchod a posledný odchod dňa (0 = bez). Opravy platia pri zapnutej automatickej oprave."
     ctl.FontSize = 8: ctl.ForeColor = RGB(100, 100, 100)
 
     Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 500, 11750, 2700, 420)

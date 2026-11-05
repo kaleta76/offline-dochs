@@ -1,6 +1,6 @@
 {
-  "balik": "2.16.0",
-  "vytvorene": "2026-11-05 20:05:18",
+  "balik": "2.17.0",
+  "vytvorene": "2026-11-05 20:13:38",
   "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
   "zrusene": [
     "modExportLovableConfig",
@@ -9,9 +9,9 @@
   "moduly": {
     "modMesaatnaDochadzka": {
       "subor": "moduly/modMesaatnaDochadzka.bas",
-      "verzia": "2.8.0",
-      "sha256": "959a143d88c1facfd3ebae89a10f042833ddd27f11b004a99628e2238114753e",
-      "obsah_sha256": "d5d31318f2cec38860efc214373604b55c90f1d95cf953e9c02c68ad80b753c5"
+      "verzia": "2.9.0",
+      "sha256": "f4684a42abbe7028566356ff6fa00c09f04be7c57d2efbfce6dbcca188cc7119",
+      "obsah_sha256": "fffb69625d8e7e01ff0c24ed01e792bcddb0056aacfe4d872db7c59779d6c162"
     },
     "mod_00_Common": {
       "subor": "moduly/mod_00_Common.bas",
@@ -63,15 +63,15 @@
     },
     "mod_08_UdalostiDna": {
       "subor": "moduly/mod_08_UdalostiDna.bas",
-      "verzia": "1.4.1",
-      "sha256": "1d207f75437a4ed82aa0264e4e36ddb674c44a6ed6d76768aeb853ddddf01615",
-      "obsah_sha256": "5538877db72df88c94a6fc23565fba9757b64c305e370f93d17550360a3ef77f"
+      "verzia": "1.5.1",
+      "sha256": "bab4a24dc6750b479a60ae7d83ffc1dcd85d44fae734439264ddf3f97a795c65",
+      "obsah_sha256": "8e2e93fe16411adcc0d68ab7d9dbee89e060eb202107fd01519bee0fc4ed7e1d"
     },
     "mod_09_AutoOprava": {
       "subor": "moduly/mod_09_AutoOprava.bas",
-      "verzia": "1.3.1",
-      "sha256": "70003e60f02fb45d612ff14884bc7033bf14fe58f30912d49d42e8230b058dd8",
-      "obsah_sha256": "4a47cc5a119f45ffa809e5e1ea83b2e21d1fa35e94c7a64db3f2335b6bd7f43c"
+      "verzia": "1.4.0",
+      "sha256": "5ebea842a2299b6d80b0410d76ba46c3e7015446c736b26efaa38baee64316ab",
+      "obsah_sha256": "8e8b31ea6b5806a400f2d868ce440ee1a4af390caab703217c745dbe57fe60fa"
     },
     "mod_10_Konfiguracia": {
       "subor": "moduly/mod_10_Konfiguracia.bas",
@@ -111,9 +111,9 @@
     },
     "mod_16_PravidlaPreruseni": {
       "subor": "moduly/mod_16_PravidlaPreruseni.bas",
-      "verzia": "1.1.0",
-      "sha256": "4aecbb95a1fc2d6cc93ca476e1ce2f90f329cc3343664e7f4a8f81be35587adb",
-      "obsah_sha256": "8ac706153850220eabd51fecb87a98234af5ca7829dbbfd104beb06547431f90"
+      "verzia": "1.1.1",
+      "sha256": "139316035c2561873799620cf70e3e19e02610a8ddf544513064046b4b056b6e",
+      "obsah_sha256": "fc929e84cadc32bf170ad739ddd6ac36b4aa596fd46a03b516e3dfa86e653230"
     },
     "mod_17_FondyPravidla": {
       "subor": "moduly/mod_17_FondyPravidla.bas",
@@ -135,15 +135,15 @@
     },
     "mod_20_KonfiguraciaExport": {
       "subor": "moduly/mod_20_KonfiguraciaExport.bas",
-      "verzia": "1.2.0",
-      "sha256": "352bfb1a47607ab445be9f8ffdfec38bc9d7cc3bbe23bbff8dd4d0eba625a45b",
-      "obsah_sha256": "b5a21ea5dbabb8a0d2841d50bd1b225fde4f90819d853f33984180cbf3ea8743"
+      "verzia": "1.3.0",
+      "sha256": "c35655be150dbe179fbfc3f88e6c05411cede7e2bdfc9ff4dff5bd6f7c23c7e9",
+      "obsah_sha256": "89e9ec67acfcaa83e212f6546c82bae39a62207660883ae0f7307acaac80f8b7"
     },
     "mod_21_RezimyVypoctu": {
       "subor": "moduly/mod_21_RezimyVypoctu.bas",
-      "verzia": "1.0.0",
-      "sha256": "6f8bdc91576851bf13ceb5b0b3dd5a0719efa941ab84278dea575ac64736199d",
-      "obsah_sha256": "32a65c37df75072f18bf5bc02f082e8f1d7efd3c2d89aa1b2eff5122c25600e2"
+      "verzia": "1.1.0",
+      "sha256": "0c9b4b60d8bb80e06c1652fc641ca311917379b900ae3656b829e4422d2191dc",
+      "obsah_sha256": "3282c7b2052c55a246c84dde7d519df09dc32af59f6c0029e3634b171d7f4059"
     },
     "mod_UI_Core": {
       "subor": "moduly/mod_UI_Core.bas",

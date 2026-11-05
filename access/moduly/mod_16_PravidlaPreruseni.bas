@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_16_PravidlaPreruseni"
-'@Verzia 1.1.0
+'@Verzia 1.1.1
 Option Compare Database
 Option Explicit
 
@@ -146,11 +146,11 @@ Public Sub VyhodnotDen(ByRef db As DAO.Database, ByRef r As TVysledokDna, ByVal 
     Set rul = Pravidla(db, lSablona, CLng(Year(dDen)) * 12 + Month(dDen))
     If rul.Count = 0 Then Exit Sub
     wd = Weekday(dDen, vbMonday)
-    lCelo = mod_08_UdalostiDna.PrmCelodennaPrekazka()
 
     For i = 1 To r.nIv
         c = r.Iv(i).Cislo
         If c <> 1 Then
+            lCelo = mod_08_UdalostiDna.PrmPrahPrerusenia(c)     ' hranica celého dňa tohto prerušenia (vlastná, z režimu, alebo spoločná)
             If rul.Exists(c) And Not r.Iv(i).ZacAuto And Not r.Iv(i).KonAuto Then
                 zac = r.Iv(i).Zac
                 kon = r.Iv(i).Kon

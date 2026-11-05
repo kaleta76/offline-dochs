@@ -98,7 +98,7 @@ Stav databázy terminála: po čistení v nej nie je žiadna organizácia ani ú
 | Sviatok | Terminál berie sviatky z organizácie, Access z kalendára zamestnanca | Skontrolujte zoznam sviatkov |
 | Lekár / rodina | Terminál ich dopĺňa do fondu, Access počíta skutočné trvanie | Rozdiel v pravidle (D1) |
 | Súkromné prerušenie | Terminál ho nezapočíta, Access áno | Rozdiel v pravidle (D1) |
-| Obed | Terminál odpočíta len prebytok nad 6 h, Access celý automatický obed, ak nebol obed | Rozdiel v pravidle (D1) |
+| Obed | Odpočet je rovnaký: celých 30 min od 6 h práce vrátane, ak nebol obed. Líši sa to, čo sa do 6 h počíta (Access oreže prácu oknom a služobnú cestu nepočíta, terminál nie) | Rozdiel v pravidle (D1) |
 | Práca mimo okna 6:00 až 17:00 | Access oreže, terminál nie | Rozdiel v pravidle (D1) |
 | Deň so schválenou automatickou opravou | Access ju má, terminál nie (v popise dňa je poznámka) | Očakávané |
 | **Obyčajný deň s rovnakým fondom, príchod a odchod bez zvláštností, a predsa iné saldo** | Nič z hore uvedeného to nevysvetľuje | **Podozrenie na chybu. Pošlite `porovnanie_report.txt`.** |

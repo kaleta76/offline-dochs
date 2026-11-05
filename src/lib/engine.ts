@@ -82,11 +82,12 @@ export function computeDay(input: DayInput, s: EngineSettings): DayResult {
     }
   }
 
-  // Statutory break: deducted once work exceeds threshold, unless the employee punched out for lunch
-  // (the lunch time is then already missing from the work time; same rule as the Access system).
+  // Statutory break: deducted in full once work reaches the threshold (6 h or more, 5 h 59 min is not enough), unless
+  // the employee punched out for lunch (the lunch time is then already missing from the work time).
+  // Same rule as the Access system (mod_08 SumarDna), which is the system of record.
   let breakMin = 0;
-  if (!lunchPunched && workMin > s.breakAfterHours * 60) {
-    breakMin = Math.min(s.breakMin, workMin - s.breakAfterHours * 60);
+  if (!lunchPunched && workMin >= s.breakAfterHours * 60) {
+    breakMin = Math.min(s.breakMin, workMin); // never below zero work (only reachable with a very low threshold)
     workMin -= breakMin;
     if (byCode["WORK"]) byCode["WORK"] = Math.max(0, byCode["WORK"] - breakMin);
   }

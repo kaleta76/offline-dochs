@@ -44,6 +44,57 @@ export type Database = {
         }
         Relationships: []
       }
+      access_config: {
+        Row: {
+          config: Json
+          config_version: string
+          employee_months_count: number
+          employees_count: number
+          imported_at: string
+          imported_by: string | null
+          organization_id: string
+          period_from: string
+          period_to: string
+        }
+        Insert: {
+          config: Json
+          config_version: string
+          employee_months_count: number
+          employees_count: number
+          imported_at?: string
+          imported_by?: string | null
+          organization_id: string
+          period_from: string
+          period_to: string
+        }
+        Update: {
+          config?: Json
+          config_version?: string
+          employee_months_count?: number
+          employees_count?: number
+          imported_at?: string
+          imported_by?: string | null
+          organization_id?: string
+          period_from?: string
+          period_to?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_config_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -199,6 +250,62 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_month_plan: {
+        Row: {
+          calendar_id: number
+          config_version: string
+          day_types: string[]
+          employment_pct: number
+          expected_min: number[]
+          fund_id: number
+          month: string
+          organization_id: string
+          personnel_number: string
+          regime_ids: number[] | null
+          template_id: number
+          window_end_min: number | null
+          window_start_min: number | null
+        }
+        Insert: {
+          calendar_id: number
+          config_version: string
+          day_types: string[]
+          employment_pct: number
+          expected_min: number[]
+          fund_id: number
+          month: string
+          organization_id: string
+          personnel_number: string
+          regime_ids?: number[] | null
+          template_id: number
+          window_end_min?: number | null
+          window_start_min?: number | null
+        }
+        Update: {
+          calendar_id?: number
+          config_version?: string
+          day_types?: string[]
+          employment_pct?: number
+          expected_min?: number[]
+          fund_id?: number
+          month?: string
+          organization_id?: string
+          personnel_number?: string
+          regime_ids?: number[] | null
+          template_id?: number
+          window_end_min?: number | null
+          window_start_min?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_month_plan_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -683,6 +790,7 @@ export type Database = {
         }[]
       }
       can_see: { Args: { _emp: string }; Returns: boolean }
+      can_see_personnel: { Args: { _pn: string }; Returns: boolean }
       claim_recovery_code: { Args: { _token_hash: string }; Returns: string }
       confirm_unverified_punch: {
         Args: { _punch_id: number }
@@ -713,6 +821,10 @@ export type Database = {
         Returns: boolean
       }
       hash_recovery_code: { Args: { _code: string }; Returns: string }
+      import_access_config: {
+        Args: { _dry_run?: boolean; _payload: Json }
+        Returns: Json
+      }
       is_closed: { Args: { _t: string; _user: string }; Returns: boolean }
       is_manager_of: { Args: { _emp: string }; Returns: boolean }
       my_organization: { Args: never; Returns: string }

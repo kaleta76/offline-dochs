@@ -16,6 +16,9 @@ Pravidlá (rovnaké ako v Accesse):
   * Pevný mesačný fond (monthly_min > 0, fond typu 4): denný fond = monthly_min // počet pracovných dní mesiaca
     (celočíselné delenie, pred úväzkom).
   * Úväzok: fond = round(fond * úväzok / 100) – zaokrúhlenie na najbližšie, polovica na párne (ako VBA CLng).
+  * Okno práce (kontrakt 1.4.0): ak platná verzia fondu pre mesiac má "window" [začiatok, koniec] v minútach, mesiac zamestnanca
+    dostane window_start_min a window_end_min; inak sa kľúče vynechajú a platí okno z rules.
+  * Voliteľné kľúče rules a prerušení (1.4.0) sa len prepíšu zo vstupu; ich zmysel a rozsahy hlási tools/verify_config.py.
 
 Použitie:  python3 -I build_config_example.py [vstup.json] [výstup.json]
            python3 -I build_config_example.py --check      (zlatý súbor zodpovedá vstupu; kód 1 ak nie)
@@ -120,8 +123,11 @@ def build(inp):
             a = valid_version(e["assignments"], ym_key(mo))
             fv = valid_version(funds[a["fund"]]["versions"], ym_key(mo))
             types, fond = day_plan(mo, fv, cals[a["calendar"]], holidays, a["employment_pct"])
-            em.append({"month": mo, "employment_pct": a["employment_pct"], "fund_id": a["fund"], "template_id": a["template"],
-                       "calendar_id": a["calendar"], "day_types": types, "expected_min": fond})
+            entry = {"month": mo, "employment_pct": a["employment_pct"], "fund_id": a["fund"], "template_id": a["template"],
+                     "calendar_id": a["calendar"], "day_types": types, "expected_min": fond}
+            if fv.get("window"):
+                entry["window_start_min"], entry["window_end_min"] = fv["window"]
+            em.append(entry)
             n_mon += 1
         employees.append({"personnel_number": e["personnel_number"], "months": em})
     return {

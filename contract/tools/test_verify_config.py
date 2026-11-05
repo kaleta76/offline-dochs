@@ -333,7 +333,8 @@ class Chyby(unittest.TestCase):
 
     def test_subor_bez_tlacidiel_je_stale_platny(self):
         for it in self.doc["interruptions"]:
-            for k in ("terminal_button", "terminal_label", "terminal_order"):
+            # terminal_icon (1.4.0) patrí k tlačidlu, preto sa s ním odoberá
+            for k in ("terminal_button", "terminal_label", "terminal_order", "terminal_icon"):
                 it.pop(k, None)
         errs, warns = vc.check(self.doc)
         self.assertEqual((errs, warns), ([], []))
@@ -368,6 +369,204 @@ class Chyby(unittest.TestCase):
         rc, out = run_main(write_file(json.dumps(self.doc).encode("utf-8")))
         self.assertEqual(rc, 1)
         self.assertIn("counts.employees", out)
+
+
+NOVE_PRAVIDLA = ("lunch_recorded_mode", "lunch_min_min", "unlabeled_out_is_lunch", "rounding_in_min", "rounding_out_min",
+                 "rounding_mode", "auto_repair_target", "auto_repair_cases", "correction_deadline_day",
+                 "early_return_ends_interruption")
+NOVE_PRIZNAKY = ("terminal_icon", "terminal_request", "needs_approval", "full_day_only")
+
+
+class Kontrakt140(unittest.TestCase):
+    """Voliteľné kľúče kontraktu 1.4.0: pravidlá, príznaky prerušení, okno práce v mesiaci."""
+
+    def setUp(self):
+        self.doc = golden()
+
+    def assertHas(self, doc, text, strict=False):
+        errs = errors(doc, strict)
+        self.assertTrue(any(text in e for e in errs), f"hľadané '{text}' nie je v {errs}")
+
+    def _it(self, code):
+        return next(i for i in self.doc["interruptions"] if i["code"] == code)
+
+    # --- súbor bez nových kľúčov ostáva platný (spätná kompatibilita s 1.3.0)
+    def test_subor_bez_novych_klucov_je_stale_platny(self):
+        for k in NOVE_PRAVIDLA:
+            self.doc["rules"].pop(k, None)
+        for it in self.doc["interruptions"]:
+            for k in NOVE_PRIZNAKY:
+                it.pop(k, None)
+            if it["calc"] == "UNPAID":
+                it["calc"] = "COUNTED"
+        for e in self.doc["employees"]:
+            for m in e["months"]:
+                m.pop("window_start_min", None)
+                m.pop("window_end_min", None)
+        self.assertEqual(vc.check(self.doc), ([], []))
+
+    def test_zlaty_subor_ma_vsetky_nove_kluce(self):
+        for k in NOVE_PRAVIDLA:
+            self.assertIn(k, self.doc["rules"])
+        pouzite = {k for it in self.doc["interruptions"] for k in it}
+        for k in NOVE_PRIZNAKY:
+            self.assertIn(k, pouzite)
+        self.assertIn("UNPAID", {it["calc"] for it in self.doc["interruptions"]})
+
+    # --- pravidlá
+    def test_pravidla_mimo_rozsahu_alebo_zleho_typu(self):
+        zle = {"lunch_recorded_mode": (3, -1, "1", True, 1.5), "lunch_min_min": (601, -1, "30"),
+               "rounding_in_min": (61, -1, "5"), "rounding_out_min": (61, -1, False), "rounding_mode": (4, -1, "0"),
+               "auto_repair_target": (2, -1, True), "auto_repair_cases": (0, 4, "3"),
+               "correction_deadline_day": (32, -1, "5")}
+        for k, hodnoty in zle.items():
+            for v in hodnoty:
+                self.doc = golden()
+                self.doc["rules"][k] = v
+                self.assertHas(self.doc, f"rules.{k} musí byť celé číslo")
+
+    def test_hranice_pravidiel_su_platne(self):
+        horne = {"lunch_recorded_mode": 2, "lunch_min_min": 600, "rounding_in_min": 60, "rounding_out_min": 60,
+                 "rounding_mode": 3, "auto_repair_target": 1, "auto_repair_cases": 1, "correction_deadline_day": 31}
+        dolne = {"lunch_recorded_mode": 0, "lunch_min_min": 0, "rounding_in_min": 0, "rounding_out_min": 0,
+                 "rounding_mode": 0, "auto_repair_target": 0, "auto_repair_cases": 3, "correction_deadline_day": 0}
+        for hodnoty in (horne, dolne):
+            self.doc = golden()
+            self.doc["rules"].update(hodnoty)
+            if hodnoty["lunch_recorded_mode"] == 0:
+                del self.doc["rules"]["lunch_min_min"]
+            self.assertEqual(vc.check(self.doc), ([], []))
+
+    def test_pravdivostne_pravidla(self):
+        for k in ("unlabeled_out_is_lunch", "early_return_ends_interruption", "interruption_check_enabled"):
+            for v in ("ano", 1, 0, None):
+                self.doc = golden()
+                self.doc["rules"][k] = v
+                self.assertHas(self.doc, f"rules.{k} nie je true/false")
+
+    def test_minuty_obeda_bez_rezimu_su_upozornenie_a_v_strict_chyba(self):
+        self.doc["rules"]["lunch_recorded_mode"] = 0
+        errs, warns = vc.check(self.doc)
+        self.assertEqual(errs, [])
+        self.assertTrue(any("lunch_min_min sa nepoužije" in w for w in warns))
+        self.assertHas(self.doc, "lunch_min_min sa nepoužije", strict=True)
+        del self.doc["rules"]["lunch_recorded_mode"]            # bez kľúča platí predvolené 0
+        self.assertTrue(any("lunch_min_min sa nepoužije" in w for w in vc.check(self.doc)[1]))
+
+    def test_neznamy_kluc_pravidiel_je_upozornenie_a_v_strict_chyba(self):
+        self.doc["rules"]["rounding_in_mn"] = 5                 # preklep
+        errs, warns = vc.check(self.doc)
+        self.assertEqual(errs, [])
+        self.assertTrue(any("neznámy kľúč 'rounding_in_mn'" in w for w in warns))
+        self.assertHas(self.doc, "neznámy kľúč 'rounding_in_mn'", strict=True)
+
+    # --- prerušenia
+    def test_nezapocitany_interval_unpaid(self):
+        self.assertEqual(self._it(13)["calc"], "UNPAID")
+        self.assertEqual(errors(self.doc), [])
+
+    def test_unpaid_nepatri_praci_ani_obedu(self):
+        self._it(1)["calc"] = "UNPAID"
+        self.assertHas(self.doc, "calc WORK patrí práve prerušeniu č. 1")
+        self.doc = golden()
+        self._it(7)["calc"] = "UNPAID"
+        self.assertHas(self.doc, "calc LUNCH patrí práve prerušeniu č. 7")
+
+    def test_ikony_zlateho_suboru(self):
+        self.assertEqual({it["code"]: it["terminal_icon"] for it in self.doc["interruptions"] if "terminal_icon" in it},
+                         {2: "doctor", 4: "errand", 12: "trip", 16: "family"})
+
+    def test_ikona_zleho_tvaru(self):
+        for zla in ("", "Doctor", "doctor\n", "d-r", "1abc", "x" * 21, 5, None):
+            self.doc = golden()
+            self._it(2)["terminal_icon"] = zla
+            self.assertHas(self.doc, "terminal_icon musí byť názov z malých písmen")
+
+    def test_neznama_ikona_je_upozornenie_a_v_strict_chyba(self):
+        self._it(2)["terminal_icon"] = "rocket"
+        errs, warns = vc.check(self.doc)
+        self.assertEqual(errs, [])
+        self.assertTrue(any("neznáma ikona 'rocket'" in w for w in warns))
+        self.assertHas(self.doc, "neznáma ikona 'rocket'", strict=True)
+
+    def test_ikona_bez_tlacidla(self):
+        self._it(8)["terminal_icon"] = "home"
+        self.assertHas(self.doc, "terminal_icon patrí len prerušeniu s terminal_button = true")
+
+    def test_priznaky_nie_su_pravdivostne_hodnoty(self):
+        for k in ("terminal_request", "needs_approval", "full_day_only"):
+            self.doc = golden()
+            self._it(8)[k] = "ano"
+            self.assertHas(self.doc, f"prerušenie 8: {k} nie je true/false")
+
+    def test_praca_nema_priznaky_1_4_0(self):
+        for k in ("terminal_request", "needs_approval", "full_day_only"):
+            self.doc = golden()
+            self._it(1)[k] = True
+            self.assertHas(self.doc, f"práca (č. 1) nemá kľúč {k}")
+            self.doc = golden()
+            self._it(1)[k] = False                              # false je neškodné
+            self.assertEqual(errors(self.doc), [])
+
+    def test_celodenne_prerusenie_nema_tlacidlo(self):
+        self._it(2)["full_day_only"] = True                     # prerušenie 2 má tlačidlo
+        self.assertHas(self.doc, "prerušenie 2: full_day_only a terminal_button sa vylučujú")
+
+    def test_zadost_a_schvalovanie_su_nezavisle_od_tlacidla(self):
+        self.assertTrue(self._it(12)["terminal_button"] and self._it(12)["terminal_request"] and self._it(12)["needs_approval"])
+        self.assertFalse(self._it(8).get("terminal_button", False))
+        self.assertEqual(errors(self.doc), [])
+
+    # --- okno práce v mesiaci
+    def test_okno_je_len_pri_fonde_s_oknom(self):
+        for pn, ma in (("9000004", True), ("9000001", False), ("9000002", False), ("9000003", False)):
+            for m in emp(self.doc, pn)["months"]:
+                self.assertEqual("window_start_min" in m, ma, (pn, m["month"]))
+                self.assertEqual("window_end_min" in m, ma, (pn, m["month"]))
+        m = month(self.doc, "9000004", "2026-11")
+        self.assertEqual((m["window_start_min"], m["window_end_min"]), (420, 960))
+
+    def test_okno_len_jedna_hodnota(self):
+        del month(self.doc, "9000004", "2026-10")["window_end_min"]
+        self.assertHas(self.doc, "window_start_min a window_end_min musia byť spolu")
+        self.doc = golden()
+        m = month(self.doc, "9000001", "2026-10")
+        m["window_end_min"] = 1020
+        self.assertHas(self.doc, "window_start_min a window_end_min musia byť spolu")
+
+    def test_okno_mimo_rozsahu_alebo_zleho_typu(self):
+        for zle in (-1, 1441, "420", True, 420.5, None):
+            self.doc = golden()
+            month(self.doc, "9000004", "2026-10")["window_start_min"] = zle
+            self.assertHas(self.doc, "musia byť celé čísla 0 až 1440")
+
+    def test_okno_koniec_nie_je_po_zaciatku(self):
+        for start, koniec in ((960, 960), (960, 420)):
+            self.doc = golden()
+            m = month(self.doc, "9000004", "2026-10")
+            m["window_start_min"], m["window_end_min"] = start, koniec
+            self.assertHas(self.doc, "koniec okna práce nie je po začiatku")
+
+    def test_okno_cely_den_je_platne(self):
+        m = month(self.doc, "9000001", "2026-10")
+        m["window_start_min"], m["window_end_min"] = 0, 1440     # „okno sa nepoužíva“
+        self.assertEqual(errors(self.doc), [])
+
+    def test_ina_polozka_v_mesiaci_ostava_zakazana(self):
+        month(self.doc, "9000001", "2026-10")["window_start"] = 420
+        self.assertHas(self.doc, "nepovolené kľúče")
+
+    # --- referenčný výpočet plánu
+    def test_vypocet_plan_okno_podla_platnej_verzie_fondu(self):
+        inp = json.loads(read(os.path.join(HERE, "..", "examples", "config_example.input.json")))
+        f3 = next(f for f in inp["funds"] if f["id"] == 3)
+        f3["versions"] = [{"from": "2025-01", "avg_day_min": 450, "monthly_min": 0, "by_weekday": None},
+                          {"from": "2026-11", "avg_day_min": 450, "monthly_min": 0, "by_weekday": None, "window": [480, 1080]}]
+        doc = bc.build(inp)
+        self.assertNotIn("window_start_min", month(doc, "9000004", "2026-10"))      # staršia verzia okno nemá
+        m = month(doc, "9000004", "2026-11")
+        self.assertEqual((m["window_start_min"], m["window_end_min"]), (480, 1080))
+        self.assertEqual(errors(doc), [])
 
 
 class Nezmenene(unittest.TestCase):

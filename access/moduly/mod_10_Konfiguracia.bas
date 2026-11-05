@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_10_Konfiguracia"
-'@Verzia 1.2.0
+'@Verzia 1.3.0
 Option Compare Database
 Option Explicit
 
@@ -24,10 +24,19 @@ Option Explicit
 ' - UlozPriznakyPrerusenia(...)               : Tlačidlo terminálu a príznaky prerušenia (kontrakt 1.3.0 a 1.4.0), s kontrolou a kódom terminála.
 ' - ChybaPriznakov(...) / ChybaTlacidiel(db)   : Kontrola príznakov jedného prerušenia a všetkých tlačidiel naraz (volá ju aj export).
 ' - PlatnaIkona(ikona) / TextTlacidla(...)     : Zatvorený zoznam ikon a text tlačidla (vlastný text, inak názov prerušenia).
+' - UplatniPredvolenyTlacidla(sprava)          : Predvolené tlačidlá a príznaky prerušení (jednorazovo, len prerušenia, ktoré správca nikdy nenastavil).
+' - PoslednaSpravaTlacidiel()                  : Text o tom, čo posledné uplatnenie predvolieb nastavilo (pre okno INICIALIZOVAŤ).
 '===============================================================================
 
 Public Const MAX_TLACIDIEL As Long = 12
 Public Const MAX_TEXT_TLACIDLA As Long = 24
+
+' Kľúč v NastaveniaSystemu: predvolené tlačidlá sa už uplatnili (po prvom uplatnení sa na existujúce prerušenia nevracajú).
+Private Const KLUC_PREDVOLBA_TLACIDIEL As String = "PredvolbaTlacidielPouzita"
+
+' Čísla prerušení, ktoré práve vytvorila inicializácia (v tvare |2||16|); nové prerušenie dostane predvoľbu vždy.
+Private mNoveCisla As String
+Private mSpravaTlacidiel As String
 
 ' Predvolené prerušenia: Cislo|Nazov|Skratka|Predvolba|KodZ|TextZ|KodK|TextK|AutoKoniec(1/0)
 Private Function PredvolenePreruseniaDef() As Variant
@@ -47,6 +56,21 @@ Private Function PredvolenePreruseniaDef() As Variant
         "15|Ošetrenie pracovníka|P|Ošetrenie prac.|128|Ošetr.pr.-odchod|129|Ošetr.pr.-prícho|1", _
         "16|Ošetrenie člena rodiny|OČR|Ošetrenie ČR|130|Ošetr. ČR-odchod|131|Ošetr.ČR-príchod|1", _
         "17|Prekážky §142 ods. 3|§142ods3|Prekážky|132|Prekážky-zač.|133|Prekážky-kon.|1")
+End Function
+
+' Predvolené tlačidlá a príznaky pre terminál (zatiaľ podľa doterajších tlačidiel terminálu; neskôr podľa dotazníka):
+' Cislo|Tlacidlo(1/0)|Text|Poradie|Ikona|Ziadost(1/0)|Schvalenie(1/0)|CelyDen(1/0)|Nezapocitat(1/0)|KodTerminala
+' Dovolenka a nemoc nemajú tlačidlo: zadávajú sa na celý deň ako žiadosť so schválením vedúcim. "Nezapočítať" sa nenastavuje
+' (je to rozhodnutie o výpočte, nie predvoľba).
+Private Function PredvolenePriznakyDef() As Variant
+    PredvolenePriznakyDef = Array( _
+        "2|1|Lekár|1|doctor|0|0|0|0|DOCTOR", _
+        "16|1|Sprievod|2|family|0|0|0|0|FAMILY", _
+        "12|1|Služobná cesta|3|trip|1|0|0|0|TRIP", _
+        "13|1|Súkromné|4|private|0|0|0|0|PRIV", _
+        "4|1|Služobné vzdialenie|5|errand|0|0|0|0|ERRAND", _
+        "8|0||0||1|1|1|0|", _
+        "11|0||0||1|1|1|0|")
 End Function
 
 ' Pevné štátne sviatky SR: Den|Mesiac|Nazov
@@ -116,6 +140,7 @@ End Function
 '-------------------------------------------------------------------------------
 Private Function DoplnPreruseniaAKody(ByRef db As DAO.Database) As Long
     Dim v As Variant, a() As String, rs As DAO.Recordset, n As Long, lCislo As Long, bNove As Boolean
+    mNoveCisla = ""
     For Each v In PredvolenePreruseniaDef()
         a = Split(CStr(v), "|")
         lCislo = CLng(a(0))
@@ -139,6 +164,7 @@ Private Function DoplnPreruseniaAKody(ByRef db As DAO.Database) As Long
             rs!AutoKoniecDoKoncaSmeny = (a(8) = "1")
             rs.Update
             n = n + 1
+            mNoveCisla = mNoveCisla & "|" & lCislo & "|"
         End If
         rs.Close
 
@@ -266,6 +292,7 @@ Public Function InicializujPredvolenuKonfiguraciu(Optional ByVal bTicho As Boole
 
     n = n + DoplnPreruseniaAKody(db)
     Call InicializujAutoKoniec(db)
+    Call UplatniPredvolenyTlacidla(mSpravaTlacidiel)
     n = n + DoplnNastavenia()
     n = n + PridajSviatkyRokov(db, Year(Date) - 1, Year(Date) + 2)
 
@@ -274,6 +301,7 @@ Public Function InicializujPredvolenuKonfiguraciu(Optional ByVal bTicho As Boole
     Call modMesaatnaDochadzka.ObnovCacheNazvov
     Call mod_00_Common.ZapisLog("InicializujPredvolenuKonfiguraciu", "INFO", "Pridaných záznamov: " & n)
     If Not bTicho Then MsgBox "Predvolená konfigurácia je pripravená." & vbCrLf & "Pridaných záznamov: " & n & vbCrLf & vbCrLf & _
+                              IIf(Len(mSpravaTlacidiel) > 0, mSpravaTlacidiel & vbCrLf & vbCrLf, "") & _
                               "Existujúce nastavenia sa nemenili.", vbInformation, "Konfigurácia"
     InicializujPredvolenuKonfiguraciu = n
     Exit Function
@@ -354,8 +382,10 @@ End Function
 ' SQL pre zoznam prerušení v UI (prvý stĺpec = Cislo).
 '-------------------------------------------------------------------------------
 Public Function ZoznamPreruseniSQL() As String
-    ZoznamPreruseniSQL = "SELECT Cislo, Nazov, NazovSkratka, KodZaciatok, KodKoniec, IIf(AutoKoniecDoKoncaSmeny, 'áno', '') AS AutoKon, " & _
-                         "IIf(TerminalTlacidlo, 'áno', '') AS Tlacidlo " & _
+    ' Hlavičky stĺpcov zoznamu sú názvy v zátvorkách (čitateľné, krátke); riadok sa vyberá podľa prvého stĺpca (číslo).
+    ZoznamPreruseniSQL = "SELECT Cislo AS [Číslo], Nazov AS [Názov], NazovSkratka AS [Skratka], KodZaciatok AS [Kód Z], KodKoniec AS [Kód K], " & _
+                         "IIf(AutoKoniecDoKoncaSmeny, 'áno', '') AS [Auto], " & _
+                         "IIf(TerminalTlacidlo, 'áno', '') AS [Tlačidlo] " & _
                          "FROM CiselnikPreruseni ORDER BY Cislo;"
 End Function
 
@@ -661,6 +691,98 @@ Chyba:
 End Function
 
 '-------------------------------------------------------------------------------
+' Prerušenie, ktoré správca nikdy nenastavil: žiadne tlačidlo ani príznak, text, poradie a ikona prázdne.
+'-------------------------------------------------------------------------------
+Private Function PrerusenieBezPriznakov(ByRef rs As DAO.Recordset) As Boolean
+    Dim bPrazdne As Boolean
+    bPrazdne = Not CBool(Nz(rs!TerminalTlacidlo, False))
+    If CBool(Nz(rs!TerminalZiadost, False)) Then bPrazdne = False
+    If CBool(Nz(rs!VyzadujeSchvalenie, False)) Then bPrazdne = False
+    If CBool(Nz(rs!LenCelyDen, False)) Then bPrazdne = False
+    If CBool(Nz(rs!NezapocitavatInterval, False)) Then bPrazdne = False
+    If Len(Trim$(CStr(Nz(rs!TerminalText, "")))) > 0 Then bPrazdne = False
+    If Len(Trim$(CStr(Nz(rs!TerminalIkona, "")))) > 0 Then bPrazdne = False
+    If CLng(Nz(rs!TerminalPoradie, 0)) > 0 Then bPrazdne = False
+    PrerusenieBezPriznakov = bPrazdne
+End Function
+
+' Zabezpečí, aby prerušenie malo kód terminála (predvolený názov), ak ešte žiadny nemá a názov nepatrí inému prerušeniu.
+Private Sub ZabezpecKodTerminalu(ByRef db As DAO.Database, ByVal lCislo As Long, ByVal strKod As String)
+    If DCount("*", "TerminalMapaKodov", "CisloPreruseni = " & lCislo) > 0 Then Exit Sub
+    If DCount("*", "TerminalMapaKodov", "Kod = " & mod_00_Common.SqlText(strKod)) > 0 Then Exit Sub
+    db.Execute "INSERT INTO TerminalMapaKodov (Kod, CisloPreruseni, Poznamka) VALUES (" & mod_00_Common.SqlText(strKod) & ", " & lCislo & ", " & _
+               mod_00_Common.SqlText("predvolený kód tlačidla terminálu") & ")", dbFailOnError
+End Sub
+
+'-------------------------------------------------------------------------------
+' Predvolené tlačidlá a príznaky prerušení pre terminál (PredvolenePriznakyDef). Uplatnia sa len na prerušenia, ktoré správca
+' nikdy nenastavil (PrerusenieBezPriznakov), a to
+'   - jednorazovo pri prvom spustení (kľúč PredvolbaTlacidielPouzita v NastaveniaSystemu; potom sa na existujúce prerušenia nevracajú,
+'     takže vypnuté tlačidlo sa pri ďalšej inicializácii samo nezapne), alebo
+'   - vždy pri prerušení, ktoré práve vytvorila inicializácia (nové, ešte nič nenastavené).
+' Nastavené prerušenia (aj č. 13 s vlastným tlačidlom) sa nemenia. Vráti počet nastavených prerušení (-1 pri chybe);
+' strSprava je prehľad pre správcu (prázdny, ak sa nič neuplatňovalo).
+'-------------------------------------------------------------------------------
+Public Function UplatniPredvolenyTlacidla(ByRef strSprava As String) As Long
+    On Error GoTo Chyba
+    Dim db As DAO.Database, rs As DAO.Recordset, v As Variant, a() As String
+    Dim lCislo As Long, bPrvy As Boolean, bUplatnit As Boolean, strErr As String
+    Dim n As Long, strOk As String, strChyby As String
+
+    strSprava = ""
+    Set db = CurrentDb
+    Call ZabezpecStlpceKonfiguracie(db)
+    Call mod_19_TerminalImport.ZabezpecTabulky(db)
+    bPrvy = (Len(mod_00_Common.GetNastavenie(KLUC_PREDVOLBA_TLACIDIEL, "")) = 0)
+
+    For Each v In PredvolenePriznakyDef()
+        a = Split(CStr(v), "|")
+        lCislo = CLng(a(0))
+        bUplatnit = False
+        Set rs = db.OpenRecordset("SELECT * FROM CiselnikPreruseni WHERE Cislo = " & lCislo & ";", dbOpenSnapshot)
+        If Not rs.EOF Then
+            If bPrvy Or InStr(1, mNoveCisla, "|" & lCislo & "|") > 0 Then bUplatnit = PrerusenieBezPriznakov(rs)
+        End If
+        rs.Close
+
+        If bUplatnit Then
+            If Len(a(9)) > 0 Then Call ZabezpecKodTerminalu(db, lCislo, a(9))
+            strErr = UlozPriznakyPrerusenia(lCislo, (a(1) = "1"), a(2), CLng(a(3)), a(4), (a(5) = "1"), (a(6) = "1"), (a(7) = "1"), (a(8) = "1"))
+            If Len(strErr) = 0 Then
+                n = n + 1
+                strOk = strOk & IIf(Len(strOk) > 0, ", ", "") & lCislo
+            Else
+                strChyby = strChyby & "č. " & lCislo & ": " & strErr & vbCrLf
+            End If
+        End If
+    Next v
+
+    If bPrvy Then Call mod_00_Common.SetNastavenie(KLUC_PREDVOLBA_TLACIDIEL, "2.14.1", "Predvolené tlačidlá a príznaky prerušení pre terminál už boli uplatnené (jednorazovo)")
+    mNoveCisla = ""
+
+    If n > 0 Then
+        strSprava = "Predvolené tlačidlá a príznaky pre terminál: nastavené prerušenia č. " & strOk & "."
+    ElseIf bPrvy Then
+        strSprava = "Predvolené tlačidlá a príznaky pre terminál: nič sa nezmenilo (prerušenia už majú vlastné nastavenie)."
+    End If
+    If Len(strChyby) > 0 Then strSprava = strSprava & vbCrLf & "Nepodarilo sa nastaviť:" & vbCrLf & strChyby
+    If Len(strSprava) > 0 Then Call mod_00_Common.ZapisLog("Konfigurácia", IIf(Len(strChyby) > 0, "WARN", "INFO"), Replace(strSprava, vbCrLf, " "))
+    UplatniPredvolenyTlacidla = n
+    Exit Function
+Chyba:
+    strErr = Err.Description
+    mNoveCisla = ""
+    Call mod_00_Common.ZapisLog("mod_10_Konfiguracia.UplatniPredvolenyTlacidla", "ERROR", strErr)
+    strSprava = "Predvolené tlačidlá pre terminál sa nepodarilo nastaviť: " & strErr
+    UplatniPredvolenyTlacidla = -1
+End Function
+
+' Text o tom, čo nastavilo posledné uplatnenie predvolieb (prázdny, ak sa nič neuplatňovalo).
+Public Function PoslednaSpravaTlacidiel() As String
+    PoslednaSpravaTlacidiel = mSpravaTlacidiel
+End Function
+
+'-------------------------------------------------------------------------------
 ' Textový prehľad stavu konfigurácie (na kontrolu v UI).
 '-------------------------------------------------------------------------------
 Public Function StavKonfiguracie() As String
@@ -677,6 +799,8 @@ Public Function StavKonfiguracie() As String
         "Zamestnanci s priradením fondu: " & PocetRozdielnych("ZamestnanciFondy", "OsobneCislo") & " z " & DCount("*", "Zamestnanci") & vbCrLf & _
         "Okno práce: " & mod_17_FondyPravidla.MinutyNaText(mod_08_UdalostiDna.PrmOknoOd()) & " - " & mod_17_FondyPravidla.MinutyNaText(mod_08_UdalostiDna.PrmOknoDo()) & _
         ", obed " & mod_08_UdalostiDna.PrmObedMin() & " min po " & mod_08_UdalostiDna.PrmObedLimit() & " min práce bez pípnutého obeda"
+    ' samostatný príkaz: pri chýbajúcom stĺpci sa preskočí len tento riadok, nie celý prehľad
+    s = s & vbCrLf & "Tlačidlá pre terminál: " & DCount("*", "CiselnikPreruseni", "TerminalTlacidlo = True") & " (najviac " & MAX_TLACIDIEL & ")"
     StavKonfiguracie = s
 End Function
 

@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_13_Instalacia"
-'@Verzia 1.0.3
+'@Verzia 1.0.4
 Option Compare Database
 Option Explicit
 
@@ -31,7 +31,7 @@ Public Const DATA_MODEL_VERZIA As Long = 2
 '-------------------------------------------------------------------------------
 Public Function InstalacnaInicializacia(Optional ByVal strZdrojDB As String = "", Optional ByVal iRezim As Long = 1) As String
     On Error GoTo Chyba
-    Dim sb As String, n As Long
+    Dim sb As String, n As Long, strTlac As String
     If Not mod_00_Common.TabulkaExistuje("NastaveniaSystemu") Or Not mod_00_Common.TabulkaExistuje("Zamestnanci") Then
         Call mod_01_SystemInit.InicializujDatabazuV2(True)
         sb = sb & "Vytvorená základná štruktúra tabuliek." & vbCrLf
@@ -49,9 +49,15 @@ Public Function InstalacnaInicializacia(Optional ByVal strZdrojDB As String = ""
         n = mod_10_Konfiguracia.InicializujPredvolenuKonfiguraciu(True)
         Call mod_00_Common.SetNastavenie("PredvolenaKonfiguraciaInicializovana", "TRUE", "Predvolená konfigurácia prerušení už bola doplnená")
         sb = sb & "Predvolená konfigurácia prerušení a sviatkov doplnená (nových položiek: " & n & ")." & vbCrLf
+        If Len(mod_10_Konfiguracia.PoslednaSpravaTlacidiel()) > 0 Then sb = sb & mod_10_Konfiguracia.PoslednaSpravaTlacidiel() & vbCrLf
     Else
         sb = sb & "Predvolená konfigurácia už bola doplnená skôr - preskočené (kartu Prerušenia môžete použiť na doplnenie ručne)." & vbCrLf
     End If
+
+    ' Predvolené tlačidlá a príznaky prerušení pre terminál: jednorazovo aj v databáze, ktorá už konfiguráciu má (aktualizácia).
+    ' Uplatnia sa len na prerušenia, ktoré správca nikdy nenastavil; nastavené sa nemenia.
+    Call mod_10_Konfiguracia.UplatniPredvolenyTlacidla(strTlac)
+    If Len(strTlac) > 0 Then sb = sb & strTlac & vbCrLf
 
     Call mod_00_Common.SetNastavenie("VerziaDatovehoModelu", CStr(DATA_MODEL_VERZIA), "Verzia dátového modelu (nastavuje inštalátor)")
     Call mod_00_Common.SetNastavenie("InstalaciaDatum", Format$(Now, "yyyy-mm-dd hh:nn:ss"), "Posledná inštalácia / aktualizácia modulov")

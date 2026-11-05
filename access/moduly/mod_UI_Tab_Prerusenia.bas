@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_Tab_Prerusenia"
-'@Verzia 2.10.0
+'@Verzia 2.10.1
 Option Compare Database
 Option Explicit
 
@@ -52,7 +52,7 @@ Public Sub BuildUI(ByVal strFrmName As String, ByVal strPageName As String)
     ctl.Name = "lstPrerusenia"
     ctl.ColumnCount = 7
     ctl.ColumnHeads = True
-    ctl.ColumnWidths = "500;1500;900;700;700;700;500"
+    ctl.ColumnWidths = "560;1400;800;640;640;600;860"
     ctl.BoundColumn = 1
     ctl.RowSourceType = "Table/Query"
     ctl.AfterUpdate = "=PrerusenieVyberUI()"
@@ -387,9 +387,10 @@ ChybaHandler:
 End Function
 
 Public Function InicializujKonfiguraciuUI() As Boolean
-    Dim n As Long, nF As Long, strF As String
+    Dim n As Long, nF As Long, strF As String, strT As String
     If MsgBox("Doplniť predvolenú konfiguráciu?" & vbCrLf & vbCrLf & _
               "- prerušenia a kódy razení, pravidlá anomálií, parametre výpočtu, štátne sviatky SR," & vbCrLf & _
+              "- predvolené tlačidlá a príznaky prerušení pre terminál (jednorazovo, len pre prerušenia, ktoré ste ešte nenastavili)," & vbCrLf & _
               "- pracovný fond (denný fond 7:30), šablónu pravidiel bez kontroly a kalendár, ak ešte žiadne nie sú, a ich priradenie zamestnancom, ktorí nemajú žiadne priradenie." & vbCrLf & vbCrLf & _
               "Existujúce záznamy sa NEMENIA, doplnia sa len chýbajúce." & vbCrLf & vbCrLf & _
               "Ak chcete preniesť fondy a priradenia zo staršej databázy (karta 1, tlačidlo 5), urobte to PRED týmto krokom.", _
@@ -401,7 +402,9 @@ Public Function InicializujKonfiguraciuUI() As Boolean
             MsgBox "Prerušenia, kódy a parametre sú pripravené, ale pracovný fond sa nepodarilo doplniť:" & vbCrLf & vbCrLf & strF & vbCrLf & vbCrLf & _
                    "Podrobnosti sú v logu (záložka Audit & Admin).", vbExclamation, "Predvolená konfigurácia"
         Else
-            MsgBox "Konfigurácia je pripravená. Pridaných záznamov: " & (n + nF) & vbCrLf & vbCrLf & strF & vbCrLf & mod_10_Konfiguracia.StavKonfiguracie(), vbInformation, "Predvolená konfigurácia"
+            strT = mod_10_Konfiguracia.PoslednaSpravaTlacidiel()
+            MsgBox "Konfigurácia je pripravená. Pridaných záznamov: " & (n + nF) & vbCrLf & vbCrLf & strF & vbCrLf & _
+                   IIf(Len(strT) > 0, vbCrLf & strT & vbCrLf, "") & vbCrLf & mod_10_Konfiguracia.StavKonfiguracie(), vbInformation, "Predvolená konfigurácia"
         End If
         Call InitDefaults(Forms!frmHlavnaKonzola)
         Call mod_UI_Pomocnik.OznacCinnost("PRERUSENIA")

@@ -1,5 +1,22 @@
 # Dochádzka – zmeny
 
+## Balík 2.14.1
+Predvolené tlačidlá a príznaky prerušení pre terminál sa nastavia pri inštalácii; hlavičky stĺpcov zoznamu prerušení sú čitateľné.
+- **Súvislosť**: po 2.14.0 sa tlačidlá a príznaky museli prerušenie po prerušení nastaviť ručne na karte 5. Teraz sa nastavia samy, zatiaľ podľa doterajších tlačidiel terminálu;
+  po vyplnení dotazníkov sa predvoľba upraví podľa odpovedí.
+- **Čo sa nastaví**: tlačidlá Lekár (č. 2, poradie 1), Sprievod (č. 16, 2), Služobná cesta (č. 12, 3, aj žiadosť vopred), Súkromné (č. 13, 4), Služobné vzdialenie (č. 4, 5, ikona errand,
+  kód terminála `ERRAND`); Dovolenka (č. 8) a Nemoc (č. 11) bez tlačidla ako žiadosť len na celý deň so schválením vedúcim. „Nezapočíta sa do práce“ sa nenastavuje (rozhodnutie o výpočte).
+- **Kedy sa to uplatní**: pri inštalácii novej databázy, pri aktualizácii databázy (jednorazovo, kľúč `PredvolbaTlacidielPouzita` v nastaveniach systému) a tlačidlom INICIALIZOVAŤ PREDVOLENÚ KONFIGURÁCIU.
+  Uplatní sa len na prerušenia, v ktorých správca nikdy nič z tlačidla a príznakov nenastavil. Nastavené prerušenia (napríklad č. 13 s vlastným tlačidlom) sa nemenia a po prvom uplatnení sa predvoľba
+  na existujúce prerušenia nevracia, takže vypnuté tlačidlo sa samo nezapne. Nové prerušenie, ktoré inicializácia vytvorí, dostane predvoľbu vždy.
+- **`mod_10_Konfiguracia` 1.3.0**: `UplatniPredvolenyTlacidla`, predvoľba v `PredvolenePriznakyDef`, kód terminála pre tlačidlo sa doplní podľa názvu (`DOCTOR`, `FAMILY`, `TRIP`, `PRIV`, `ERRAND`),
+  ak ho už nemá iné prerušenie (inak vznikne `PRER` a číslo prerušenia). Prehľad stavu konfigurácie ukazuje počet tlačidiel. Hlavičky stĺpcov zoznamu prerušení: Číslo, Názov, Skratka, Kód Z, Kód K, Auto, Tlačidlo.
+- **`mod_13_Instalacia` 1.0.4**: inštalátor uplatní predvoľbu aj v databáze, ktorá už predvolenú konfiguráciu má, a vypíše, čo nastavil.
+- **`mod_UI_Tab_Prerusenia` 2.10.1**: stĺpce zoznamu prerušení majú šírky podľa nových hlavičiek (nič sa neorezáva), okno INICIALIZOVAŤ vypíše, ktoré prerušenia dostali tlačidlo alebo príznaky.
+- **Čo to nerieši**: kontrakt, terminál ani databáza sa nemenia. Kód `ERRAND` pre Služobné vzdialenie terminálová databáza zatiaľ nepozná (nový kód razenia je súčasť databázovej dávky, krok 5);
+  do tej dávky sa súbor s ním do terminálu neimportuje. Import z Ordata sa v tomto balíku nemení.
+- **Neoverené v skutočnom Accesse**: nový kód prešiel `tools/kontrola_vba.py`, ale nespúšťal sa. Po inštalácii skontrolujte kartu 5 a exportujte konfiguráciu (karta 7).
+
 ## Balík 2.14.0
 Karta 5 vie nastaviť tlačidlo pre terminál a príznaky prerušení; konfigurácia pre terminál ich prenáša (kontrakt 1.3.0 a 1.4.0, strana Accessu, 1. časť).
 - **Súvislosť**: kontrakt vo verziách 1.3.0 a 1.4.0 opisuje tlačidlá odchodu v termináli (text, poradie, ikona) a príznaky prerušenia (žiadosť vopred, schvaľovanie, len celý deň, nezapočítaný interval),

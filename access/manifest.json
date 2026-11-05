@@ -1,6 +1,6 @@
 {
-  "balik": "2.14.0",
-  "vytvorene": "2026-11-05 11:15:55",
+  "balik": "2.14.1",
+  "vytvorene": "2026-11-05 13:39:31",
   "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
   "zrusene": [
     "modExportLovableConfig",
@@ -75,9 +75,9 @@
     },
     "mod_10_Konfiguracia": {
       "subor": "moduly/mod_10_Konfiguracia.bas",
-      "verzia": "1.2.0",
-      "sha256": "458bdd167b7f7e391d7586dd83c284338d94c5a0397a5c83107d7dc9778e1d52",
-      "obsah_sha256": "48b3d0e573e1423fbedb4e84c795944524be3b74767bfb856d283606f7cbb33b"
+      "verzia": "1.3.0",
+      "sha256": "304cf19c98fcc110299a39c5744300448e42b922c43aeae7b43d8d530a3314a4",
+      "obsah_sha256": "77c497a9e843c28a73b792da37d918b9b99bf037697c15bde995a088aa6665e0"
     },
     "mod_11_ImportZamestnancov": {
       "subor": "moduly/mod_11_ImportZamestnancov.bas",
@@ -93,9 +93,9 @@
     },
     "mod_13_Instalacia": {
       "subor": "moduly/mod_13_Instalacia.bas",
-      "verzia": "1.0.3",
-      "sha256": "c6cb7106cc1c8ddf7d33ffd4e251b418708d3c15fd7102b2fa78852d41720af7",
-      "obsah_sha256": "9a08c1b2a378fee5df34159ed49c7a321bdfa8d503b097fcae53f22618528816"
+      "verzia": "1.0.4",
+      "sha256": "8c4e91328488d1a484bed904403c1188a8975b90086ef5b994f18dbf99074fab",
+      "obsah_sha256": "4760d90cfc495e231b7e692bad9b781a0f42f56adab29ab39a2a262c8fdfbe1b"
     },
     "mod_14_ImportModelu": {
       "subor": "moduly/mod_14_ImportModelu.bas",
@@ -201,9 +201,9 @@
     },
     "mod_UI_Tab_Prerusenia": {
       "subor": "moduly/mod_UI_Tab_Prerusenia.bas",
-      "verzia": "2.10.0",
-      "sha256": "7075d5b7c06f505bc7dbf861ff61e2027371472eb0f6409362e5823e0b814669",
-      "obsah_sha256": "cc1bcf7669fa557da27796a6415b4685b1a54304d177d7f33d091254e580e876"
+      "verzia": "2.10.1",
+      "sha256": "674222421aeae9b305db30b62e72d3f33dcf768e86fb93cb031b508e58b23775",
+      "obsah_sha256": "c234e6481c397652dfeb920e57ce9ae01172726228e46bb666e100a65f100d27"
     },
     "mod_UI_Tab_Vypocet": {
       "subor": "moduly/mod_UI_Tab_Vypocet.bas",

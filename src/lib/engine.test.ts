@@ -55,6 +55,25 @@ describe("computeDay", () => {
     expect(r.breakMin).toBe(0);
   });
 
+  describe("break threshold (same as Access: 6 h or more, the full break)", () => {
+    it("5 h 59 min of work deducts nothing", () => {
+      const r = computeDay(day([p("WORK", "IN", "07:00"), p("WORK", "OUT", "12:59")]), S);
+      expect(r.workMin).toBe(359);
+      expect(r.breakMin).toBe(0);
+    });
+    it("exactly 6 h of work deducts the full 30 min", () => {
+      const r = computeDay(day([p("WORK", "IN", "07:00"), p("WORK", "OUT", "13:00")]), S);
+      expect(r.breakMin).toBe(30);
+      expect(r.workMin).toBe(330);
+    });
+    it("6 h 10 min of work deducts the full 30 min, not only the part above 6 h", () => {
+      const r = computeDay(day([p("WORK", "IN", "07:00"), p("WORK", "OUT", "13:10")]), S);
+      expect(r.breakMin).toBe(30);
+      expect(r.workMin).toBe(340);
+      expect(r.byCode["WORK"]).toBe(340);
+    });
+  });
+
   it("leaving to the doctor without return tops the day up to the fund", () => {
     const r = computeDay(day([p("WORK", "IN", "07:00"), p("DOCTOR", "OUT", "10:00")]), S);
     expect(r.workMin).toBe(180);

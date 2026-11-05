@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_Tab_Prerusenia"
-'@Verzia 2.10.1
+'@Verzia 2.11.0
 Option Compare Database
 Option Explicit
 
@@ -20,8 +20,17 @@ Option Explicit
 ' - PrerusenieZmazUI()             : Zmaže nepoužité prerušenie.
 ' - InicializujKonfiguraciuUI()    : Doplní predvolenú konfiguráciu (iba chýbajúce záznamy).
 ' - UlozParametreVypoctuUI()       : Uloží okno práce, obed a limit celodennej prekážky.
+' - UlozPravidlaVypoctuUI()        : Uloží pravidlá výpočtu (razený obed, odchod bez dôvodu, zaokrúhlenie, doplnenie opráv).
+' - PredvolbaPravidielDnesUI() / PredvolbaPravidielOdporucaneUI() : Vyplnia polia pravidiel hotovou predvoľbou (uloží ich správca).
 ' - SpustiUlozenieOUProfiluUI()    : Uloží časový profil strediska.
 '===============================================================================
+
+' Zoznamy volieb pravidiel výpočtu: každá voľba začína číselným kódom, ktorý sa ukladá (Val prečíta kód).
+Private Const LIST_RAZ_OBED As String = "0 - skutočný čas;1 - najmenej (minúty obeda);2 - vždy presne (minúty obeda)"
+Private Const LIST_ODCHOD_BEZ As String = "obed;odchod"
+Private Const LIST_ZAOKR_SMER As String = "0 - príchod nahor, odchod nadol;1 - oba nahor;2 - oba nadol;3 - na najbližší"
+Private Const LIST_OPRAVA_CIEL As String = "0 - do denného fondu;1 - do konca okna práce"
+Private Const LIST_OPRAVA_PRIPADY As String = "3 - odchod aj návrat z prerušenia;1 - len zabudnutý odchod;2 - len zabudnutý návrat"
 
 Public Function IsAvailable() As Boolean
     IsAvailable = True
@@ -39,9 +48,41 @@ Private Sub Pole(ByVal f As String, ByVal p As String, ByVal x As Long, ByVal y 
     ctl.Name = sName
 End Sub
 
+' Pole s dlhším popisom (šírku popisu a poľa určuje volajúci).
+Private Sub PoleSir(ByVal f As String, ByVal p As String, ByVal x As Long, ByVal y As Long, ByVal sCap As String, ByVal sName As String, ByVal wLab As Long, ByVal w As Long)
+    Dim ctl As Control
+    Set ctl = CreateControl(f, acLabel, acDetail, p, "", x, y + 40, wLab, 280)
+    ctl.Caption = sCap
+    Set ctl = CreateControl(f, acTextBox, acDetail, p, "", x + wLab, y, w, 320)
+    ctl.Name = sName
+End Sub
+
+' Výber zo zoznamu hodnôt s popisom (zoznam sa nedá obísť vlastným textom).
+Private Sub VolbaSir(ByVal f As String, ByVal p As String, ByVal x As Long, ByVal y As Long, ByVal sCap As String, ByVal sName As String, ByVal wLab As Long, ByVal w As Long, ByVal sZoznam As String)
+    Dim ctl As Control
+    Set ctl = CreateControl(f, acLabel, acDetail, p, "", x, y + 40, wLab, 280)
+    ctl.Caption = sCap
+    Set ctl = CreateControl(f, acComboBox, acDetail, p, "", x + wLab, y, w, 320)
+    ctl.Name = sName
+    ctl.RowSourceType = "Value List"
+    ctl.RowSource = sZoznam
+    ctl.LimitToList = True
+End Sub
+
+' Text voľby so zadaným číselným kódom (prvá voľba, ak kód v zozname nie je).
+Private Function VolbaPodlaKodu(ByVal strZoznam As String, ByVal lKod As Long) As String
+    Dim a() As String, i As Long
+    a = Split(strZoznam, ";")
+    For i = 0 To UBound(a)
+        If CLng(Val(a(i))) = lKod Then VolbaPodlaKodu = a(i): Exit Function
+    Next i
+    VolbaPodlaKodu = a(0)
+End Function
+
 Public Sub BuildUI(ByVal strFrmName As String, ByVal strPageName As String)
     On Error GoTo ChybaHandler
-    Dim ctl As Control, btn As Control
+    Dim ctl As Control, btn As Control, lDy As Long
+    lDy = 3700      ' o koľko je sekcia 3 posunutá nadol kvôli sekcii 2b (pravidlá výpočtu)
 
     ' --- 1. SEKCIA: ČÍSELNÍK PRERUŠENÍ ---
     Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 1100, 9500, 300)
@@ -144,24 +185,56 @@ Public Sub BuildUI(ByVal strFrmName As String, ByVal strPageName As String)
     btn.Name = "btnUlozParametre": btn.Caption = "Uložiť parametre": btn.FontBold = True: btn.ForeColor = RGB(0, 100, 0)
     btn.OnClick = "=UlozParametreVypoctuUI()"
 
+    ' --- 2b. PRAVIDLÁ VÝPOČTU (kontrakt 1.4.0): razený obed, zaokrúhlenie, doplnenie opráv ---
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 8800, 9500, 300)
+    ctl.Caption = "2b. Pravidlá výpočtu (razený obed, zaokrúhlenie, doplnenie opráv)"
+    ctl.FontBold = True: ctl.FontSize = 10: ctl.ForeColor = RGB(15, 30, 90)
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 9130, 9500, 420)
+    ctl.Caption = "Predvolené hodnoty dávajú rovnaký výsledok ako doteraz. Platia pri ďalšom prepočte mesiaca; uzavreté mesiace sa neprepočítajú. Do súboru pre terminál sa dostanú len hodnoty, ktoré sa líšia od predvolených."
+    ctl.FontSize = 8: ctl.ForeColor = RGB(100, 100, 100)
+
+    Call VolbaSir(strFrmName, strPageName, 500, 9650, "Razený obed:", "cboRazObed", 1500, 3600, LIST_RAZ_OBED)
+    Call PoleSir(strFrmName, strPageName, 5800, 9650, "Minúty obeda:", "txtRazObedMin", 1500, 700)
+    Call VolbaSir(strFrmName, strPageName, 500, 10050, "Odchod bez dôvodu:", "cboOdchodBezDovodu", 1900, 1200, LIST_ODCHOD_BEZ)
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 3800, 10090, 6200, 280)
+    ctl.Caption = "(odchod z terminálu bez dôvodu a neskorší príchod v ten istý deň)": ctl.FontSize = 8: ctl.ForeColor = RGB(100, 100, 100)
+    Call PoleSir(strFrmName, strPageName, 500, 10450, "Zaokrúhliť príchod (min):", "txtZaokrPrichod", 2100, 600)
+    Call PoleSir(strFrmName, strPageName, 3500, 10450, "odchod (min):", "txtZaokrOdchod", 1300, 600)
+    Call VolbaSir(strFrmName, strPageName, 5800, 10450, "Smer:", "cboZaokrSmer", 600, 3600, LIST_ZAOKR_SMER)
+    Call VolbaSir(strFrmName, strPageName, 500, 10850, "Doplniť opravu:", "cboOpravaCiel", 1500, 2700, LIST_OPRAVA_CIEL)
+    Call VolbaSir(strFrmName, strPageName, 4900, 10850, "Prípady:", "cboOpravaPripady", 900, 3700, LIST_OPRAVA_PRIPADY)
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 11250, 9500, 420)
+    ctl.Caption = "Zaokrúhľuje sa prvý razený príchod a posledný razený odchod dňa (0 = bez zaokrúhlenia). Doplnenie opráv platí, ak je automatická oprava zapnutá, a netýka sa obeda."
+    ctl.FontSize = 8: ctl.ForeColor = RGB(100, 100, 100)
+
+    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 500, 11750, 2700, 420)
+    btn.Name = "btnPravidlaDnes": btn.Caption = "Predvoľba: dnešný stav": btn.OnClick = "=PredvolbaPravidielDnesUI()"
+    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 3550, 11750, 2900, 420)
+    btn.Name = "btnPravidlaOdporucane": btn.Caption = "Predvoľba: odporúčané": btn.OnClick = "=PredvolbaPravidielOdporucaneUI()"
+    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 7500, 11750, 2500, 420)
+    btn.Name = "btnUlozPravidla": btn.Caption = "Uložiť pravidlá": btn.FontBold = True: btn.ForeColor = RGB(0, 100, 0)
+    btn.OnClick = "=UlozPravidlaVypoctuUI()"
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 12250, 9500, 300)
+    ctl.Name = "lblPravidlaStav": ctl.Caption = "": ctl.FontSize = 8: ctl.ForeColor = RGB(100, 100, 100)
+
     ' --- 3. SEKCIA: ČASOVÝ PROFIL STREDISKA ---
-    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 8900, 9500, 300)
+    Set ctl = CreateControl(strFrmName, acLabel, acDetail, strPageName, "", 500, 8900 + lDy, 9500, 300)
     ctl.Caption = "3. Časový profil strediska (pružný čas a obedné okno)"
     ctl.FontBold = True: ctl.FontSize = 10: ctl.ForeColor = RGB(15, 30, 90)
 
-    Call Pole(strFrmName, strPageName, 500, 9250, "Základný čas od:", "txtZaklOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 9250, "do:", "txtZaklDo", 800)
-    Call Pole(strFrmName, strPageName, 500, 9650, "Pružný ráno od:", "txtVolRanoOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 9650, "do:", "txtVolRanoDo", 800)
-    Call Pole(strFrmName, strPageName, 500, 10050, "Pružný popol. od:", "txtVolPoobOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 10050, "do:", "txtVolPoobDo", 800)
-    Call Pole(strFrmName, strPageName, 500, 10450, "Služ. cesta od:", "txtSlceOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 10450, "do:", "txtSlceDo", 800)
-    Call Pole(strFrmName, strPageName, 500, 10850, "Obedné okno od:", "txtObedOd", 800)
-    Call Pole(strFrmName, strPageName, 3000, 10850, "do:", "txtObedDo", 800)
-    Call Pole(strFrmName, strPageName, 5500, 10850, "Trvanie (min):", "txtObedMin", 700)
+    Call Pole(strFrmName, strPageName, 500, 9250 + lDy, "Základný čas od:", "txtZaklOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 9250 + lDy, "do:", "txtZaklDo", 800)
+    Call Pole(strFrmName, strPageName, 500, 9650 + lDy, "Pružný ráno od:", "txtVolRanoOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 9650 + lDy, "do:", "txtVolRanoDo", 800)
+    Call Pole(strFrmName, strPageName, 500, 10050 + lDy, "Pružný popol. od:", "txtVolPoobOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 10050 + lDy, "do:", "txtVolPoobDo", 800)
+    Call Pole(strFrmName, strPageName, 500, 10450 + lDy, "Služ. cesta od:", "txtSlceOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 10450 + lDy, "do:", "txtSlceDo", 800)
+    Call Pole(strFrmName, strPageName, 500, 10850 + lDy, "Obedné okno od:", "txtObedOd", 800)
+    Call Pole(strFrmName, strPageName, 3000, 10850 + lDy, "do:", "txtObedDo", 800)
+    Call Pole(strFrmName, strPageName, 5500, 10850 + lDy, "Trvanie (min):", "txtObedMin", 700)
 
-    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 500, 11450, 4600, 450)
+    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 500, 11450 + lDy, 4600, 450)
     btn.Name = "btnUlozitOU"
     btn.Caption = "Uložiť časový profil strediska"
     btn.FontBold = True: btn.ForeColor = RGB(0, 100, 0)
@@ -180,6 +253,7 @@ Public Sub InitDefaults(ByRef frm As Form)
     frm!txtParObedMin = mod_00_Common.ParamPravidla("AUTO_OBED_NAD_6H", "TrvanieObedaMin", "30")
     frm!txtParObedLimit = mod_00_Common.LimitPravidla("AUTO_OBED_NAD_6H", 360)
     frm!txtParCelodenna = mod_00_Common.GetNastavenie("CelodennaPrekazkaMin", "360")
+    Call VyplnPravidla(mod_10_Konfiguracia.PravidlaVypoctuSucasne())
 
     ' časový profil strediska (posledný uložený alebo predvolený)
     frm!txtZaklOd = "08:00": frm!txtZaklDo = "14:30"
@@ -431,6 +505,76 @@ Public Function UlozParametreVypoctuUI() As Boolean
     Exit Function
 ChybaHandler:
     MsgBox "Chyba pri ukladaní parametrov: " & Err.Description, vbCritical
+End Function
+
+'-------------------------------------------------------------------------------
+' PRAVIDLÁ VÝPOČTU (razený obed, zaokrúhlenie, doplnenie opráv)
+'-------------------------------------------------------------------------------
+' Vyplní polia sekcie 2b z reťazca hodnôt (mod_10_Konfiguracia: obed|minúty|odchod|príchod|odchod|smer|cieľ|prípady).
+Private Sub VyplnPravidla(ByVal strHodnoty As String)
+    Dim a() As String, frm As Form
+    a = Split(strHodnoty, "|")
+    If UBound(a) < 7 Then Exit Sub
+    Set frm = Forms!frmHlavnaKonzola
+    frm!cboRazObed = VolbaPodlaKodu(LIST_RAZ_OBED, CLng(Val(a(0))))
+    frm!txtRazObedMin = a(1)
+    frm!cboOdchodBezDovodu = LCase$(a(2))
+    frm!txtZaokrPrichod = a(3)
+    frm!txtZaokrOdchod = a(4)
+    frm!cboZaokrSmer = VolbaPodlaKodu(LIST_ZAOKR_SMER, CLng(Val(a(5))))
+    frm!cboOpravaCiel = VolbaPodlaKodu(LIST_OPRAVA_CIEL, CLng(Val(a(6))))
+    frm!cboOpravaPripady = VolbaPodlaKodu(LIST_OPRAVA_PRIPADY, CLng(Val(a(7))))
+End Sub
+
+Private Sub PredvolbaPravidiel(ByVal strNazov As String, ByVal strPopis As String)
+    Dim strH As String
+    strH = mod_10_Konfiguracia.PredvolbaPravidielVypoctu(strNazov)
+    If Len(strH) = 0 Then Exit Sub
+    Call VyplnPravidla(strH)
+    Forms!frmHlavnaKonzola!lblPravidlaStav.Caption = strPopis & " Hodnoty sú len vyplnené; uložte ich tlačidlom Uložiť pravidlá."
+End Sub
+
+Public Function PredvolbaPravidielDnesUI() As Boolean
+    On Error GoTo ChybaHandler
+    Call PredvolbaPravidiel("DNES", "Dnešný stav: razený obed v skutočnom čase, bez zaokrúhlenia, opravy do denného fondu.")
+    PredvolbaPravidielDnesUI = True
+    Exit Function
+ChybaHandler:
+    Call mod_00_Common.ZapisLog("mod_UI_Tab_Prerusenia.PredvolbaPravidielDnesUI", "ERROR", Err.Description)
+End Function
+
+Public Function PredvolbaPravidielOdporucaneUI() As Boolean
+    On Error GoTo ChybaHandler
+    Call PredvolbaPravidiel("ODPORUCANE", "Odporúčané: razený obed najmenej 30 minút, inak ako dnes (potvrďte s HR).")
+    PredvolbaPravidielOdporucaneUI = True
+    Exit Function
+ChybaHandler:
+    Call mod_00_Common.ZapisLog("mod_UI_Tab_Prerusenia.PredvolbaPravidielOdporucaneUI", "ERROR", Err.Description)
+End Function
+
+Public Function UlozPravidlaVypoctuUI() As Boolean
+    On Error GoTo ChybaHandler
+    Dim frm As Form, strErr As String, strMsg As String
+    Set frm = Forms!frmHlavnaKonzola
+    strErr = mod_10_Konfiguracia.UlozPravidlaVypoctu(CLng(Val(Nz(frm!cboRazObed, "0"))), CLng(Val(Nz(frm!txtRazObedMin, "30"))), _
+                 CStr(Nz(frm!cboOdchodBezDovodu, "obed")), CLng(Val(Nz(frm!txtZaokrPrichod, "0"))), CLng(Val(Nz(frm!txtZaokrOdchod, "0"))), _
+                 CLng(Val(Nz(frm!cboZaokrSmer, "0"))), CLng(Val(Nz(frm!cboOpravaCiel, "0"))), CLng(Val(Nz(frm!cboOpravaPripady, "3"))))
+    If Len(strErr) > 0 Then
+        MsgBox strErr, vbExclamation, "Pravidlá výpočtu"
+        Exit Function
+    End If
+    strMsg = "Pravidlá výpočtu uložené. Platia pri ďalšom prepočte mesiaca; uzavreté mesiace sa neprepočítajú."
+    If Len(mod_20_KonfiguraciaExport.VolitelnePravidla()) > 0 Then
+        strMsg = strMsg & vbCrLf & vbCrLf & "Nastavili ste hodnoty iné než predvolené, preto ich bude obsahovať aj export konfigurácie pre terminál (karta 7). " & _
+                 "Terminál ich zatiaľ len prijme a neuplatní; skôr než taký súbor prijmete v produkčnom termináli, musí byť nasadená databázová časť (krok 5)."
+    End If
+    MsgBox strMsg, vbInformation, "Pravidlá výpočtu"
+    frm!lblPravidlaStav.Caption = "Pravidlá výpočtu uložené " & Format$(Now, "d. m. yyyy hh:nn") & "."
+    Call mod_UI_Pomocnik.OznacCinnost("PRERUSENIA")
+    UlozPravidlaVypoctuUI = True
+    Exit Function
+ChybaHandler:
+    MsgBox "Chyba pri ukladaní pravidiel výpočtu: " & Err.Description, vbCritical
 End Function
 
 '-------------------------------------------------------------------------------

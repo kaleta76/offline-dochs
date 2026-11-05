@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_10_Konfiguracia"
-'@Verzia 1.3.0
+'@Verzia 1.4.0
 Option Compare Database
 Option Explicit
 
@@ -18,6 +18,9 @@ Option Explicit
 ' - VelkaNoc(rok)                              : Dátum Veľkonočnej nedele.
 ' - NastavParameterPravidla(kod, kluc, hodn)   : Zmení jeden kľúč v texte Parametre pravidla.
 ' - UlozParametreVypoctu(...)                  : Uloží okno práce, obed a limit celodennej prekážky.
+' - UlozPravidlaVypoctu(...)                  : Uloží razený obed, odchod bez dôvodu, zaokrúhlenie a doplnenie opráv (kontrakt 1.4.0).
+' - PredvolbaPravidielVypoctu(nazov)          : Hodnoty hotovej predvoľby (DNES / ODPORUCANE) na vyplnenie polí karty 5.
+' - PravidlaVypoctuSucasne()                  : Súčasne uložené pravidlá výpočtu (na vyplnenie polí karty 5).
 ' - StavKonfiguracie()                        : Textový prehľad stavu konfigurácie.
 ' - ZoznamPreruseniSQL()                       : SQL pre zoznam prerušení v UI.
 ' - UlozPrerusenie / ZmazPrerusenie            : Úprava jedného prerušenia a jeho kódov razení.
@@ -213,6 +216,13 @@ Private Function DoplnNastavenia() As Long
         "OknoPraceDo|17:00|Koniec okna, v ktorom sa počíta odpracovaný čas (HH:MM)", _
         "CelodennaPrekazkaMin|360|Prekážka dlhšia ako tento počet minút sa počíta ako celý denný fond", _
         "AutoOpravaRezim|1|Automatické opravy: 0=vypnuté, 1=isté automaticky + odhady na schválenie, 2=všetko automaticky", _
+        "ObedZaznamenanyRezim|0|Razený obed: 0=skutočný čas, 1=najmenej ObedZaznamenanyMin, 2=vždy presne ObedZaznamenanyMin", _
+        "ObedZaznamenanyMin|30|Minúty razeného obeda pre režim 1 a 2", _
+        "ZaokruhleniePrichodMin|0|Zaokrúhlenie prvého príchodu dňa na násobok týchto minút (0=bez)", _
+        "ZaokruhlenieOdchodMin|0|Zaokrúhlenie posledného odchodu dňa na násobok týchto minút (0=bez)", _
+        "ZaokruhlenieSmer|0|Smer zaokrúhlenia: 0=príchod nahor a odchod nadol, 1=oba nahor, 2=oba nadol, 3=najbližší", _
+        "AutoOpravaCiel|0|Doplnenie zabudnutého razenia: 0=do denného fondu, 1=do konca okna práce", _
+        "AutoOpravaPripady|3|Prípady opráv (súčet bitov): 1=zabudnutý odchod, 2=zabudnutý návrat z prerušenia", _
         "PredvolenyFondMin|450|Denný fond (min) pre zamestnancov bez priradeného fondu (7,5 h)", _
         "OsobneCisloDlzka|0|Povinná dĺžka osobného čísla pri importe z CSV/AD (0 = ľubovoľná)")
         a = Split(CStr(v), "|")
@@ -376,6 +386,75 @@ Public Function UlozParametreVypoctu(ByVal strOd As String, ByVal strDo As Strin
     Exit Function
 Chyba:
     UlozParametreVypoctu = Err.Description
+End Function
+
+'-------------------------------------------------------------------------------
+' Pravidlá výpočtu (kontrakt 1.4.0): razený obed, odchod bez dôvodu, zaokrúhlenie, doplnenie opráv.
+' Uloží ich do nastavení systému. Predvolené hodnoty dávajú rovnaký výpočet ako pred touto voľbou.
+' Vráti chybovú správu (prázdna = OK).
+'-------------------------------------------------------------------------------
+Public Function UlozPravidlaVypoctu(ByVal lObedRezim As Long, ByVal lObedMin As Long, ByVal strOdchodBezDovodu As String, _
+                                    ByVal lZaokrPrichod As Long, ByVal lZaokrOdchod As Long, ByVal lZaokrSmer As Long, _
+                                    ByVal lCiel As Long, ByVal lPripady As Long) As String
+    On Error GoTo Chyba
+    strOdchodBezDovodu = UCase$(Trim$(strOdchodBezDovodu))
+    If lObedRezim < 0 Or lObedRezim > 2 Then UlozPravidlaVypoctu = "Razený obed: zvoľte skutočný čas, najmenej alebo vždy presne.": Exit Function
+    If lObedMin < 0 Or lObedMin > 600 Then UlozPravidlaVypoctu = "Minúty obeda musia byť 0 až 600.": Exit Function
+    If strOdchodBezDovodu <> "OBED" And strOdchodBezDovodu <> "ODCHOD" Then UlozPravidlaVypoctu = "Odchod bez dôvodu je obed alebo odchod.": Exit Function
+    If lZaokrPrichod < 0 Or lZaokrPrichod > 60 Then UlozPravidlaVypoctu = "Zaokrúhlenie príchodu musí byť 0 až 60 minút (0 = bez zaokrúhlenia).": Exit Function
+    If lZaokrOdchod < 0 Or lZaokrOdchod > 60 Then UlozPravidlaVypoctu = "Zaokrúhlenie odchodu musí byť 0 až 60 minút (0 = bez zaokrúhlenia).": Exit Function
+    If lZaokrSmer < 0 Or lZaokrSmer > 3 Then UlozPravidlaVypoctu = "Smer zaokrúhlenia je neplatný.": Exit Function
+    If lCiel < 0 Or lCiel > 1 Then UlozPravidlaVypoctu = "Cieľ doplnenia opráv je neplatný.": Exit Function
+    If lPripady < 1 Or lPripady > 3 Then UlozPravidlaVypoctu = "Prípady doplnenia opráv sú neplatné.": Exit Function
+
+    Call mod_00_Common.SetNastavenie("ObedZaznamenanyRezim", CStr(lObedRezim), "Razený obed: 0=skutočný čas, 1=najmenej ObedZaznamenanyMin, 2=vždy presne ObedZaznamenanyMin")
+    Call mod_00_Common.SetNastavenie("ObedZaznamenanyMin", CStr(lObedMin), "Minúty razeného obeda pre režim 1 a 2")
+    Call mod_00_Common.SetNastavenie("TerminalOdchodBezDovodu", strOdchodBezDovodu, "Odchod bez dôvodu z terminálu a neskorší príchod v ten istý deň: OBED=obed, ODCHOD=odchod a nový príchod")
+    Call mod_00_Common.SetNastavenie("ZaokruhleniePrichodMin", CStr(lZaokrPrichod), "Zaokrúhlenie prvého príchodu dňa na násobok týchto minút (0=bez)")
+    Call mod_00_Common.SetNastavenie("ZaokruhlenieOdchodMin", CStr(lZaokrOdchod), "Zaokrúhlenie posledného odchodu dňa na násobok týchto minút (0=bez)")
+    Call mod_00_Common.SetNastavenie("ZaokruhlenieSmer", CStr(lZaokrSmer), "Smer zaokrúhlenia: 0=príchod nahor a odchod nadol, 1=oba nahor, 2=oba nadol, 3=najbližší")
+    Call mod_00_Common.SetNastavenie("AutoOpravaCiel", CStr(lCiel), "Doplnenie zabudnutého razenia: 0=do denného fondu, 1=do konca okna práce")
+    Call mod_00_Common.SetNastavenie("AutoOpravaPripady", CStr(lPripady), "Prípady opráv (súčet bitov): 1=zabudnutý odchod, 2=zabudnutý návrat z prerušenia")
+    Call mod_08_UdalostiDna.ObnovParametre
+    Call mod_00_Common.ZapisLog("Konfigurácia", "INFO", "Uložené pravidlá výpočtu: " & PredvolbaPravidielText(lObedRezim, lObedMin, strOdchodBezDovodu, lZaokrPrichod, lZaokrOdchod, lZaokrSmer, lCiel, lPripady))
+    Exit Function
+Chyba:
+    UlozPravidlaVypoctu = Err.Description
+End Function
+
+'-------------------------------------------------------------------------------
+' Hodnoty pravidiel výpočtu ako jeden riadok s oddeľovačom "|":
+' razený obed | minúty | odchod bez dôvodu | zaokrúhlenie príchodu | odchodu | smer | cieľ opráv | prípady opráv.
+'-------------------------------------------------------------------------------
+Private Function PredvolbaPravidielText(ByVal lObedRezim As Long, ByVal lObedMin As Long, ByVal strOdchod As String, _
+                                        ByVal lZP As Long, ByVal lZO As Long, ByVal lSmer As Long, ByVal lCiel As Long, ByVal lPripady As Long) As String
+    PredvolbaPravidielText = lObedRezim & "|" & lObedMin & "|" & strOdchod & "|" & lZP & "|" & lZO & "|" & lSmer & "|" & lCiel & "|" & lPripady
+End Function
+
+'-------------------------------------------------------------------------------
+' Súčasne uložené pravidlá výpočtu v tvare, ktorý používa PredvolbaPravidielVypoctu (na vyplnenie polí karty 5).
+'-------------------------------------------------------------------------------
+Public Function PravidlaVypoctuSucasne() As String
+    Dim strOdchod As String
+    strOdchod = IIf(UCase$(Trim$(mod_00_Common.GetNastavenie("TerminalOdchodBezDovodu", "OBED"))) = "ODCHOD", "ODCHOD", "OBED")
+    PravidlaVypoctuSucasne = PredvolbaPravidielText(mod_08_UdalostiDna.PrmObedRezim(), mod_08_UdalostiDna.PrmObedMinZaznamenany(), strOdchod, _
+                                                    mod_08_UdalostiDna.PrmZaokruhleniePrichod(), mod_08_UdalostiDna.PrmZaokruhlenieOdchod(), _
+                                                    mod_08_UdalostiDna.PrmZaokruhlenieSmer(), mod_09_AutoOprava.CielAutoOpravy(), mod_09_AutoOprava.PripadyAutoOpravy())
+End Function
+
+'-------------------------------------------------------------------------------
+' Hotové súbory hodnôt pravidiel výpočtu pre kartu 5 (len ich vyplnia do polí, uloží ich správca):
+'   DNES       = doterajší výpočet Accessu (razený obed v skutočnom čase, bez zaokrúhlenia, opravy do denného fondu),
+'   ODPORUCANE = ako DNES, ale razený obed najmenej 30 minút.
+' Neznámy názov vráti prázdny reťazec.
+'-------------------------------------------------------------------------------
+Public Function PredvolbaPravidielVypoctu(ByVal strNazov As String) As String
+    Select Case UCase$(Trim$(strNazov))
+        Case "DNES"
+            PredvolbaPravidielVypoctu = PredvolbaPravidielText(0, 30, "OBED", 0, 0, 0, 0, 3)
+        Case "ODPORUCANE"
+            PredvolbaPravidielVypoctu = PredvolbaPravidielText(1, 30, "OBED", 0, 0, 0, 0, 3)
+    End Select
 End Function
 
 '-------------------------------------------------------------------------------

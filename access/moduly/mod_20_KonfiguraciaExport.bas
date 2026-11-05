@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_20_KonfiguraciaExport"
-'@Verzia 1.1.0
+'@Verzia 1.2.0
 Option Compare Database
 Option Explicit
 
@@ -15,6 +15,8 @@ Option Explicit
 '          - interruptions[].calc    ako sa interval prerušenia počíta do dňa (WORK / LUNCH / COUNTED / UNPAID),
 '          - interruptions[] voliteľne terminal_button, terminal_label, terminal_order, terminal_icon, terminal_request,
 '                                    needs_approval, full_day_only (kontrakt 1.3.0 a 1.4.0; len keď ich správca nastavil),
+'          - rules (voliteľné, kontrakt 1.4.0) lunch_recorded_mode, lunch_min_min, unlabeled_out_is_lunch, rounding_*,
+'                                    auto_repair_target, auto_repair_cases: len keď ich správca nastavil inak ako predvolene,
 '          - terminal_code_map       kódy razení terminála (WORK, DOCTOR, ...) -> čísla prerušení v Accesse,
 '          - funds, templates        názvy fondov a pravidlá prerušení (parametre) po mesiacoch,
 '          - employees[].months[]    pre každého zamestnanca a mesiac okna: úväzok, priradenie a PLÁN DNÍ
@@ -31,6 +33,7 @@ Option Explicit
 ' - GenerujKonfiguraciuV2JSON(odYM, doYM)  : Zostaví JSON konfigurácie s plánom; "" pri chybe. YM = rok * 100 + mesiac.
 ' - SpravaExportu()                        : Text o poslednom exporte (počty, preskočené položky) na zobrazenie používateľovi.
 ' - PocetZamestnancovVPlane()              : Počet zamestnancov v poslednom exporte.
+' - VolitelnePravidla()                     : Voliteľné kľúče pravidiel (kontrakt 1.4.0), ktoré export vloží; prázdny text = žiadny.
 '===============================================================================
 
 Private Const MAX_MESIACOV As Long = 14
@@ -191,9 +194,49 @@ Private Function SekciaPravidla() As String
     s = s & "    ""duplicate_punch_window_min"": " & mod_08_UdalostiDna.PrmDuplicitaLimit() & "," & vbCrLf
     s = s & "    ""default_daily_fund_min"": " & CLng(Val(mod_00_Common.GetNastavenie("PredvolenyFondMin", "450"))) & "," & vbCrLf
     s = s & "    ""auto_repair_mode"": " & mod_09_AutoOprava.RezimAutoOpravy() & "," & vbCrLf
-    s = s & "    ""interruption_check_enabled"": " & JB(mod_00_Common.GetNastavenie("KontrolaPravidielPreruseni", "1") <> "0") & vbCrLf
+    s = s & "    ""interruption_check_enabled"": " & JB(mod_00_Common.GetNastavenie("KontrolaPravidielPreruseni", "1") <> "0")
+    s = s & VolitelnePravidla() & vbCrLf
     s = s & "  }"
     SekciaPravidla = s
+End Function
+
+'-------------------------------------------------------------------------------
+' Voliteľné kľúče pravidiel (kontrakt 1.4.0). Vkladajú sa len pri hodnote inej než predvolenej, takže bez nastavenia
+' je súbor rovnaký ako predtým a starší terminál ho prijme. Každý kľúč začína čiarkou a novým riadkom.
+' Access nepoužíva a preto nevkladá correction_deadline_day a early_return_ends_interruption (platí predvolené).
+'-------------------------------------------------------------------------------
+Public Function VolitelnePravidla() As String
+    Dim s As String, l As Long, bKrok As Boolean, strNL As String
+    strNL = "," & vbCrLf & "    "
+
+    l = mod_08_UdalostiDna.PrmObedRezim()
+    If l > 0 Then
+        s = s & strNL & """lunch_recorded_mode"": " & l
+        s = s & strNL & """lunch_min_min"": " & mod_08_UdalostiDna.PrmObedMinZaznamenany()
+    End If
+    If UCase$(Trim$(mod_00_Common.GetNastavenie("TerminalOdchodBezDovodu", "OBED"))) = "ODCHOD" Then
+        s = s & strNL & """unlabeled_out_is_lunch"": false"
+    End If
+
+    l = mod_08_UdalostiDna.PrmZaokruhleniePrichod()
+    If l > 0 Then
+        s = s & strNL & """rounding_in_min"": " & l
+        bKrok = True
+    End If
+    l = mod_08_UdalostiDna.PrmZaokruhlenieOdchod()
+    If l > 0 Then
+        s = s & strNL & """rounding_out_min"": " & l
+        bKrok = True
+    End If
+    l = mod_08_UdalostiDna.PrmZaokruhlenieSmer()
+    If bKrok And l > 0 Then s = s & strNL & """rounding_mode"": " & l
+
+    l = mod_09_AutoOprava.CielAutoOpravy()
+    If l > 0 Then s = s & strNL & """auto_repair_target"": " & l
+    l = mod_09_AutoOprava.PripadyAutoOpravy()
+    If l <> 3 Then s = s & strNL & """auto_repair_cases"": " & l
+
+    VolitelnePravidla = s
 End Function
 
 ' Číselník prerušení; do slovníka dicPrer uloží čísla prerušení (na kontrolu odkazov v ďalších sekciách).

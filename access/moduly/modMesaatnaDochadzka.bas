@@ -1,5 +1,5 @@
 Attribute VB_Name = "modMesaatnaDochadzka"
-'@Verzia 2.7.0
+'@Verzia 2.8.0
 Option Compare Database
 Option Explicit
 
@@ -120,6 +120,7 @@ Private Sub GenerujDniAIntervaly(ByRef db As DAO.Database, ByVal strOC As String
             End If
         End If
 
+        Call mod_08_UdalostiDna.UplatniZaokruhlenie(r)     ' zaokrúhlenie podľa pravidiel výpočtu (predvolene vypnuté)
         Call ZoradIntervaly(r)
         For j = 1 To r.nIv
             Call ZapisInterval(rsIv, strOC, dDen, j, r.Iv(j), lFond)

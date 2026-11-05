@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_08_UdalostiDna"
-'@Verzia 1.2.0
+'@Verzia 1.3.0
 Option Compare Database
 Option Explicit
 
@@ -91,6 +91,7 @@ Private mObedLimit As Long
 Private mObedAktivny As Boolean
 Private mCelodenna As Long
 Private mDuplLimit As Long
+Private mNezapocitane As Object   ' čísla prerušení, ktorých interval sa nezapočíta (príznak NezapocitavatInterval)
 
 '-------------------------------------------------------------------------------
 ' Zahodí cache parametrov (volať po zmene nastavení alebo pravidiel).
@@ -103,7 +104,7 @@ End Sub
 ' Načíta parametre výpočtu z NastaveniaSystemu a CiselnikPravidielAnomalii (s bezpečnými predvolenými hodnotami).
 '-------------------------------------------------------------------------------
 Private Sub NacitajParametre()
-    Dim m As Long
+    Dim m As Long, db As DAO.Database, rsN As DAO.Recordset
     If mNacitane Then Exit Sub
     On Error Resume Next
     m = mod_00_Common.CasNaMinuty(mod_00_Common.GetNastavenie("OknoPraceOd", "06:00"))
@@ -121,8 +122,31 @@ Private Sub NacitajParametre()
     If mObedMin <= 0 Then mObedMin = 30
     mDuplLimit = mod_00_Common.LimitPravidla("DUPLICITA_DO_10MIN", 10)
     If mDuplLimit < 0 Then mDuplLimit = 10
+
+    ' prerušenia s príznakom "nezapočítať" (kontrakt 1.4.0 calc UNPAID); bez stĺpca alebo príznaku je zoznam prázdny = doterajšie správanie
+    Set mNezapocitane = CreateObject("Scripting.Dictionary")
+    Set db = CurrentDb
+    If mod_00_Common.TabulkaExistujeDB(db, "CiselnikPreruseni") Then
+        If mod_00_Common.PoleExistujeDB(db, "CiselnikPreruseni", "NezapocitavatInterval") Then
+            Set rsN = db.OpenRecordset("SELECT Cislo FROM CiselnikPreruseni WHERE NezapocitavatInterval = True AND Cislo <> 1 AND Cislo <> 7;", dbOpenSnapshot)
+            Do While Not rsN.EOF
+                mNezapocitane(CLng(rsN!Cislo)) = True
+                rsN.MoveNext
+            Loop
+            rsN.Close
+        End If
+    End If
     mNacitane = True
 End Sub
+
+'-------------------------------------------------------------------------------
+' Interval tohto prerušenia sa nezapočíta ani do práce, ani do prekážok dňa (neplatený odchod, kontrakt calc UNPAID).
+'-------------------------------------------------------------------------------
+Public Function JeNezapocitavane(ByVal lCislo As Long) As Boolean
+    Call NacitajParametre
+    If mNezapocitane Is Nothing Then Exit Function
+    JeNezapocitavane = mNezapocitane.Exists(lCislo)
+End Function
 
 Public Function PrmOknoOd() As Long
     Call NacitajParametre
@@ -448,6 +472,8 @@ Public Function TrvanieIntervalu(ByVal lCislo As Long, ByVal lZ As Long, ByVal l
         If b > a Then TrvanieIntervalu = b - a
     ElseIf lCislo = 7 Then
         TrvanieIntervalu = lK - lZ
+    ElseIf JeNezapocitavane(lCislo) Then
+        TrvanieIntervalu = 0
     Else
         t = lK - lZ
         If t >= PrmCelodennaPrekazka() Then t = lFond

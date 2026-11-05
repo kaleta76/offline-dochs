@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_01_SystemInit"
-'@Verzia 2.9.1
+'@Verzia 2.9.2
 Option Compare Database
 Option Explicit
 
@@ -371,6 +371,7 @@ Public Sub MigrujDatovyModel(ByRef db As DAO.Database)
     Call mod_09_AutoOprava.ZabezpecTabulky(db)
     Call mod_12_TerminalPriprava.ZabezpecTabulky(db)
     Call mod_18_Uzavierka.ZabezpecTabulky(db)       ' uzávierka mesiaca (zámok po tlači a podpise zostavy)
+    Call mod_21_RezimyVypoctu.ZabezpecTabulky(db)   ' režimy výpočtu a ich obdobia (kontrakt 1.5.0)
     db.TableDefs.Refresh
     Call mod_15_Zamestnanci.ZabezpecModel(db)       ' vyradenie, úväzok, fond podľa dňa, pravidlá prerušení
     db.TableDefs.Refresh

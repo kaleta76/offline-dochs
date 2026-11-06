@@ -89,29 +89,51 @@ describe("Access terminal button mapping", () => {
   });
 });
 
-describe("Correction requests from Access config (terminal_request)", () => {
-  it("offers arrival/departure plus only interruptions with terminal_request = true", () => {
+describe("Correction requests from Access config", () => {
+  it("unites button and request interruptions by code, ordered by interruption number", () => {
     const types = correctionTypes(parseTerminalConfig(version, golden()));
-    // zlatý súbor: terminal_request majú prerušenia 8 (Dovolenka), 11 (Nemoc) a 12 (Služobná cesta)
     expect(types.map((t) => [t.code, t.dir])).toEqual([
       ["WORK", "IN"],
       ["WORK", "OUT"],
+      ["DOCTOR", "OUT"],
+      ["ERRAND", "OUT"],
       ["LEAVE", "OUT"],
       ["SICK", "OUT"],
       ["TRIP", "OUT"],
+      ["FAMILY", "OUT"],
     ]);
   });
-  it("falls back to the default list without configuration", () => {
+  it("falls back only without configuration, retaining buttons without requests", () => {
     expect(correctionTypes(null)).toEqual(DEFAULT_CORRECTION_TYPES);
     const doc = golden();
     for (const it of doc.interruptions) it.terminal_request = false;
-    expect(correctionTypes(parseTerminalConfig(version, doc))).toEqual(DEFAULT_CORRECTION_TYPES);
+    expect(correctionTypes(parseTerminalConfig(version, doc)).map((t) => t.code)).toEqual([
+      "WORK",
+      "WORK",
+      "DOCTOR",
+      "ERRAND",
+      "TRIP",
+      "FAMILY",
+    ]);
+    for (const it of doc.interruptions) it.terminal_button = false;
+    expect(correctionTypes(parseTerminalConfig(version, doc)).map((t) => t.code)).toEqual([
+      "WORK",
+      "WORK",
+    ]);
   });
   it("skips a request with ambiguous code mapping instead of offering a wrong code", () => {
     const doc = golden();
     doc.terminal_code_map.push({ code: "LEAVE2", interruption: 8 });
     const types = correctionTypes(parseTerminalConfig(version, doc));
-    expect(types.map((t) => t.code)).toEqual(["WORK", "WORK", "SICK", "TRIP"]);
+    expect(types.map((t) => t.code)).toEqual([
+      "WORK",
+      "WORK",
+      "DOCTOR",
+      "ERRAND",
+      "SICK",
+      "TRIP",
+      "FAMILY",
+    ]);
   });
   it("carries needs_approval and full_day_only flags from the config", () => {
     const config = parseTerminalConfig(version, golden());
@@ -125,6 +147,28 @@ describe("Correction requests from Access config (terminal_request)", () => {
     const doc = golden();
     delete doc.rules.correction_deadline_day;
     expect(parseTerminalConfig(version, doc)?.correctionDeadlineDay).toBe(0);
+  });
+  it("carries approval requirements from buttons without terminal_request", () => {
+    const doc = golden();
+    const doctor = doc.interruptions.find((it: { code: number }) => it.code === 2);
+    Object.assign(doctor, { needs_approval: true, terminal_request: false });
+    const config = parseTerminalConfig(version, doc);
+    expect(config?.buttons.find((b) => b.code === "DOCTOR")?.needsApproval).toBe(true);
+    expect(needsApprovalCodes(config).has("DOCTOR")).toBe(true);
+    expect(correctionTypes(config).find((t) => t.code === "DOCTOR")?.needsApproval).toBe(true);
+  });
+  it("restores old buttons without needsApproval as false", () => {
+    const config = parseTerminalConfig(version, golden());
+    if (!config) throw new Error("Fixture must parse");
+    const legacy = {
+      ...config,
+      buttons: config.buttons.map(({ needsApproval, ...button }) => button),
+    };
+    const key = terminalCacheKey("owner", "company");
+    localStorage.setItem(key, JSON.stringify(legacy));
+    const restored = readTerminalCache(localStorage, key);
+    expect(restored?.buttons.map((b) => b.needsApproval)).toEqual([false, false, false, false]);
+    expect(restored?.buttons.map((b) => b.code)).toEqual(config.buttons.map((b) => b.code));
   });
   it("old cached snapshot without the new fields still parses with defaults", () => {
     const config = parseTerminalConfig(version, golden());

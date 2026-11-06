@@ -51,6 +51,7 @@ const snapshotSchema = z
           icon: z.enum(KNOWN_ICONS),
           interruption: z.number().int().min(2).max(9999),
           order: z.number().int().min(1).max(99),
+          needsApproval: z.boolean().default(false),
         }),
       )
       .max(MAX_BUTTONS),
@@ -104,6 +105,7 @@ export function parseTerminalConfig(version: string, doc: unknown): TerminalConf
       icon,
       interruption: it.code,
       order: it.terminal_order ?? 99,
+      needsApproval: it.needs_approval === true,
     });
   }
   // Žiadosti z terminálu (kontrakt 1.4.0): prerušenie s terminal_request = true a práve jedným kódom v mape.
@@ -160,12 +162,16 @@ export const DEFAULT_CORRECTION_TYPES: CorrectionType[] = [
   { code: "SICK", dir: "OUT", label: "PN", needsApproval: false, fullDayOnly: false },
 ];
 
-/** Typy v dialógu žiadosti o korekciu: príchod/odchod + prerušenia s terminal_request = true z konfigurácie Accessu. */
+/** Typy v dialógu: príchod/odchod + zjednotené tlačidlové a žiadané prerušenia z Accessu. */
 export function correctionTypes(config: TerminalConfig | null): CorrectionType[] {
-  if (!config?.requests.length) return DEFAULT_CORRECTION_TYPES;
+  if (!config) return DEFAULT_CORRECTION_TYPES;
+  const interruptions = new Map<string, TerminalConfig["requests"][number]>(
+    config.buttons.map((b) => [b.code, { ...b, fullDayOnly: false }]),
+  );
+  for (const request of config.requests) interruptions.set(request.code, request);
   return [
     ...DEFAULT_CORRECTION_TYPES.slice(0, 2),
-    ...[...config.requests]
+    ...[...interruptions.values()]
       .sort((a, b) => a.interruption - b.interruption)
       .map((r) => ({
         code: r.code,
@@ -190,13 +196,17 @@ export function correctionDeadlineOk(at: Date, now: Date, deadlineDay: number): 
   return false;
 }
 
-/** Kódy prerušení len na celý deň (dovolenka, PN): pri schválenej absencii na deň sa na termináli nerazí. */
+/** Kódy celodenných prerušení na upozornenie; razenie zostáva dostupné. */
 export function fullDayCodes(config: TerminalConfig | null): Set<string> {
   return new Set((config?.requests ?? []).filter((r) => r.fullDayOnly).map((r) => r.code));
 }
-/** Kódy prerušení, ktoré terminál prijme, ale deň je nepotvrdený, kým ich vedúci neschváli. */
+/** Kódy vyžadujúce schválenie; terminál aktuálny stav schválenia nepozná. */
 export function needsApprovalCodes(config: TerminalConfig | null): Set<string> {
-  return new Set((config?.requests ?? []).filter((r) => r.needsApproval).map((r) => r.code));
+  return new Set(
+    [...(config?.buttons ?? []), ...(config?.requests ?? [])]
+      .filter((r) => r.needsApproval)
+      .map((r) => r.code),
+  );
 }
 
 export function terminalCacheKey(userId: string, organizationId: string): string {

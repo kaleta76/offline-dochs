@@ -149,7 +149,7 @@ function Terminal() {
     .sort((a, b) => a.time.getTime() - b.time.getTime());
   const last = list[list.length - 1];
   const atWork = last ? last.dir === "IN" : false;
-  // Celodenná absencia (full_day_only, napr. schválená dovolenka/PN): na taký deň sa na termináli nerazí.
+  // Celodenná absencia je iba upozornenie; terminál stav schválenia nepozná a razenie prijme.
   const fullDayToday = (today.data ?? []).find((p) => !p.voided_at && fullDay.has(p.code));
 
   if (confirm) {
@@ -207,9 +207,9 @@ function Terminal() {
             role="alert"
             className="mb-4 rounded-sm border-2 border-warning bg-muted px-3 py-2 text-sm font-semibold"
           >
-            Dnes máte schválenú celodennú absenciu (
-            {actionLabel(fullDayToday.code, fullDayToday.direction)}). Razenie na tento deň je
-            zablokované; zmenu riešte so svojím vedúcim.
+            Dnes je vedená celodenná absencia (
+            {actionLabel(fullDayToday.code, fullDayToday.direction)}). Razenie sa prijme, o dni
+            rozhodne dochádzkový systém.
           </p>
         )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -224,7 +224,7 @@ function Terminal() {
             return (
               <Button
                 key={`${a.code}:${a.dir}`}
-                disabled={busy || !uid || !!fullDayToday}
+                disabled={busy || !uid}
                 onClick={() => punch(a)}
                 className={`h-auto min-h-40 min-w-0 flex flex-col items-center justify-center gap-2 rounded-sm px-3 py-8 text-xl font-black uppercase whitespace-normal shadow-[4px_4px_0_0_var(--foreground)] transition active:translate-x-1 active:translate-y-1 active:shadow-none ${cls} ${i < 2 ? "sm:py-12" : ""}`}
               >
@@ -259,9 +259,9 @@ function Terminal() {
                 {approval.has(p.code) && (
                   <span
                     className="rounded-sm border border-warning px-1.5 text-[10px] font-bold uppercase text-warning-foreground"
-                    title="Razenie s týmto dôvodom je nepotvrdené, kým ho vedúci neschváli."
+                    title="Toto prerušenie schvaľuje vedúci; terminál stav schválenia nepozná."
                   >
-                    čaká na schválenie
+                    vyžaduje schválenie
                   </span>
                 )}
                 <span className="num">{hm(p.time)}</span>

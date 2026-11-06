@@ -22,7 +22,7 @@ export function MonthTable({
   data: MonthData;
   compact?: boolean;
   onVoid?: (target: VoidTarget) => void;
-  /** Kódy prerušení z konfigurácie Accessu s needs_approval = true; také razenia sa označia „čaká na schválenie“. */
+  /** Kódy prerušení z konfigurácie Accessu s needs_approval = true; označenie nevyjadruje stav schválenia. */
   approvalCodes?: ReadonlySet<string>;
 }) {
   return (
@@ -93,9 +93,9 @@ export function MonthTable({
                       {!p.voided && approvalCodes?.has(p.code) && (
                         <span
                           className="ml-1 rounded-sm border border-warning px-1 text-[10px] font-semibold uppercase text-warning-foreground"
-                          title="Razenie s týmto dôvodom je nepotvrdené, kým ho vedúci neschváli."
+                          title="Toto prerušenie schvaľuje vedúci; terminál stav schválenia nepozná."
                         >
-                          čaká na schválenie
+                          vyžaduje schválenie
                         </span>
                       )}
                       {onVoid && !p.voided && !p.voidPending && !data.closedAt && (

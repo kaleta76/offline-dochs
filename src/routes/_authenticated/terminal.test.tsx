@@ -11,6 +11,14 @@ const mocks = vi.hoisted(() => ({
   online: true,
   userId: "owner",
   organizationId: "company",
+  today: [] as {
+    client_uuid: string;
+    code: string;
+    direction: string;
+    client_time: string;
+    drift_minutes: number;
+    voided_at: null;
+  }[],
 }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: mocks.from } }));
 vi.mock("@/lib/auth", () => ({
@@ -44,13 +52,14 @@ describe("terminal configured punching", () => {
     mocks.online = true;
     mocks.userId = "owner";
     mocks.organizationId = "company";
+    mocks.today = [];
     const config = JSON.parse(readFileSync("contract/examples/config_example.json", "utf8"));
     mocks.from.mockImplementation((table: string) => {
       const query = {
         select: () => query,
         eq: () => query,
         gte: () => query,
-        order: () => Promise.resolve({ data: [], error: null }),
+        order: () => Promise.resolve({ data: mocks.today, error: null }),
         maybeSingle: () =>
           Promise.resolve({
             data: table === "access_config" ? { config_version: "2026.11.04.1200", config } : null,
@@ -73,6 +82,32 @@ describe("terminal configured punching", () => {
         user_id: "owner",
         code: "ERRAND",
         direction: "OUT",
+      }),
+    );
+  });
+
+  it("keeps every punch button enabled with a full-day punch today and enqueues arrival", async () => {
+    mocks.today = [
+      {
+        client_uuid: "full-day-today",
+        code: "LEAVE",
+        direction: "OUT",
+        client_time: new Date().toISOString(),
+        drift_minutes: 0,
+        voided_at: null,
+      },
+    ];
+    mount();
+    await screen.findByRole("alert");
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(6);
+    for (const button of buttons) expect(button).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Príchod" }));
+    await waitFor(() =>
+      expect(mocks.enqueue).toHaveBeenCalledWith({
+        user_id: "owner",
+        code: "WORK",
+        direction: "IN",
       }),
     );
   });

@@ -1,4 +1,6 @@
 # Roadmap
+- [x] Úzko vymedzené opravy terminálu: neblokujúca celodenná absencia, zjednotené korekcie, pravdivé odznaky a bezpečný online stav; 336 testov prešlo, lint upravených súborov prešiel
+- [ ] Celkový lint opráv terminálu — blokujú existujúce chyby mimo povoleného rozsahu; prihlásené overenie — účet vlastníka nie je dostupný pre automatické prihlásenie
 - [x] Dynamické tlačidlá terminálu podľa Accessu, predvolené tlačidlá a offline záloha; zachovaná fronta razení, 134 testov
 - [ ] Prihlásené overenie dynamických tlačidiel v živej evidencii — automatické prihlásenie nie je dostupné pre účet vlastníka
 - [ ] Osobné číslo pri registrácii, unikátnosť a schvaľované zmeny

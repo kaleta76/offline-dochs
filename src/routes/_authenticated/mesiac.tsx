@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -33,11 +33,25 @@ const STATUS: Record<string, string> = {
   rejected: "zamietnutá",
 };
 
+function subscribeOnline(onChange: () => void) {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
+}
+
 function MyMonth() {
   const { session, roles, profile } = useAuth();
   const uid = session?.user.id;
   // Projekcia konfigurácie z Accessu (tlačidlá, žiadosti, lehoty); offline sa použije cache.
-  const terminalConfig = useTerminalConfig(uid, profile?.organization_id, navigator.onLine);
+  const online = useSyncExternalStore(
+    subscribeOnline,
+    () => navigator.onLine,
+    () => true,
+  );
+  const terminalConfig = useTerminalConfig(uid, profile?.organization_id, online);
   const types = correctionTypes(terminalConfig);
   const deadlineDay = terminalConfig?.correctionDeadlineDay ?? 0;
   const isAdmin = roles.includes("admin");

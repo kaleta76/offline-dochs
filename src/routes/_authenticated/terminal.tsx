@@ -23,8 +23,14 @@ import { Button } from "@/components/ui/button";
 import { DeviceRegistration } from "@/components/DeviceRegistration";
 import { dayKey, hm, labelOf } from "@/lib/month";
 import { notHappenedYet } from "@/lib/presence";
-import { useTerminalActions } from "@/lib/use-terminal-actions";
-import type { TerminalAction, TerminalIcon } from "@/lib/terminal-actions";
+import { useTerminalConfig } from "@/lib/use-terminal-actions";
+import {
+  fullDayCodes,
+  needsApprovalCodes,
+  terminalActions,
+  type TerminalAction,
+  type TerminalIcon,
+} from "@/lib/terminal-actions";
 
 export const Route = createFileRoute("/_authenticated/terminal")({
   head: () => ({
@@ -56,7 +62,10 @@ const ICONS: Record<TerminalIcon, typeof LogIn> = {
 function Terminal() {
   const { session, profile } = useAuth();
   const { items, online } = useQueue(session?.user.id);
-  const actions = useTerminalActions(session?.user.id, profile?.organization_id, online);
+  const terminalConfig = useTerminalConfig(session?.user.id, profile?.organization_id, online);
+  const actions = terminalActions(terminalConfig);
+  const fullDay = fullDayCodes(terminalConfig);
+  const approval = needsApprovalCodes(terminalConfig);
   const actionLabel = (code: string, dir: string) =>
     actions.find((a) => a.code === code && a.dir === dir)?.label ?? labelOf(code, dir);
   const [busy, setBusy] = useState(false);
@@ -87,7 +96,7 @@ function Terminal() {
       start.setHours(0, 0, 0, 0);
       const { data, error } = await supabase
         .from("punches")
-        .select("client_uuid, code, direction, client_time, drift_minutes")
+        .select("client_uuid, code, direction, client_time, drift_minutes, voided_at")
         .eq("user_id", uid)
         .gte("client_time", start.toISOString())
         .order("client_time");
@@ -140,6 +149,8 @@ function Terminal() {
     .sort((a, b) => a.time.getTime() - b.time.getTime());
   const last = list[list.length - 1];
   const atWork = last ? last.dir === "IN" : false;
+  // Celodenná absencia (full_day_only, napr. schválená dovolenka/PN): na taký deň sa na termináli nerazí.
+  const fullDayToday = (today.data ?? []).find((p) => !p.voided_at && fullDay.has(p.code));
 
   if (confirm) {
     return (
@@ -191,6 +202,16 @@ function Terminal() {
             </div>
           </div>
         </div>
+        {fullDayToday && (
+          <p
+            role="alert"
+            className="mb-4 rounded-sm border-2 border-warning bg-muted px-3 py-2 text-sm font-semibold"
+          >
+            Dnes máte schválenú celodennú absenciu (
+            {actionLabel(fullDayToday.code, fullDayToday.direction)}). Razenie na tento deň je
+            zablokované; zmenu riešte so svojím vedúcim.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {actions.map((a, i) => {
             const Icon = ICONS[a.icon];
@@ -203,7 +224,7 @@ function Terminal() {
             return (
               <Button
                 key={`${a.code}:${a.dir}`}
-                disabled={busy || !uid}
+                disabled={busy || !uid || !!fullDayToday}
                 onClick={() => punch(a)}
                 className={`h-auto min-h-40 min-w-0 flex flex-col items-center justify-center gap-2 rounded-sm px-3 py-8 text-xl font-black uppercase whitespace-normal shadow-[4px_4px_0_0_var(--foreground)] transition active:translate-x-1 active:translate-y-1 active:shadow-none ${cls} ${i < 2 ? "sm:py-12" : ""}`}
               >
@@ -233,6 +254,14 @@ function Terminal() {
                 {p.pending && (
                   <span className="rounded-sm bg-warning px-1.5 text-[10px] font-bold uppercase text-warning-foreground">
                     čaká
+                  </span>
+                )}
+                {approval.has(p.code) && (
+                  <span
+                    className="rounded-sm border border-warning px-1.5 text-[10px] font-bold uppercase text-warning-foreground"
+                    title="Razenie s týmto dôvodom je nepotvrdené, kým ho vedúci neschváli."
+                  >
+                    čaká na schválenie
                   </span>
                 )}
                 <span className="num">{hm(p.time)}</span>

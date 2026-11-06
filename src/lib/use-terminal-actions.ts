@@ -10,11 +10,12 @@ import {
   type TerminalConfig,
 } from "./terminal-actions";
 
-export function useTerminalActions(
+/** Celá projekcia konfigurácie terminálu (tlačidlá, žiadosti, lehoty) s offline cache podľa účtu a organizácie. */
+export function useTerminalConfig(
   userId: string | undefined,
   organizationId: string | null | undefined,
   online: boolean,
-) {
+): TerminalConfig | null {
   const key = userId && organizationId ? terminalCacheKey(userId, organizationId) : null;
   const [cached, setCached] = useState<{ key: string; config: TerminalConfig | null } | null>(null);
   useEffect(() => {
@@ -63,6 +64,13 @@ export function useTerminalActions(
     },
   });
   // Query data belongs to the full account/organization key; stale cached state never crosses accounts.
-  const config = query.data !== undefined ? query.data : cached?.key === key ? cached.config : null;
-  return terminalActions(config);
+  return query.data !== undefined ? query.data : cached?.key === key ? cached.config : null;
+}
+
+export function useTerminalActions(
+  userId: string | undefined,
+  organizationId: string | null | undefined,
+  online: boolean,
+) {
+  return terminalActions(useTerminalConfig(userId, organizationId, online));
 }

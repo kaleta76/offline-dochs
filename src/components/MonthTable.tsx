@@ -17,15 +17,21 @@ export function MonthTable({
   data,
   compact = false,
   onVoid,
+  approvalCodes,
 }: {
   data: MonthData;
   compact?: boolean;
   onVoid?: (target: VoidTarget) => void;
+  /** Kódy prerušení z konfigurácie Accessu s needs_approval = true; také razenia sa označia „čaká na schválenie“. */
+  approvalCodes?: ReadonlySet<string>;
 }) {
   return (
     <div className="overflow-x-auto">
       {data.unverifiedCount > 0 && (
-        <p role="status" className="no-print mb-2 rounded-sm border border-warning bg-muted px-3 py-2 text-sm">
+        <p
+          role="status"
+          className="no-print mb-2 rounded-sm border border-warning bg-muted px-3 py-2 text-sm"
+        >
           {unverifiedSummary(data.unverifiedCount)}
         </p>
       )}
@@ -44,7 +50,10 @@ export function MonthTable({
           {data.days.map((d) => {
             const off = d.weekend || d.holiday;
             return (
-              <tr key={d.key} className={`border-b border-border ${off ? "bg-muted/60 text-muted-foreground" : ""}`}>
+              <tr
+                key={d.key}
+                className={`border-b border-border ${off ? "bg-muted/60 text-muted-foreground" : ""}`}
+              >
                 <td className="num whitespace-nowrap py-1.5 pr-2">
                   {WEEKDAYS[d.date.getDay()]} {d.date.getDate()}.
                 </td>
@@ -58,11 +67,16 @@ export function MonthTable({
                     >
                       {labelOf(p.code, p.direction)} <span className="num">{hm(p.time)}</span>
                       {!compact && p.source === "terminal" && Math.abs(p.drift) > data.maxDrift && (
-                        <span title={`Odoslané o ${p.drift} min neskôr (offline)`} className="ml-0.5 inline-flex text-warning-foreground">
+                        <span
+                          title={`Odoslané o ${p.drift} min neskôr (offline)`}
+                          className="ml-0.5 inline-flex text-warning-foreground"
+                        >
                           <AlertTriangle className="inline h-3 w-3 text-warning" />
                         </span>
                       )}
-                      {p.source === "correction" && <sup className="ml-0.5 font-bold text-primary">K</sup>}
+                      {p.source === "correction" && (
+                        <sup className="ml-0.5 font-bold text-primary">K</sup>
+                      )}
                       {p.verification === "unverified" && !p.voided && (
                         <span
                           className="ml-1 rounded-sm border border-warning px-1 text-[10px] font-semibold uppercase text-warning-foreground"
@@ -71,25 +85,51 @@ export function MonthTable({
                           neoverené
                         </span>
                       )}
-                      {p.voidPending && <span className="ml-1 font-semibold text-warning-foreground">(čaká na zneplatnenie)</span>}
+                      {p.voidPending && (
+                        <span className="ml-1 font-semibold text-warning-foreground">
+                          (čaká na zneplatnenie)
+                        </span>
+                      )}
+                      {!p.voided && approvalCodes?.has(p.code) && (
+                        <span
+                          className="ml-1 rounded-sm border border-warning px-1 text-[10px] font-semibold uppercase text-warning-foreground"
+                          title="Razenie s týmto dôvodom je nepotvrdené, kým ho vedúci neschváli."
+                        >
+                          čaká na schválenie
+                        </span>
+                      )}
                       {onVoid && !p.voided && !p.voidPending && !data.closedAt && (
                         <button
                           type="button"
                           className="no-print ml-1 rounded-sm border border-border px-1 text-[10px] text-muted-foreground hover:border-foreground hover:text-foreground"
                           aria-label={`Požiadať o zneplatnenie: ${labelOf(p.code, p.direction)} ${hm(p.time)}`}
-                          onClick={() => onVoid({ id: p.id, label: labelOf(p.code, p.direction), time: hm(p.time) })}
+                          onClick={() =>
+                            onVoid({
+                              id: p.id,
+                              label: labelOf(p.code, p.direction),
+                              time: hm(p.time),
+                            })
+                          }
                         >
                           zneplatniť
                         </button>
                       )}
                     </span>
                   ))}
-                  {d.open && !d.future && <span className="text-xs font-bold text-destructive">chýba odchod</span>}
+                  {d.open && !d.future && (
+                    <span className="text-xs font-bold text-destructive">chýba odchod</span>
+                  )}
                 </td>
                 <td className="num py-1.5 pr-2 text-right">{d.workMin ? fmtMin(d.workMin) : ""}</td>
-                <td className="num py-1.5 pr-2 text-right">{d.creditMin ? fmtMin(d.creditMin) : ""}</td>
-                <td className="num py-1.5 pr-2 text-right font-semibold">{d.totalMin ? fmtMin(d.totalMin) : ""}</td>
-                <td className={`num py-1.5 text-right ${d.balanceMin < 0 ? "text-destructive" : d.balanceMin > 0 ? "text-success" : ""}`}>
+                <td className="num py-1.5 pr-2 text-right">
+                  {d.creditMin ? fmtMin(d.creditMin) : ""}
+                </td>
+                <td className="num py-1.5 pr-2 text-right font-semibold">
+                  {d.totalMin ? fmtMin(d.totalMin) : ""}
+                </td>
+                <td
+                  className={`num py-1.5 text-right ${d.balanceMin < 0 ? "text-destructive" : d.balanceMin > 0 ? "text-success" : ""}`}
+                >
                   {d.balanceMin ? fmtMin(d.balanceMin) : ""}
                 </td>
               </tr>
@@ -98,11 +138,17 @@ export function MonthTable({
         </tbody>
         <tfoot>
           <tr className="border-t-2 border-foreground font-bold">
-            <td className="py-2" colSpan={2}>Spolu (fond {fmtMin(data.totals.expected)})</td>
+            <td className="py-2" colSpan={2}>
+              Spolu (fond {fmtMin(data.totals.expected)})
+            </td>
             <td className="num py-2 pr-2 text-right">{fmtMin(data.totals.work)}</td>
             <td className="num py-2 pr-2 text-right">{fmtMin(data.totals.credit)}</td>
             <td className="num py-2 pr-2 text-right">{fmtMin(data.totals.total)}</td>
-            <td className={`num py-2 text-right ${data.totals.balance < 0 ? "text-destructive" : "text-success"}`}>{fmtMin(data.totals.balance)}</td>
+            <td
+              className={`num py-2 text-right ${data.totals.balance < 0 ? "text-destructive" : "text-success"}`}
+            >
+              {fmtMin(data.totals.balance)}
+            </td>
           </tr>
         </tfoot>
       </table>
@@ -110,17 +156,38 @@ export function MonthTable({
   );
 }
 
-export function MonthPicker({ ym, onChange }: { ym: { y: number; m: number }; onChange: (v: { y: number; m: number }) => void }) {
+export function MonthPicker({
+  ym,
+  onChange,
+}: {
+  ym: { y: number; m: number };
+  onChange: (v: { y: number; m: number }) => void;
+}) {
   const shift = (d: number) => {
     const dt = new Date(ym.y, ym.m - 1 + d, 1);
     onChange({ y: dt.getFullYear(), m: dt.getMonth() + 1 });
   };
-  const label = new Date(ym.y, ym.m - 1, 1).toLocaleDateString("sk-SK", { month: "long", year: "numeric" });
+  const label = new Date(ym.y, ym.m - 1, 1).toLocaleDateString("sk-SK", {
+    month: "long",
+    year: "numeric",
+  });
   return (
     <div className="flex items-center gap-1">
-      <button className="rounded-sm border-2 border-foreground px-2.5 py-1 font-bold" onClick={() => shift(-1)} aria-label="Predchádzajúci mesiac">‹</button>
+      <button
+        className="rounded-sm border-2 border-foreground px-2.5 py-1 font-bold"
+        onClick={() => shift(-1)}
+        aria-label="Predchádzajúci mesiac"
+      >
+        ‹
+      </button>
       <span className="min-w-36 text-center font-bold capitalize">{label}</span>
-      <button className="rounded-sm border-2 border-foreground px-2.5 py-1 font-bold" onClick={() => shift(1)} aria-label="Nasledujúci mesiac">›</button>
+      <button
+        className="rounded-sm border-2 border-foreground px-2.5 py-1 font-bold"
+        onClick={() => shift(1)}
+        aria-label="Nasledujúci mesiac"
+      >
+        ›
+      </button>
     </div>
   );
 }

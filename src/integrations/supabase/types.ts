@@ -860,6 +860,16 @@ export type Database = {
       same_organization: { Args: { _user: string }; Returns: boolean }
       set_organization_test: { Args: { _is_test: boolean }; Returns: undefined }
       test_organization_summary: { Args: never; Returns: Json }
+      verify_punch_synced: {
+        Args: {
+          p_client_time: string
+          p_client_uuid: string
+          p_code: string
+          p_device: string
+          p_direction: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "employee" | "manager" | "admin"

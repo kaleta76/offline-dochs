@@ -215,17 +215,6 @@ function scheduleRetry() {
 
 type ItemOutcome = "done" | "retry" | "certificate";
 
-type VerifyRpc = (
-  fn: "verify_punch_synced",
-  args: {
-    p_client_uuid: string;
-    p_code: string;
-    p_direction: string;
-    p_client_time: string;
-    p_device: string;
-  },
-) => PromiseLike<{ data: boolean | null; error: ErrorLike | null; status?: number }>;
-
 async function save(item: QueuedPunch) {
   await tx("readwrite", (s) => s.put(item));
 }
@@ -297,9 +286,7 @@ async function syncItem(item: QueuedPunch, uid: string): Promise<ItemOutcome> {
   if (readKind !== "transport") return "retry"; // auth / RLS / conflict: unchanged behaviour, flag kept.
 
   // Phase 2 (fallback only after a transport failure): ownership is checked server-side via auth.uid().
-  // verify_punch_synced comes from docs/migracie/0008; generated types include it once applied.
-  const rpc = supabase.rpc as unknown as VerifyRpc;
-  const verified = await rpc.call(supabase, "verify_punch_synced", {
+  const verified = await supabase.rpc("verify_punch_synced", {
     p_client_uuid: current.client_uuid,
     p_code: current.code,
     p_direction: current.direction,

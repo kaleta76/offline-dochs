@@ -399,6 +399,25 @@ describe("Certificate errors", () => {
     expect(classifySyncError({ message: "TypeError: Failed to fetch" })).toBe("transport");
     expect(classifySyncError({ message: "permission denied", code: "42501" }, 403)).toBe("other");
   });
+  it("keeps a certificate error with status 502 as certificate, not transport", () => {
+    expect(classifySyncError({ message: "net::ERR_CERT_AUTHORITY_INVALID" }, 502)).toBe(
+      "certificate",
+    );
+  });
+  it("keeps a certificate error with status 504 as certificate, not transport", () => {
+    expect(classifySyncError({ message: "SSL_ERROR_BAD_CERT_DOMAIN" }, 504)).toBe("certificate");
+  });
+  it("detects a certificate pattern in the code field", () => {
+    expect(classifySyncError({ message: "", code: "UNABLE_TO_GET_ISSUER_CERT_LOCALLY" })).toBe(
+      "certificate",
+    );
+  });
+  it("treats HTTP 403 without a database code as transport", () => {
+    expect(classifySyncError({ message: "Forbidden", code: "" }, 403)).toBe("transport");
+  });
+  it("treats HTTP 403 with database code 42501 as other", () => {
+    expect(classifySyncError({ message: "permission denied", code: "42501" }, 403)).toBe("other");
+  });
 });
 
 describe("Exponential backoff with jitter", () => {

@@ -140,8 +140,10 @@ export function classifySyncError(error: unknown, status?: number | null): SyncE
       : String(e.message ?? (error instanceof Error ? error.message : ""));
   const code = e.code ?? "";
   const httpStatus = status ?? e.status ?? null;
-  if (CERTIFICATE_PATTERNS.some((p) => p.test(message))) return "certificate";
-  if (TRANSPORT_PATTERNS.some((p) => p.test(message))) return "transport";
+  if (CERTIFICATE_PATTERNS.some((p) => p.test(message) || (code ? p.test(code) : false)))
+    return "certificate";
+  if (TRANSPORT_PATTERNS.some((p) => p.test(message) || (code ? p.test(code) : false)))
+    return "transport";
   if (httpStatus != null && TRANSPORT_STATUSES.has(httpStatus)) return "transport";
   // A 403 without a database error code comes from a proxy / gateway, not from RLS or grants.
   if (httpStatus === 403 && !code) return "transport";

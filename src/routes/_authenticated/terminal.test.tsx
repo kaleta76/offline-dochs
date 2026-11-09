@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route } from "./terminal";
+import { PUNCH_COOLDOWN_MS, Route } from "./terminal";
 import { terminalCacheKey } from "@/lib/terminal-actions";
 
 const mocks = vi.hoisted(() => ({
@@ -154,5 +154,40 @@ describe("terminal configured punching", () => {
         direction: "IN",
       }),
     );
+  });
+
+  it("ignores a double click: one punch is queued at once and buttons lock for 1.5 s", async () => {
+    let finish: (v: { client_time: string }) => void = () => undefined;
+    mocks.enqueue.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+    mount();
+    const arrival = await screen.findByRole("button", { name: "Príchod" });
+    fireEvent.click(arrival);
+    fireEvent.click(arrival);
+    expect(mocks.enqueue).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueue).toHaveBeenCalledWith({ user_id: "owner", code: "WORK", direction: "IN" });
+    expect(screen.getByRole("status")).toHaveTextContent("Zaevidované");
+    for (const button of screen.getAllByRole("button")) expect(button).toBeDisabled();
+    expect(PUNCH_COOLDOWN_MS).toBe(1500);
+    await act(async () => finish({ client_time: "2026-11-05T10:00:00Z" }));
+  });
+
+  it("re-enables the buttons after 1.5 s when saving fails, and shows the failure", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mocks.enqueue.mockRejectedValueOnce(new Error("IndexedDB unavailable"));
+      mount();
+      const arrival = await screen.findByRole("button", { name: "Príchod" });
+      fireEvent.click(arrival);
+      await screen.findByText(/Záznam sa nepodarilo uložiť/);
+      expect(screen.getByRole("button", { name: "Príchod" })).toBeDisabled();
+      await act(async () => {
+        vi.advanceTimersByTime(PUNCH_COOLDOWN_MS + 10);
+      });
+      expect(screen.getByRole("button", { name: "Príchod" })).toBeEnabled();
+      fireEvent.click(screen.getByRole("button", { name: "Príchod" }));
+      expect(mocks.enqueue).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -38,12 +38,35 @@ export function DeviceRegistration({ userId, online }: { userId: string; online:
     return () => { off = true; };
   }, [userId]);
   useEffect(() => { if (key && online) void load(key); }, [key, online, load]);
-  // Poll while waiting for approval.
+  // Čakanie na schválenie bez pravidelného dopytovania: stav sa overí pri načítaní, pri návrate do aplikácie
+  // (karta znova viditeľná / okno získa fokus) alebo tlačidlom „Skontrolovať stav“.
   useEffect(() => {
     if (!key || !online || dev?.status !== "pending") return;
-    const iv = setInterval(() => void load(key), 15_000);
-    return () => clearInterval(iv);
+    let last = 0;
+    const recheck = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - last < 2_000) return; // focus a visibilitychange prichádzajú spolu – stačí jeden dopyt
+      last = now;
+      void load(key);
+    };
+    document.addEventListener("visibilitychange", recheck);
+    window.addEventListener("focus", recheck);
+    return () => {
+      document.removeEventListener("visibilitychange", recheck);
+      window.removeEventListener("focus", recheck);
+    };
   }, [key, online, dev?.status, load]);
+  const [checking, setChecking] = useState(false);
+  async function checkNow() {
+    if (!key) return;
+    setChecking(true);
+    try {
+      await load(key);
+    } finally {
+      setChecking(false);
+    }
+  }
   useEffect(() => {
     if (!dev?.pairing_expires_at) return;
     const tick = () => setLeft(Math.max(0, Math.round((new Date(dev.pairing_expires_at!).getTime() - Date.now()) / 1000)));
@@ -109,6 +132,11 @@ export function DeviceRegistration({ userId, online }: { userId: string; online:
       <p className="text-sm">Povedzte tento kód{label ? ` a označenie ${label}` : ""} vedúcemu alebo správcovi.</p>
       <p className="mt-2 text-sm text-muted-foreground">Po vymazaní údajov prehliadača alebo pri novom zariadení použite „Nahradiť pôvodné zariadenie“. Nové zariadenie schváli vedúci.</p>
       <div className="mt-3 flex flex-wrap gap-2">
+        {dev.status === "pending" && online && (
+          <Button variant="outline" size="sm" onClick={checkNow} disabled={checking}>
+            Skontrolovať stav
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={replace}>Nahradiť pôvodné zariadenie</Button>
       </div>
       {msg && <p role="alert" className="mt-2 text-sm text-destructive">{msg}</p>}

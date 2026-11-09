@@ -34,7 +34,9 @@ import {
   classifySyncError,
   enqueue,
   getSyncStatus,
+  hasSyncFailed,
   resetBackoff,
+  SYNC_FAILED_MESSAGE,
   syncNow,
   syncQueue,
 } from "./offline-queue";
@@ -362,7 +364,9 @@ describe("Certificate errors", () => {
     await syncQueue();
     expect(consoleError).toHaveBeenCalled();
     expect(getSyncStatus()).toMatchObject({ blockedBy: "certificate", retryScheduled: false });
-    expect((await rows())[0]?.error).toContain("certifikát");
+    expect((await rows())[0]?.error).toBe(
+      "Odoslanie sa nepodarilo potvrdiť, razenia sú uložené v zariadení.",
+    );
     expect(mocks.rpc).not.toHaveBeenCalled();
     await syncQueue("auto");
     await syncQueue("retry");
@@ -430,5 +434,25 @@ describe("Exponential backoff with jitter", () => {
     mocks.read.mockResolvedValue({ error: null, data: (await rows())[0] });
     await syncNow();
     expect(getSyncStatus()).toMatchObject({ failures: 0, retryScheduled: false });
+  });
+});
+
+describe("Neutral sync indicator", () => {
+  it("uses neutral wording without technical infrastructure", () => {
+    expect(SYNC_FAILED_MESSAGE).toBe(
+      "Odoslanie sa nepodarilo potvrdiť, razenia sú uložené v zariadení.",
+    );
+    expect(SYNC_FAILED_MESSAGE).not.toMatch(/proxy|firewall|certifik|server|sieť/i);
+  });
+  it("reports a failure after an unconfirmed send and clears it after success", async () => {
+    await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
+    mocks.insert.mockResolvedValue(fetchFailure);
+    goOnline();
+    await syncQueue();
+    expect(hasSyncFailed()).toBe(true);
+    mocks.insert.mockResolvedValue({ error: null });
+    mocks.read.mockResolvedValue({ error: null, data: (await rows())[0] });
+    await syncNow();
+    expect(hasSyncFailed()).toBe(false);
   });
 });

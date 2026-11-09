@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { beginActiveSession, IDLE_MESSAGE, isIdleSignOutPending } from "@/lib/idle-timeout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -88,6 +89,7 @@ function AuthPage() {
     accepted: false,
   });
   const [msg, setMsg] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [issued, setIssued] = useState<Issued | null>(null);
   const [copied, setCopied] = useState(false);
@@ -98,9 +100,15 @@ function AuthPage() {
   const passwordRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/terminal" });
-    });
+    if (isIdleSignOutPending()) {
+      // Odhlásenie pre nečinnosť: reláciu (ak ešte ostala, napr. offline) skúsime zrušiť znova, nepresmerujeme.
+      setNotice(IDLE_MESSAGE);
+      void supabase.auth.signOut().catch(() => undefined);
+    } else {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) navigate({ to: "/terminal" });
+      });
+    }
     const saved = readOrgCode();
     if (saved) setF((prev) => ({ ...prev, orgCode: saved }));
     const number = readRememberedNumber(browserStorage());
@@ -134,6 +142,7 @@ function AuthPage() {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
     });
+    if (!error) beginActiveSession();
     return !error;
   }
 
@@ -155,7 +164,10 @@ function AuthPage() {
           password: f.password,
         });
         if (error) setMsg("Nesprávny e-mail alebo heslo.");
-        else navigate({ to: "/terminal" });
+        else {
+          beginActiveSession();
+          navigate({ to: "/terminal" });
+        }
       } else if (mode === "employee") {
         const r = await employeeLogin({
           data: { orgCode: f.orgCode, number: f.number, password: f.password },
@@ -443,6 +455,11 @@ function AuthPage() {
                 ? "Obnoviť heslo"
                 : "Prihlásiť"}
         </Button>
+        {notice && !msg && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {notice}
+          </p>
+        )}
         {msg && (
           <p role="alert" className="text-sm">
             {msg}

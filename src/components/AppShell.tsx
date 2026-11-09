@@ -4,17 +4,33 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Clock, CalendarDays, Users, Settings, LogOut, Wifi, WifiOff, CloudUpload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { useQueue } from "@/lib/offline-queue";
+import { SYNC_FAILED_MESSAGE, syncNow, useQueue } from "@/lib/offline-queue";
+import { signOutForInactivity, signedInAtOf, useIdleSignOut } from "@/lib/idle-timeout";
 import { backendHost, isNetworkError } from "@/lib/connection";
 
 export function AppShell() {
   const { roles, profile, session, organization, meError, refetchMe } = useAuth();
-  const { items, online } = useQueue(session?.user.id);
+  const { items, online, syncFailed } = useQueue(session?.user.id);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const isMgr = roles.includes("manager") || roles.includes("admin");
   const isAdmin = roles.includes("admin");
   const pending = items.length;
+  const showSyncNotice = pending > 0 && (syncFailed || !online);
+
+  // Odhlásenie po 12 hodinách nečinnosti; fronta razení v zariadení (IndexedDB) ostáva nedotknutá.
+  useIdleSignOut({
+    enabled: !!session,
+    signedInAt: signedInAtOf(session),
+    onExpire: () => {
+      void (async () => {
+        await qc.cancelQueries();
+        qc.clear();
+        await signOutForInactivity(session?.user.id);
+        navigate({ to: "/auth", replace: true });
+      })();
+    },
+  });
 
   async function signOut() {
     await qc.cancelQueries();
@@ -35,16 +51,34 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-background">
       <div
-        className={`no-print flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider ${
+        className={`no-print flex flex-wrap items-center justify-center gap-2 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider ${
           online ? (pending ? "bg-warning text-warning-foreground" : "bg-success text-success-foreground") : "bg-destructive text-destructive-foreground"
         }`}
       >
         {online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-        {online ? "Online" : "Offline – záznamy sa ukladajú v zariadení"}
+        {online
+          ? "Online"
+          : showSyncNotice
+            ? "Offline"
+            : "Offline – záznamy sa ukladajú v zariadení"}
         {pending > 0 && (
           <span className="flex items-center gap-1">
             <CloudUpload className="h-3.5 w-3.5" /> čaká na odoslanie: {pending}
           </span>
+        )}
+        {showSyncNotice && (
+          <span role="status" className="normal-case tracking-normal">
+            {SYNC_FAILED_MESSAGE}
+          </span>
+        )}
+        {online && pending > 0 && (
+          <button
+            type="button"
+            onClick={() => void syncNow()}
+            className="rounded-sm border border-current px-2 py-0.5 normal-case tracking-normal underline-offset-2 hover:underline"
+          >
+            Odoslať teraz
+          </button>
         )}
       </div>
       <header className="no-print border-b-4 border-primary bg-secondary text-secondary-foreground">

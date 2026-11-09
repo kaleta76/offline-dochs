@@ -148,8 +148,11 @@ export function classifySyncError(error: unknown, status?: number | null): SyncE
   return "other";
 }
 
-const CERTIFICATE_MESSAGE =
-  "Zabezpečené spojenie odmietnuté (certifikát). Záznam zostáva v zariadení – kontaktujte IT.";
+/** Neutral text shown whenever sending or confirming fails (network, offline, blocked connection). */
+export const SYNC_FAILED_MESSAGE =
+  "Odoslanie sa nepodarilo potvrdiť, razenia sú uložené v zariadení.";
+// The certificate cause is logged to the console only; the screen stays neutral.
+const CERTIFICATE_MESSAGE = SYNC_FAILED_MESSAGE;
 
 function logCertificate(context: string, error: unknown) {
   console.error(
@@ -184,6 +187,11 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function getSyncStatus(): Readonly<SyncState> & { retryScheduled: boolean } {
   return { ...state, retryScheduled: retryTimer !== null };
+}
+
+/** True after a failed send or confirmation until the next successful synchronization. */
+export function hasSyncFailed(): boolean {
+  return state.failures > 0 || state.blockedBy !== null;
 }
 
 function clearRetry() {
@@ -385,15 +393,17 @@ export async function discard(uuid: string) {
   await refresh();
 }
 
+function subscribe(l: () => void) {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+}
+const getSnapshot = () => snapshot;
+
 export function useQueue(userId?: string) {
-  const items = useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-    () => snapshot,
-    () => snapshot,
-  );
+  const items = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const syncFailed = useSyncExternalStore(subscribe, hasSyncFailed, () => false);
   const [online, setOnline] = useState(true);
   useEffect(() => {
     setOnline(navigator.onLine);
@@ -412,5 +422,5 @@ export function useQueue(userId?: string) {
       clearInterval(iv);
     };
   }, []);
-  return { items: items.filter((item) => item.user_id === userId), online };
+  return { items: items.filter((item) => item.user_id === userId), online, syncFailed };
 }

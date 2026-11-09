@@ -1,6 +1,6 @@
 import { personnelLabel } from "@/lib/personnel";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   LogIn,
@@ -19,6 +19,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { enqueue, useQueue } from "@/lib/offline-queue";
+import { recordActivity } from "@/lib/idle-timeout";
 import { Button } from "@/components/ui/button";
 import { DeviceRegistration } from "@/components/DeviceRegistration";
 import { dayKey, hm, labelOf } from "@/lib/month";
@@ -31,6 +32,9 @@ import {
   type TerminalAction,
   type TerminalIcon,
 } from "@/lib/terminal-actions";
+
+/** After a punch, all punch buttons stay disabled this long to prevent an accidental double click. */
+export const PUNCH_COOLDOWN_MS = 1500;
 
 export const Route = createFileRoute("/_authenticated/terminal")({
   head: () => ({
@@ -69,6 +73,9 @@ function Terminal() {
   const actionLabel = (code: string, dir: string) =>
     actions.find((a) => a.code === code && a.dir === dir)?.label ?? labelOf(code, dir);
   const [busy, setBusy] = useState(false);
+  // Synchronný zámok: dva kliky v tom istom okamihu nesmú vytvoriť dve razenia.
+  const locked = useRef(false);
+  const [pressed, setPressed] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [now, setNow] = useState<Date | null>(null);
   const [confirm, setConfirm] = useState<{ label: string; time: Date; queued: boolean } | null>(
@@ -105,11 +112,24 @@ function Terminal() {
     },
   });
 
+  useEffect(() => {
+    if (!pressed) return;
+    const t = setTimeout(() => {
+      locked.current = false;
+      setPressed(null);
+    }, PUNCH_COOLDOWN_MS);
+    return () => clearTimeout(t);
+  }, [pressed]);
+
   async function punch(a: TerminalAction) {
-    if (!uid || busy) return;
+    if (!uid || locked.current) return;
+    locked.current = true;
+    setPressed(`${a.code}:${a.dir}`);
     setBusy(true);
     setSaveError(null);
+    recordActivity(Date.now(), undefined, true);
     try {
+      // Zápis do lokálnej fronty prebehne okamžite; razenie sa nikdy potichu nezahodí.
       const item = await enqueue({ user_id: uid, code: a.code, direction: a.dir });
       setConfirm({ label: a.label, time: new Date(item.client_time), queued: true });
     } catch {
@@ -214,7 +234,9 @@ function Terminal() {
         )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {actions.map((a, i) => {
-            const Icon = ICONS[a.icon];
+            const id = `${a.code}:${a.dir}`;
+            const isPressed = pressed === id;
+            const Icon = isPressed ? CheckCircle2 : ICONS[a.icon];
             const cls =
               a.icon === "in"
                 ? "bg-success text-success-foreground"
@@ -223,13 +245,20 @@ function Terminal() {
                   : "bg-card text-foreground border-2 border-foreground";
             return (
               <Button
-                key={`${a.code}:${a.dir}`}
-                disabled={busy || !uid}
+                key={id}
+                disabled={busy || !!pressed || !uid}
+                aria-label={a.label}
+                aria-busy={isPressed || undefined}
                 onClick={() => punch(a)}
-                className={`h-auto min-h-40 min-w-0 flex flex-col items-center justify-center gap-2 rounded-sm px-3 py-8 text-xl font-black uppercase whitespace-normal shadow-[4px_4px_0_0_var(--foreground)] transition active:translate-x-1 active:translate-y-1 active:shadow-none ${cls} ${i < 2 ? "sm:py-12" : ""}`}
+                className={`h-auto min-h-40 min-w-0 flex flex-col items-center justify-center gap-2 rounded-sm px-3 py-8 text-xl font-black uppercase whitespace-normal shadow-[4px_4px_0_0_var(--foreground)] transition active:translate-x-1 active:translate-y-1 active:shadow-none ${cls} ${i < 2 ? "sm:py-12" : ""} ${isPressed ? "translate-x-1 translate-y-1 shadow-none ring-4 ring-ring" : ""}`}
               >
                 <Icon className="h-9 w-9 shrink-0" />
                 <span className="w-full break-words">{a.label}</span>
+                {isPressed && (
+                  <span role="status" className="text-sm font-bold normal-case">
+                    Zaevidované
+                  </span>
+                )}
               </Button>
             );
           })}

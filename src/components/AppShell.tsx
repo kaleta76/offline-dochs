@@ -18,7 +18,7 @@ export function AppShell() {
   const pending = items.length;
   const showSyncNotice = pending > 0 && (syncFailed || !online);
 
-  // Odhlásenie po 12 hodinách nečinnosti; fronta razení v zariadení (IndexedDB) ostáva nedotknutá.
+  // Odhlásenie po nečinnosti (predvolene 12 hodín, v Správe sa dá nastaviť pre zariadenie); fronta razení v zariadení (IndexedDB) ostáva nedotknutá.
   useIdleSignOut({
     enabled: !!session,
     signedInAt: signedInAtOf(session),

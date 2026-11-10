@@ -506,6 +506,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          idle_timeout_hours: number
           is_test: boolean
           name: string
         }
@@ -513,6 +514,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          idle_timeout_hours?: number
           is_test?: boolean
           name: string
         }
@@ -520,6 +522,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          idle_timeout_hours?: number
           is_test?: boolean
           name?: string
         }
@@ -860,6 +863,7 @@ export type Database = {
       }
       rotate_organization_invite: { Args: never; Returns: string }
       same_organization: { Args: { _user: string }; Returns: boolean }
+      set_idle_timeout: { Args: { _hours: number }; Returns: undefined }
       set_organization_test: { Args: { _is_test: boolean }; Returns: undefined }
       test_organization_summary: { Args: never; Returns: Json }
       verify_punch_synced: {

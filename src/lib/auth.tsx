@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session } from "@supabase/supabase-js";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { loadMe } from "./me-profile";
 
 type Role = "employee" | "manager" | "admin";
 interface AuthCtx {
@@ -39,18 +40,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["me", uid],
     enabled: !!uid,
     queryFn: async () => {
-      if (!uid) throw new Error('Prihlásenie je potrebné.');
-      const [r, p] = await Promise.all([
-        supabase.from("user_roles").select("role").eq("user_id", uid),
-        supabase.from("profiles").select("id, sap_id, department, daily_fund, organization_id").eq("id", uid).maybeSingle(),
-      ]);
-      if (r.error || p.error) throw r.error ?? p.error;
-      const org = await supabase.from('organizations').select('id, name').maybeSingle();
-      if (org.error) throw org.error;
-      // Príznak testovacej organizácie je nepovinný: ak stĺpec v databáze ešte nie je (migrácia 0007), účet sa načíta aj tak.
-      const flag = org.data ? await supabase.from('organizations').select('is_test').maybeSingle() : null;
-      const organization = org.data ? { ...org.data, ...(flag && !flag.error && flag.data ? { is_test: flag.data.is_test } : {}) } : null;
-      const v = { roles: (r.data ?? []).map((x) => x.role as Role), profile: p.data, organization };
+      // Jeden POST dopyt (RPC get_my_profile) namiesto štyroch GET so select=; pozri src/lib/me-profile.ts.
+      const v = await loadMe(supabase, uid);
       localStorage.setItem(`me-cache:${uid}`, JSON.stringify(v));
       return v;
     },

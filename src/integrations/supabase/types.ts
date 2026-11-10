@@ -813,6 +813,7 @@ export type Database = {
         Returns: Json
       }
       device_manager_ok: { Args: { _user: string }; Returns: boolean }
+      get_my_profile: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

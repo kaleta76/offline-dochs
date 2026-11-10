@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { pollInterval, useRefetchOnResume, useUserActive } from "./activity-polling";
 import {
   newestTerminalConfig,
   parseTerminalConfig,
@@ -9,6 +10,9 @@ import {
   terminalCacheKey,
   type TerminalConfig,
 } from "./terminal-actions";
+
+/** Ako často sa pri práci s terminálom kontroluje nová konfigurácia tlačidiel (po nečinnosti sa kontrola zastaví, pozri activity-polling.ts). */
+const CONFIG_POLL_MS = 60_000;
 
 /** Celá projekcia konfigurácie terminálu (tlačidlá, žiadosti, lehoty) s offline cache podľa účtu a organizácie. */
 export function useTerminalConfig(
@@ -26,10 +30,11 @@ export function useTerminalConfig(
       setCached(null);
     }
   }, [key]);
+  const active = useUserActive();
   const query = useQuery({
     queryKey: ["terminal-buttons", userId, organizationId],
     enabled: !!key && online,
-    refetchInterval: online ? 60_000 : false,
+    refetchInterval: pollInterval(CONFIG_POLL_MS, online && active),
     queryFn: async () => {
       if (!key || !organizationId) return null;
       const { data, error } = await supabase
@@ -63,6 +68,7 @@ export function useTerminalConfig(
       return config;
     },
   });
+  useRefetchOnResume({ active, enabled: !!key && online, updatedAt: query.dataUpdatedAt, baseMs: CONFIG_POLL_MS, refetch: query.refetch });
   // Query data belongs to the full account/organization key; stale cached state never crosses accounts.
   return query.data !== undefined ? query.data : cached?.key === key ? cached.config : null;
 }

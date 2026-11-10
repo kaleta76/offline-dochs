@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import {
   isIdleExpired,
   isIdleSignOutPending,
+  readIdleLimitMs,
   readLastActivity,
   signOutForInactivity,
   signedInAtOf,
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/_authenticated")({
     if (isIdleSignOutPending()) throw redirect({ to: "/auth" });
     const local = await supabase.auth.getSession();
     const s = local.data.session;
-    if (s && isIdleExpired(readLastActivity(), Date.now(), signedInAtOf(s))) {
+    if (s && isIdleExpired(readLastActivity(), Date.now(), signedInAtOf(s), readIdleLimitMs())) {
       await signOutForInactivity(s.user.id);
       throw redirect({ to: "/auth" });
     }

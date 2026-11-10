@@ -12,6 +12,7 @@ import { AccessExport } from "@/components/AccessExport";
 import { ConnectionDiagnostics } from "@/components/ConnectionDiagnostics";
 import { showDiagnostics } from "@/lib/diagnostics-visibility";
 import { EmployeeAccess } from "@/components/EmployeeAccess";
+import { IdleTimeoutSetting } from "@/components/IdleTimeoutSetting";
 import { TestImport } from "@/components/TestImport";
 import { TestOrganization } from "@/components/TestOrganization";
 import { Button } from "@/components/ui/button";
@@ -197,6 +198,8 @@ function Admin() {
           </section>
         </div>
       </div>
+
+      <IdleTimeoutSetting />
 
       {diagnostics && <ConnectionDiagnostics />}
 

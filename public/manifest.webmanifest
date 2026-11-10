@@ -1,10 +1,36 @@
 {
+  "id": "/terminal",
   "name": "Dochádzka",
   "short_name": "Dochádzka",
   "description": "Terminál dochádzky s offline režimom, bez osobných údajov (len osobné čísla SAP).",
+  "lang": "sk",
   "start_url": "/terminal",
   "display": "standalone",
   "background_color": "#2b2e35",
   "theme_color": "#e8590c",
-  "icons": [{ "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }]
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
 }

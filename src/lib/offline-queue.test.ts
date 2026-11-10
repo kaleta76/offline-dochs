@@ -32,14 +32,19 @@ import {
   BACKOFF_STEPS_MS,
   backoffDelay,
   classifySyncError,
+  discardParked,
   enqueue,
+  getParkedUuid,
   getSyncStatus,
   hasSyncFailed,
+  releaseParkedFor,
   resetBackoff,
+  startQueueRuntime,
   SYNC_FAILED_MESSAGE,
   syncNow,
   syncQueue,
 } from "./offline-queue";
+import { isDefiniteRejection, isMissingFunction } from "./sync-error";
 import type { QueuedPunch } from "./offline-queue";
 import { createDeviceKey } from "./device";
 
@@ -157,6 +162,165 @@ describe("Durable owner-scoped synchronization", () => {
     expect(await rows()).toHaveLength(1);
     await syncQueue();
     expect(await rows()).toHaveLength(1);
+  });
+});
+
+describe("Parked punches (definite refusals)", () => {
+  const closedMonth = { error: { code: "P0001", message: "Mesiac je uzavretý" }, status: 400 };
+
+  it("parks a punch refused by the database and stops all automatic attempts", async () => {
+    const p = await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
+    mocks.insert.mockResolvedValue(closedMonth);
+    goOnline();
+    await syncQueue();
+    const [stored] = await rows();
+    expect(stored?.error).toContain("Mesiac je uzavretý");
+    expect(getSyncStatus()).toMatchObject({
+      blockedBy: "rejected",
+      blockedItem: p.client_uuid,
+      retryScheduled: false,
+    });
+    expect(getParkedUuid()).toBe(p.client_uuid);
+    expect(hasSyncFailed()).toBe(true);
+    await syncQueue("auto");
+    await syncQueue("retry");
+    expect(mocks.sends).toHaveLength(1);
+  });
+
+  it("makes exactly one attempt on the online event and one on a manual trigger", async () => {
+    await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
+    mocks.insert.mockResolvedValue(closedMonth);
+    goOnline();
+    await syncQueue();
+    await syncQueue("online");
+    expect(mocks.sends).toHaveLength(2);
+    expect(getSyncStatus().retryScheduled).toBe(false);
+    await syncNow();
+    expect(mocks.sends).toHaveLength(3);
+    expect(getSyncStatus().retryScheduled).toBe(false);
+  });
+
+  it("keeps later punches behind the parked one and sends them after it is discarded", async () => {
+    const first = await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
+    await new Promise((r) => setTimeout(r, 5));
+    const second = await enqueue({ user_id: "user-a", code: "WORK", direction: "OUT" });
+    mocks.insert.mockResolvedValueOnce(closedMonth);
+    goOnline();
+    await syncQueue();
+    expect(mocks.sends).toHaveLength(1);
+    expect(await rows()).toHaveLength(2);
+    mocks.insert.mockResolvedValue({ error: null });
+    mocks.read.mockResolvedValue({ error: null, data: second });
+    await discardParked(first.client_uuid);
+    expect(mocks.sends).toHaveLength(2);
+    expect(await rows()).toHaveLength(0);
+    expect(getSyncStatus()).toMatchObject({ blockedBy: null, blockedItem: null });
+    expect(getParkedUuid()).toBeNull();
+  });
+
+  it.each([
+    ["too many connections (503)", { error: { code: "53300", message: "too many connections" }, status: 503 }],
+    ["pool timeout (503)", { error: { code: "PGRST000", message: "could not connect" }, status: 503 }],
+    [
+      "statement timeout (500)",
+      { error: { code: "57014", message: "canceling statement due to statement timeout" }, status: 500 },
+    ],
+    ["permission denied 42501", { error: { code: "42501", message: "permission denied" }, status: 403 }],
+    ["expired token", { error: { code: "PGRST301", message: "JWT expired" }, status: 401 }],
+  ])("does not park %s", async (_label, failure) => {
+    await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
+    mocks.insert.mockResolvedValue(failure);
+    goOnline();
+    await syncQueue();
+    expect(getSyncStatus()).toMatchObject({ blockedBy: null, retryScheduled: true });
+  });
+
+  it("does not let a punch parked for one user pause another user of the same device", async () => {
+    await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
+    mocks.insert.mockResolvedValue(closedMonth);
+    goOnline();
+    await syncQueue();
+    expect(getSyncStatus().blockedBy).toBe("rejected");
+    releaseParkedFor("user-a");
+    expect(getSyncStatus().blockedBy).toBe("rejected");
+    releaseParkedFor("user-b");
+    expect(getSyncStatus()).toMatchObject({ blockedBy: null, blockedItem: null });
+    expect(getParkedUuid()).toBeNull();
+    expect(await rows()).toHaveLength(1); // the punch itself stays on the device
+  });
+
+  it("parks a conflicting duplicate with its own explanation", async () => {
+    const p = await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
+    mocks.insert.mockResolvedValue({ error: { code: "23505", message: "duplicate" } });
+    mocks.read.mockResolvedValue({ error: null, data: { ...p, direction: "OUT" } });
+    goOnline();
+    await syncQueue();
+    expect(getSyncStatus()).toMatchObject({ blockedBy: "rejected", retryScheduled: false });
+    expect((await rows())[0]?.error).toContain("Konflikt");
+  });
+
+  it("parks a duplicate report when no such punch of this user exists", async () => {
+    await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
+    mocks.insert.mockResolvedValue({ error: { code: "23505", message: "duplicate" } });
+    mocks.read.mockResolvedValue({ error: null, data: null });
+    goOnline();
+    await syncQueue();
+    expect(getSyncStatus()).toMatchObject({ blockedBy: "rejected", retryScheduled: false });
+    expect((await rows())[0]).toMatchObject({ server_inserted: false });
+  });
+
+  it("still repeats the insert on the next attempt when an accepted insert reads back as missing", async () => {
+    await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
+    mocks.insert.mockResolvedValue({ error: null });
+    mocks.read.mockResolvedValue({ error: null, data: null });
+    goOnline();
+    await syncQueue();
+    expect(getSyncStatus()).toMatchObject({ blockedBy: null, retryScheduled: true });
+  });
+
+  it("parks when the fallback function is missing from the database", async () => {
+    await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
+    mocks.insert.mockResolvedValue({ error: null });
+    mocks.read.mockResolvedValue(fetchFailure);
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { code: "PGRST202", message: "Could not find the function public.verify_punch_synced" },
+      status: 404,
+    });
+    goOnline();
+    await syncQueue();
+    expect(getSyncStatus()).toMatchObject({ blockedBy: "rejected", retryScheduled: false });
+    expect((await rows())[0]?.error).toContain("Záložné overenie");
+  });
+
+  it("classifies only definite database refusals as parkable", () => {
+    expect(isDefiniteRejection({ code: "P0001", message: "Mesiac je uzavretý" }, 400)).toBe(true);
+    expect(isDefiniteRejection({ code: "23514", message: "check violation" }, 400)).toBe(true);
+    expect(isDefiniteRejection({ code: "22P02", message: "invalid input" }, 400)).toBe(true);
+    expect(isDefiniteRejection({ code: "P0001", message: "x" }, 500)).toBe(false);
+    expect(isDefiniteRejection({ code: "53300", message: "x" }, 503)).toBe(false);
+    expect(isDefiniteRejection({ code: "42501", message: "denied" }, 403)).toBe(false);
+    expect(isDefiniteRejection({ message: "TypeError: Failed to fetch" }, 0)).toBe(false);
+    expect(isDefiniteRejection({ message: "ERR_CERT_AUTHORITY_INVALID", code: "P0001" }, 400)).toBe(false);
+    expect(isMissingFunction({ code: "PGRST202" })).toBe(true);
+    expect(isMissingFunction({ code: "42883" })).toBe(true);
+    expect(isMissingFunction({ code: "P0001" })).toBe(false);
+  });
+});
+
+describe("Shared runtime", () => {
+  it("registers the online listener once however many components use the queue", () => {
+    const add = vi.spyOn(window, "addEventListener");
+    const remove = vi.spyOn(window, "removeEventListener");
+    const online = (calls: unknown[][]) => calls.filter(([type]) => type === "online").length;
+    const stopA = startQueueRuntime();
+    const stopB = startQueueRuntime();
+    expect(online(add.mock.calls)).toBe(1);
+    stopA();
+    stopA(); // a repeated release is harmless
+    expect(online(remove.mock.calls)).toBe(0);
+    stopB();
+    expect(online(remove.mock.calls)).toBe(1);
   });
 });
 
@@ -330,15 +494,26 @@ describe("Two-phase verification", () => {
     expect(mocks.rpc).not.toHaveBeenCalled();
     expect((await rows())[0]?.server_inserted).toBe(true);
   });
-  it("keeps the item and backs off when the RPC returns false", async () => {
+  it("parks the item when the RPC returns false and inserts again only on a manual attempt", async () => {
     await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });
     mocks.insert.mockResolvedValue({ error: null });
     mocks.read.mockResolvedValue(fetchFailure);
     mocks.rpc.mockResolvedValue({ data: false, error: null, status: 200 });
     goOnline();
     await syncQueue();
-    expect(await rows()).toHaveLength(1);
-    expect(getSyncStatus()).toMatchObject({ failures: 1, retryScheduled: true });
+    const [stored] = await rows();
+    expect(stored).toMatchObject({ server_inserted: false });
+    expect(stored?.error).toContain("nepotvrdil");
+    expect(getSyncStatus()).toMatchObject({ blockedBy: "rejected", retryScheduled: false });
+    expect(getParkedUuid()).toBe(stored?.client_uuid);
+    expect(hasSyncFailed()).toBe(true);
+    expect(mocks.sends).toHaveLength(1);
+    await syncQueue("auto");
+    await syncQueue("retry");
+    expect(mocks.sends).toHaveLength(1); // nothing automatic while parked
+    await syncNow();
+    expect(mocks.sends).toHaveLength(2); // one explicit attempt inserts again (idempotent by client_uuid)
+    expect(getSyncStatus()).toMatchObject({ blockedBy: "rejected", retryScheduled: false });
   });
   it("keeps the item and backs off when the RPC also fails on the network", async () => {
     await enqueue({ user_id: "user-a", code: "WORK", direction: "IN" });

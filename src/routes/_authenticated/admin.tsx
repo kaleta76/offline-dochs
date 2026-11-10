@@ -1,6 +1,6 @@
 import { personnelLabel, personnelNumberSchema } from "@/lib/personnel";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -10,6 +10,7 @@ import { MonthPicker } from "@/components/MonthTable";
 import { AccessConfigImport } from "@/components/AccessConfigImport";
 import { AccessExport } from "@/components/AccessExport";
 import { ConnectionDiagnostics } from "@/components/ConnectionDiagnostics";
+import { showDiagnostics } from "@/lib/diagnostics-visibility";
 import { EmployeeAccess } from "@/components/EmployeeAccess";
 import { TestImport } from "@/components/TestImport";
 import { TestOrganization } from "@/components/TestOrganization";
@@ -42,6 +43,12 @@ function Admin() {
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
   const [exporting, setExporting] = useState(false);
+  // Adresu čítame až v prehliadači (na serveri nie je window), preto najprv prázdna a po načítaní skutočná.
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    setSearch(window.location.search);
+  }, []);
+  const diagnostics = showDiagnostics({ isTestOrganization: organization?.is_test === true, search });
 
   if (!roles.includes("admin")) return <p>Táto sekcia je iba pre správcu.</p>;
 
@@ -191,7 +198,7 @@ function Admin() {
         </div>
       </div>
 
-      <ConnectionDiagnostics />
+      {diagnostics && <ConnectionDiagnostics />}
 
       <TestOrganization />
     </div>

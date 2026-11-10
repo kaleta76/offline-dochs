@@ -23,7 +23,7 @@ const box = "rounded-sm border-2 border-foreground bg-card p-4";
 
 /**
  * Diagnostika spojenia pre správcu: test známych dopytov a záznam zlyhaných dopytov (čas, tvar dopytu bez hodnôt, druh chyby).
- * Text „Kopírovať pre SOC“ neobsahuje osobné údaje ani tokeny. Podrobnosti: src/lib/net-log.ts.
+ * Text „Kopírovať pre SOC“ neobsahuje osobné údaje ani tokeny. Podrobnosti: src/lib/net-log.ts. Kedy sa panel zobrazuje: src/lib/diagnostics-visibility.ts.
  */
 export function ConnectionDiagnostics() {
   const { session } = useAuth();
@@ -143,6 +143,10 @@ export function ConnectionDiagnostics() {
       <p className="mb-3 text-xs text-muted-foreground">
         Aplikácia si v tomto prehliadači zapisuje, ktoré dopyty na server zlyhali (čas, adresa bez hodnôt, druh chyby). Neukladá osobné čísla,
         mená, tokeny ani obsah odpovedí. Test pošle tie isté čítania, aké aplikácia používa, a nič nemení.
+      </p>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Panel je určený pre IT. V testovacej organizácii je viditeľný vždy, v ostrej sa zobrazí po pridaní <span className="num">?diagnostika=1</span> k
+        adrese Správy.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={() => void runOnce()} disabled={busy || watching || !userId}>

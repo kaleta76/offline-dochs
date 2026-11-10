@@ -23,7 +23,7 @@ import { recordActivity } from "@/lib/idle-timeout";
 import { Button } from "@/components/ui/button";
 import { DeviceRegistration } from "@/components/DeviceRegistration";
 import { dayKey, hm, labelOf } from "@/lib/month";
-import { notHappenedYet } from "@/lib/presence";
+import { buildTodayList, lastActiveEntry } from "@/lib/today-list";
 import { useTerminalConfig } from "@/lib/use-terminal-actions";
 import {
   fullDayCodes,
@@ -140,34 +140,14 @@ function Terminal() {
   }
 
   const todayKey = dayKey(new Date());
-  const list = [
-    ...(today.data ?? []).map((p) => ({
-      id: p.client_uuid,
-      code: p.code,
-      dir: p.direction,
-      time: new Date(p.client_time),
-      pending: false,
-      error: undefined as string | undefined,
-    })),
-    ...items
-      .filter(
-        (i) =>
-          dayKey(new Date(i.client_time)) === todayKey &&
-          !(today.data ?? []).some((p) => p.client_uuid === i.client_uuid),
-      )
-      .map((i) => ({
-        id: i.client_uuid,
-        code: i.code,
-        dir: i.direction,
-        time: new Date(i.client_time),
-        pending: true,
-        error: i.error,
-      })),
-  ]
-    // schválené plánované razenie (napr. služobná cesta na zajtra) sa ukáže, až keď nastane
-    .filter((p) => !notHappenedYet(p.time, now ?? new Date()))
-    .sort((a, b) => a.time.getTime() - b.time.getTime());
-  const last = list[list.length - 1];
+  const list = buildTodayList(
+    today.data ?? [],
+    items,
+    (time) => dayKey(time) === todayKey,
+    now ?? new Date(),
+  );
+  // Stav „Na pracovisku“ určuje posledné platné razenie; zneplatnené sa nepočíta.
+  const last = lastActiveEntry(list);
   const atWork = last ? last.dir === "IN" : false;
   // Celodenná absencia je iba upozornenie; terminál stav schválenia nepozná a razenie prijme.
   const fullDayToday = (today.data ?? []).find((p) => !p.voided_at && fullDay.has(p.code));
@@ -278,8 +258,18 @@ function Terminal() {
               key={p.id}
               className="flex items-center justify-between gap-2 border-b border-border pb-1.5 text-sm"
             >
-              <span className="font-semibold">{actionLabel(p.code, p.dir)}</span>
+              <span
+                className={p.voided ? "font-semibold text-muted-foreground line-through" : "font-semibold"}
+                title={p.voided ? "Razenie je zneplatnené a nepočíta sa" : undefined}
+              >
+                {actionLabel(p.code, p.dir)}
+              </span>
               <span className="flex items-center gap-2">
+                {p.voided && (
+                  <span className="rounded-sm border border-border px-1.5 text-[10px] font-bold uppercase text-muted-foreground">
+                    zneplatnené
+                  </span>
+                )}
                 {p.pending && (
                   <span className="rounded-sm bg-warning px-1.5 text-[10px] font-bold uppercase text-warning-foreground">
                     čaká
@@ -293,7 +283,7 @@ function Terminal() {
                     vyžaduje schválenie
                   </span>
                 )}
-                <span className="num">{hm(p.time)}</span>
+                <span className={p.voided ? "num text-muted-foreground line-through" : "num"}>{hm(p.time)}</span>
               </span>
               {p.error && <span className="w-full text-xs text-destructive">{p.error}</span>}
             </li>

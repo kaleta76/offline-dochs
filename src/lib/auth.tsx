@@ -4,6 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { loadMe } from "./me-profile";
+import { mirrorOrganizationIdleLimit } from "./idle-timeout";
 
 type Role = "employee" | "manager" | "admin";
 interface AuthCtx {
@@ -11,7 +12,7 @@ interface AuthCtx {
   ready: boolean;
   roles: Role[];
   profile: { id: string; sap_id: string | null; department: string | null; daily_fund: number; organization_id: string | null } | null;
-  organization: { id: string; name: string; is_test?: boolean | undefined } | null;
+  organization: { id: string; name: string; is_test?: boolean | undefined; idle_timeout_hours?: number | undefined } | null;
   /** Správa o chybe, ak sa údaje o účte (roly, profil, organizácia) nepodarilo načítať; inak null. */
   meError: string | null;
   refetchMe: () => void;
@@ -43,6 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Jeden POST dopyt (RPC get_my_profile) namiesto štyroch GET so select=; pozri src/lib/me-profile.ts.
       const v = await loadMe(supabase, uid);
       localStorage.setItem(`me-cache:${uid}`, JSON.stringify(v));
+      // Limit nečinnosti organizácie sa zrkadlí do zariadenia: ochrana stránok ho potrebuje skôr, než sa načíta účet, a aj bez siete.
+      mirrorOrganizationIdleLimit(v.organization?.idle_timeout_hours);
       return v;
     },
   });

@@ -151,6 +151,18 @@ describe("loadMe: jeden POST dopyt (RPC get_my_profile)", () => {
     const me = parseMeResponse({ ...ADMIN_RESPONSE, extra: 1 });
     expect(me.roles).toEqual(["admin", "employee", "manager"]);
   });
+
+  it("parseMeResponse zachová limit nečinnosti organizácie; bez neho (stará databáza) je nedefinovaný", () => {
+    const withLimit = parseMeResponse({ ...ADMIN_RESPONSE, organization: { ...ORGANIZATION, idle_timeout_hours: 24 } });
+    expect(withLimit.organization?.idle_timeout_hours).toBe(24);
+    const without = parseMeResponse(ADMIN_RESPONSE);
+    expect(without.organization?.idle_timeout_hours).toBeUndefined();
+  });
+
+  it("parseMeResponse odmietne limit nečinnosti nesprávneho typu", async () => {
+    const bad = { ...ADMIN_RESPONSE, organization: { ...ORGANIZATION, idle_timeout_hours: "12" } };
+    expect(() => parseMeResponse(bad)).toThrow(INVALID_ME_RESPONSE_MESSAGE);
+  });
 });
 
 describe("loadMe: záloha len pri chýbajúcej funkcii", () => {

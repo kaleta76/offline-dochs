@@ -1,4 +1,4 @@
-// Automatic sign-out after a period without user activity (12 hours by default, set per device in Správa).
+// Automatic sign-out after a period without user activity (12 hours by default; the organization admin sets it in Správa).
 //
 // The time of the last user activity (key, click, touch, punch) is stored in localStorage under
 // `last_activity_at`, written at most once a minute. Sign-out only ends the login session: the
@@ -12,7 +12,10 @@ export const DEFAULT_IDLE_LIMIT_HOURS = 12;
 export const IDLE_LIMIT_MS = DEFAULT_IDLE_LIMIT_HOURS * HOUR_MS;
 /** Povolené hodnoty limitu nečinnosti v hodinách (kratší limit než pol hodiny by pri bežnej práci odhlasoval zbytočne). */
 export const IDLE_LIMIT_OPTIONS_HOURS = [0.5, 1, 2, 4, 8, 12, 24, 48, 72] as const;
-/** Kľúč v localStorage: limit nečinnosti pre toto zariadenie (prehliadač), nastavuje ho správca v Správe. */
+/**
+ * Kľúč v localStorage: kópia limitu nečinnosti organizácie v tomto zariadení. Zdroj pravdy je databáza (organizations.idle_timeout_hours,
+ * nastavuje správca v Správe); kópia sa obnovuje pri každom načítaní účtu a slúži ochrane stránok pred načítaním účtu a práci bez siete.
+ */
 export const IDLE_LIMIT_KEY = "idle_limit_hours";
 export const ACTIVITY_THROTTLE_MS = 60 * 1000;
 export const IDLE_CHECK_INTERVAL_MS = 60 * 1000;
@@ -49,7 +52,7 @@ export function parseIdleLimitHours(raw: unknown): number | null {
   return (IDLE_LIMIT_OPTIONS_HOURS as readonly number[]).includes(value) ? value : null;
 }
 
-/** Limit nečinnosti tohto zariadenia v hodinách; bez platného nastavenia 12 hodín. */
+/** Limit nečinnosti v hodinách podľa kópie v zariadení; bez platnej hodnoty 12 hodín. */
 export function readIdleLimitHours(store: Store | null = storage()): number {
   try {
     return parseIdleLimitHours(store?.getItem(IDLE_LIMIT_KEY)) ?? DEFAULT_IDLE_LIMIT_HOURS;
@@ -62,7 +65,7 @@ export function readIdleLimitMs(store: Store | null = storage()): number {
   return readIdleLimitHours(store) * HOUR_MS;
 }
 
-/** Uloží limit nečinnosti zariadenia. Neplatná hodnota sa nezapíše; predvolená hodnota nastavenie odstráni. */
+/** Uloží kópiu limitu v zariadení. Neplatná hodnota sa nezapíše; predvolená hodnota kópiu odstráni. */
 export function writeIdleLimitHours(hours: number, store: Store | null = storage()): boolean {
   const value = parseIdleLimitHours(hours);
   if (value == null || !store) return false;
@@ -73,6 +76,15 @@ export function writeIdleLimitHours(hours: number, store: Store | null = storage
   } catch {
     return false;
   }
+}
+
+/**
+ * Prenesie limit organizácie (z odpovede databázy) do zariadenia. Chýbajúca alebo neplatná hodnota (databáza bez migrácie 0012,
+ * poškodená odpoveď) kópiu nemení, aby sa limit nezmenil omylom.
+ */
+export function mirrorOrganizationIdleLimit(hours: unknown, store: Store | null = storage()): boolean {
+  const value = parseIdleLimitHours(hours);
+  return value == null ? false : writeIdleLimitHours(value, store);
 }
 
 /** Slovenský popis limitu: „30 minút“, „1 hodina“, „2 hodiny“, „12 hodín“. */

@@ -6,6 +6,7 @@ import {
   IDLE_LIMIT_OPTIONS_HOURS,
   idleLimitLabel,
   isIdleExpired,
+  mirrorOrganizationIdleLimit,
   parseIdleLimitHours,
   readIdleLimitHours,
   readIdleLimitMs,
@@ -107,5 +108,31 @@ describe("limit nečinnosti zariadenia", () => {
     expect(idleLimitLabel(8)).toBe("8 hodín");
     expect(idleLimitLabel(12)).toBe("12 hodín");
     expect(idleLimitLabel(72)).toBe("72 hodín");
+  });
+});
+
+describe("kópia limitu organizácie v zariadení", () => {
+  it("platná hodnota z databázy sa zapíše a predvolená kópiu odstráni", () => {
+    const store = fakeStore();
+    expect(mirrorOrganizationIdleLimit(24, store)).toBe(true);
+    expect(readIdleLimitHours(store)).toBe(24);
+    expect(mirrorOrganizationIdleLimit(12, store)).toBe(true);
+    expect(store.data.has(IDLE_LIMIT_KEY)).toBe(false);
+    expect(readIdleLimitHours(store)).toBe(12);
+  });
+
+  it("zmena organizácie na inú hodnotu prepíše starú kópiu", () => {
+    const store = fakeStore({ [IDLE_LIMIT_KEY]: "4" });
+    expect(mirrorOrganizationIdleLimit(72, store)).toBe(true);
+    expect(readIdleLimitHours(store)).toBe(72);
+  });
+
+  it("chýbajúca alebo neplatná hodnota kópiu nemení", () => {
+    const store = fakeStore({ [IDLE_LIMIT_KEY]: "8" });
+    for (const bad of [undefined, null, "abc", 5, Number.NaN, {}]) {
+      expect(mirrorOrganizationIdleLimit(bad, store)).toBe(false);
+    }
+    expect(readIdleLimitHours(store)).toBe(8);
+    expect(mirrorOrganizationIdleLimit(24, null)).toBe(false);
   });
 });

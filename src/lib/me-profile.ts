@@ -22,7 +22,13 @@ export interface MeData {
     daily_fund: number;
     organization_id: string | null;
   } | null;
-  organization: { id: string; name: string; is_test?: boolean | undefined } | null;
+  organization: {
+    id: string;
+    name: string;
+    is_test?: boolean | undefined;
+    /** Limit nečinnosti organizácie v hodinách (migrácia 0012); chýba, keď databáza ešte nie je aktualizovaná. */
+    idle_timeout_hours?: number | undefined;
+  } | null;
 }
 
 export const AUTH_REQUIRED_MESSAGE = "Prihlásenie je potrebné.";
@@ -40,7 +46,14 @@ const meResponseSchema = z.object({
       organization_id: z.string().nullable(),
     })
     .nullable(),
-  organization: z.object({ id: z.string(), name: z.string(), is_test: z.boolean() }).nullable(),
+  organization: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      is_test: z.boolean(),
+      idle_timeout_hours: z.number().optional(),
+    })
+    .nullable(),
 });
 
 /** Overí odpoveď RPC. Neplatný tvar je chyba (nie ticho prázdne dáta); neznáma rola sa vynechá, aby novú rolu v databáze

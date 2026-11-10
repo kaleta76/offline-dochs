@@ -8,6 +8,7 @@ import { loadMonth, labelOf, hm } from "@/lib/month";
 import { unverifiedSummary } from "@/lib/device-trace";
 import { fmtMin } from "@/lib/engine";
 import { presenceOf, summarizePresence, type Presence } from "@/lib/presence";
+import { ACTIVE_WINDOW_MS, pollInterval, useRefetchOnResume, useUserActive } from "@/lib/activity-polling";
 import { MonthPicker } from "@/components/MonthTable";
 import { Button } from "@/components/ui/button";
 import { DevicesPanel } from "@/components/DevicesPanel";
@@ -16,6 +17,9 @@ export const Route = createFileRoute("/_authenticated/tim")({
   head: () => ({ meta: [{ title: "Môj tím – Dochádzka" }, { name: "description", content: "Schvaľovanie korekcií a uzávierka mesiaca." }, { property: "og:title", content: "Môj tím – Dochádzka" }, { property: "og:description", content: "Schvaľovanie korekcií a uzávierka mesiaca." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: Team,
 });
+
+/** Ako často sa pri práci s kartou Tím obnovuje stav „Teraz“. */
+const PRESENCE_POLL_MS = 60_000;
 
 /** Stav zamestnanca teraz; undefined = ešte sa nenačítalo. Text nesie význam, farba je len doplnok. */
 function PresenceBadge({ presence }: { presence: Presence | undefined }) {
@@ -49,12 +53,14 @@ function Team() {
   });
 
   // Kto je teraz v práci: dnešné razenia tímu (rovnaké oprávnenia ako Prehľad mesiaca). Čas sa berie pri každom načítaní,
-  // aby stránka nechaná otvorenú cez polnoc nezostala na včerajšku. Obnovuje sa každú minútu.
+  // aby stránka nechaná otvorenú cez polnoc nezostala na včerajšku. Obnovuje sa každú minútu, kým sa s aplikáciou pracuje;
+  // po nečinnosti sa dotazovanie zastaví (databáza sa môže uspať) a po návrate sa stav načíta hneď (pozri activity-polling.ts).
   const teamIds = (team.data ?? []).map(({ p }) => p.id);
+  const active = useUserActive();
   const presence = useQuery({
     queryKey: ["presence", teamIds.join(",")],
     enabled: teamIds.length > 0,
-    refetchInterval: 60_000,
+    refetchInterval: pollInterval(PRESENCE_POLL_MS, active),
     queryFn: async () => {
       const start = new Date();
       start.setHours(0, 0, 0, 0);
@@ -75,6 +81,7 @@ function Team() {
       return byUser;
     },
   });
+  useRefetchOnResume({ active, enabled: teamIds.length > 0, updatedAt: presence.dataUpdatedAt, baseMs: PRESENCE_POLL_MS, refetch: presence.refetch });
   const presenceSummary = presence.data ? summarizePresence([...presence.data.values()]) : null;
 
   const pending = useQuery({
@@ -192,7 +199,7 @@ function Team() {
             {presenceSummary.away > 0 && <> · mimo pracoviska {presenceSummary.away}</>}
             {presenceSummary.out > 0 && <> · odišlo {presenceSummary.out}</>}
             {presenceSummary.none > 0 && <> · dnes bez razenia {presenceSummary.none}</>}
-            <span className="block text-xs text-muted-foreground">Stĺpec Teraz platí pre dnešok bez ohľadu na zvolený mesiac. Berie len razenia, ktoré už dorazili na server (razenia z offline terminálov sa ukážu po synchronizácii). Obnovuje sa každú minútu.</span>
+            <span className="block text-xs text-muted-foreground">Stĺpec Teraz platí pre dnešok bez ohľadu na zvolený mesiac. Berie len razenia, ktoré už dorazili na server (razenia z offline terminálov sa ukážu po synchronizácii). Obnovuje sa každú minútu, kým s aplikáciou pracujete; po {ACTIVE_WINDOW_MS / 60_000} minútach bez pohybu myšou alebo klávesu sa obnovovanie pozastaví a po návrate sa stav načíta znova.{presence.dataUpdatedAt > 0 && <> Stav k {hm(new Date(presence.dataUpdatedAt))}.</>}</span>
           </div>
         )}
         {presence.isError && <p className="mb-3 text-sm text-muted-foreground">Stav „Teraz“ sa nepodarilo načítať (ste offline?).</p>}

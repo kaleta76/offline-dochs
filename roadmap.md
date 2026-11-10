@@ -2,7 +2,8 @@
 - [x] Krok 2 klient: zámok tlačidiel 1,5 s, neutrálne hlásenie odoslania + „Odoslať teraz“, kontrola zariadenia bez 15 s dopytovania, odhlásenie po 12 h nečinnosti so zachovanou frontou; 380 testov
 - [ ] Prihlásené overenie Kroku 2 v náhľade — skúšobné razenie by sa trvalo zapísalo do živej evidencie
 - [x] Sieťová odolnosť synchronizácie: nulový šum pri prázdnom rade, server_inserted, overenie select → RPC len pri sieťovej chybe, viditeľné chyby certifikátu, backoff s jitterom; 359 testov
-- [ ] Spustiť docs/migracie/0008_verify_punch_synced.sql — čaká na pokyn vlastníka (záložné overenie dovtedy vráti chybu a razenie ostane v rade)
+- [x] Migrácia docs/migracie/0008_verify_punch_synced.sql je spustená v ostrej databáze, záložné overenie je dostupné
+- [x] Fronta razení: razenie, ktoré databáza jednoznačne odmietla (uzavretý mesiac, porušené obmedzenie), sa zaparkuje a neopakuje sa každých 60 s; dôvod a tlačidlá „Skúsiť znova“ a „Zahodiť v zariadení“ (s potvrdením); jeden spoločný plánovač namiesto dvoch
 - [x] Úzko vymedzené opravy terminálu: neblokujúca celodenná absencia, zjednotené korekcie, pravdivé odznaky a bezpečný online stav; 336 testov prešlo, lint upravených súborov prešiel
 - [ ] Celkový lint opráv terminálu — blokujú existujúce chyby mimo povoleného rozsahu; prihlásené overenie — účet vlastníka nie je dostupný pre automatické prihlásenie
 - [x] Dynamické tlačidlá terminálu podľa Accessu, predvolené tlačidlá a offline záloha; zachovaná fronta razení, 134 testov

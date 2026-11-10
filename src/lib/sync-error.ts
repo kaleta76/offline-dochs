@@ -57,3 +57,26 @@ export function classifySyncError(error: unknown, status?: number | null): SyncE
   if (httpStatus === 403 && !code) return "transport";
   return "other";
 }
+
+/**
+ * Databáza razenie jednoznačne odmietla (napr. „Mesiac je uzavretý“, porušené obmedzenie, neplatná hodnota).
+ * Opakovanie nepomôže, preto sa takéto razenie zaparkuje namiesto opakovania každých 60 s.
+ * Zámerne úzky zoznam: SQLSTATE triedy 22 (neplatné dáta), 23 (obmedzenia) a P0 (výnimka z funkcie alebo triggera) s HTTP
+ * stavom pod 500. Všetko ostatné (5xx, nedostatok zdrojov 53, vypnutie alebo časový limit 57, uviaznutie 40, chyby spojenia 08,
+ * PGRST0xx, neznáme kódy, 42501 a chyby tokenu) ostáva na opakovaní s odstupom, aby sa krátky výpadok databázy nezmenil na ručnú prácu.
+ */
+export function isDefiniteRejection(error: unknown, status?: number | null): boolean {
+  if (classifySyncError(error, status) !== "other") return false;
+  const e = (error ?? {}) as ErrorLike;
+  const httpStatus = status ?? e.status ?? null;
+  if (httpStatus != null && httpStatus >= 500) return false;
+  const code = String(e.code ?? "");
+  return /^(22|23|P0)/.test(code);
+}
+
+/** Funkcia v databáze chýba (nespustená migrácia): opakovanie nepomôže, kým sa migrácia nespustí. */
+export function isMissingFunction(error: unknown): boolean {
+  const e = (error ?? {}) as ErrorLike;
+  const code = String(e.code ?? "");
+  return code === "PGRST202" || code === "42883";
+}

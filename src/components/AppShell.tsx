@@ -4,13 +4,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Clock, CalendarDays, Users, Settings, LogOut, Wifi, WifiOff, CloudUpload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { SYNC_FAILED_MESSAGE, syncNow, useQueue } from "@/lib/offline-queue";
+import { discardParked, SYNC_FAILED_MESSAGE, syncNow, useQueue } from "@/lib/offline-queue";
+import { RejectedPunchNotice } from "@/components/RejectedPunchNotice";
 import { signOutForInactivity, signedInAtOf, useIdleSignOut } from "@/lib/idle-timeout";
 import { backendHost, isNetworkError } from "@/lib/connection";
 
 export function AppShell() {
   const { roles, profile, session, organization, meError, refetchMe } = useAuth();
-  const { items, online, syncFailed } = useQueue(session?.user.id);
+  const { items, online, syncFailed, parked } = useQueue(session?.user.id);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const isMgr = roles.includes("manager") || roles.includes("admin");
@@ -81,6 +82,13 @@ export function AppShell() {
           </button>
         )}
       </div>
+      {parked && (
+        <RejectedPunchNotice
+          punch={parked}
+          onRetry={() => void syncNow()}
+          onDiscard={(uuid) => void discardParked(uuid)}
+        />
+      )}
       <header className="no-print border-b-4 border-primary bg-secondary text-secondary-foreground">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <div className="flex flex-col gap-1">

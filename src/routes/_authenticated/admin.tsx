@@ -9,6 +9,7 @@ import { loadMonth, MONTHS } from "@/lib/month";
 import { MonthPicker } from "@/components/MonthTable";
 import { AccessConfigImport } from "@/components/AccessConfigImport";
 import { AccessExport } from "@/components/AccessExport";
+import { ConnectionDiagnostics } from "@/components/ConnectionDiagnostics";
 import { EmployeeAccess } from "@/components/EmployeeAccess";
 import { TestImport } from "@/components/TestImport";
 import { TestOrganization } from "@/components/TestOrganization";
@@ -189,6 +190,8 @@ function Admin() {
           </section>
         </div>
       </div>
+
+      <ConnectionDiagnostics />
 
       <TestOrganization />
     </div>

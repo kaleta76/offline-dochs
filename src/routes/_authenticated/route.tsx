@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
+import { guardDecision } from "@/lib/auth-guard";
 import {
   isIdleExpired,
   isIdleSignOutPending,
@@ -21,10 +22,22 @@ export const Route = createFileRoute("/_authenticated")({
       await signOutForInactivity(s.user.id);
       throw redirect({ to: "/auth" });
     }
-    // Offline: trust the locally stored session so the terminal keeps working.
-    if (!navigator.onLine && s) return;
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/auth" });
+    // Bez spojenia platí lokálna relácia. Pri zlyhaní spojenia (výpadok, firemný proxy) sa tiež nepresmerúva:
+    // na prihlásenie vedie len jasné odmietnutie servera (pozri auth-guard.ts).
+    const online = navigator.onLine;
+    let user: unknown = null;
+    let error: unknown = null;
+    if (online || !s) {
+      try {
+        const res = await supabase.auth.getUser();
+        user = res.data.user;
+        error = res.error;
+      } catch (e) {
+        error = e;
+      }
+    }
+    if (guardDecision({ hasSession: !!s, online, user, error }) === "login")
+      throw redirect({ to: "/auth" });
   },
   component: AppShell,
 });

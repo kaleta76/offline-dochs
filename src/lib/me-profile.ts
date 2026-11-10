@@ -7,10 +7,11 @@
 // (auth.tsx), ktorý ponechá údaje z lokálnej vyrovnávacej pamäte `me-cache:<uid>`.
 import { z } from "zod";
 import type { supabase } from "@/integrations/supabase/client";
+import { isAppRole, isMissingFunction, type AppRole } from "./rpc-helpers";
 
 type Client = typeof supabase;
 
-export type MeRole = "employee" | "manager" | "admin";
+export type MeRole = AppRole;
 
 export interface MeData {
   roles: MeRole[];
@@ -26,9 +27,6 @@ export interface MeData {
 
 export const AUTH_REQUIRED_MESSAGE = "Prihlásenie je potrebné.";
 export const INVALID_ME_RESPONSE_MESSAGE = "Server vrátil neplatnú odpoveď pri načítaní účtu.";
-
-const KNOWN_ROLES: readonly string[] = ["employee", "manager", "admin"];
-const isKnownRole = (role: string): role is MeRole => KNOWN_ROLES.includes(role);
 
 // Tvar odpovede RPC get_my_profile. Neznáme kľúče sa ignorujú; chýbajúci alebo zlý typ známeho kľúča je chyba.
 const meResponseSchema = z.object({
@@ -51,19 +49,10 @@ export function parseMeResponse(value: unknown): MeData {
   const parsed = meResponseSchema.safeParse(value);
   if (!parsed.success) throw new Error(INVALID_ME_RESPONSE_MESSAGE);
   return {
-    roles: parsed.data.roles.filter(isKnownRole),
+    roles: parsed.data.roles.filter(isAppRole),
     profile: parsed.data.profile,
     organization: parsed.data.organization,
   };
-}
-
-interface RpcErrorLike {
-  code?: string | null;
-  message?: string | null;
-}
-
-function isMissingFunction(error: RpcErrorLike): boolean {
-  return error.code === "PGRST202" || /could not find the function/i.test(error.message ?? "");
 }
 
 // Ak funkcia v databáze chýba, zapamätáme si to len v pamäti stránky, aby sa pri každom obnovení neopakoval zbytočný dopyt.

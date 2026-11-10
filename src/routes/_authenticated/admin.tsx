@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { loadAdminOverview, type AdminOverview } from "@/lib/admin-overview";
 import { loadMonth, MONTHS } from "@/lib/month";
 import { MonthPicker } from "@/components/MonthTable";
 import { AccessConfigImport } from "@/components/AccessConfigImport";
@@ -21,6 +22,8 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 const H = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 text-sm font-bold uppercase tracking-widest">{children}</h2>;
 const box = "rounded-sm border-2 border-foreground bg-card p-4";
+const selectInviteCode = (o: AdminOverview) => o.inviteCode;
+const selectPeople = (o: AdminOverview) => o.people;
 
 function Admin() {
   const { roles, session, organization } = useAuth();
@@ -28,17 +31,12 @@ function Admin() {
   const settings = useQuery({ queryKey: ["settings", organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: async () => (await supabase.from("organization_settings").select("*").order("key")).data ?? [] });
   const codes = useQuery({ queryKey: ["codes", organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: async () => (await supabase.from("organization_codes").select("*").order("sort")).data ?? [] });
   const holidays = useQuery({ queryKey: ["holidays", organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: async () => (await supabase.from("organization_holidays").select("*").order("day")).data ?? [] });
-  const invite = useQuery({ queryKey: ['organization-invite', organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: async () => { const { data, error } = await supabase.from('organization_invites').select('code').maybeSingle(); if (error) throw error; return data?.code; } });
+  // Pozývací kód a zamestnanci prídu jedným POST dopytom (RPC get_admin_overview, pozri src/lib/admin-overview.ts). Oba pohľady majú
+  // rovnaký kľúč dopytu, takže sa vykoná jediný dopyt; invalidácia kľúča "people" obnoví oba.
+  const overview = { queryKey: ["people", organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: () => loadAdminOverview(supabase) };
+  const invite = useQuery({ ...overview, select: selectInviteCode });
   const [inviteMessage, setInviteMessage] = useState('');
-  const people = useQuery({
-    queryKey: ["people", organization?.id, session?.user.id],
-    enabled: roles.includes('admin'),
-    queryFn: async () => {
-      const [p, r] = await Promise.all([supabase.from("profiles").select("id, sap_id, department, manager_id, daily_fund, organization_id").order("sap_id"), supabase.from("user_roles").select("user_id, role")]);
-      if (p.error || r.error) throw p.error ?? r.error;
-      return (p.data ?? []).map((x) => ({ ...x, roles: (r.data ?? []).filter((y) => y.user_id === x.id).map((y) => y.role) }));
-    },
-  });
+  const people = useQuery({ ...overview, select: selectPeople });
   const [newHol, setNewHol] = useState({ day: "", name: "" });
   const now = new Date();
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
@@ -90,7 +88,7 @@ function Admin() {
         <div className="flex flex-wrap gap-2">
           <Input id="organization-invite" readOnly value={invite.data ?? ''} className="num min-w-0 flex-1" />
           <Button variant="outline" disabled={!invite.data} onClick={async () => { try { await navigator.clipboard.writeText(invite.data ?? ''); setInviteMessage('Kód bol skopírovaný.'); } catch { setInviteMessage('Kód označte a skopírujte.'); } }}>Kopírovať</Button>
-          <Button variant="outline" onClick={async () => { if (!window.confirm('Zneplatniť pôvodný pozývací kód?')) return; const { error } = await supabase.rpc('rotate_organization_invite'); setInviteMessage(error ? error.message : 'Pôvodný kód už neplatí.'); qc.invalidateQueries({ queryKey: ['organization-invite'] }); }}>Obnoviť kód</Button>
+          <Button variant="outline" onClick={async () => { if (!window.confirm('Zneplatniť pôvodný pozývací kód?')) return; const { error } = await supabase.rpc('rotate_organization_invite'); setInviteMessage(error ? error.message : 'Pôvodný kód už neplatí.'); qc.invalidateQueries({ queryKey: ['people'] }); }}>Obnoviť kód</Button>
         </div>
         {inviteMessage && <p role="status" className="text-sm">{inviteMessage}</p>}
       </section>

@@ -4,8 +4,12 @@
 // `last_activity_at`, written at most once a minute. Sign-out only ends the login session: the
 // offline punch queue in IndexedDB is never touched, so waiting punches are sent after the next
 // sign-in of the same person.
+//
+// When the limit has passed but the server cannot be reached, the sign-out is deferred (at most IDLE_GRACE_MS after the limit,
+// see decideIdleExpiry): nobody is signed out at the moment they could not sign in again.
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { isServerReachable } from "./server-reachable";
 
 const HOUR_MS = 60 * 60 * 1000;
 export const DEFAULT_IDLE_LIMIT_HOURS = 12;
@@ -23,6 +27,10 @@ export const LAST_ACTIVITY_KEY = "last_activity_at";
 /** Set while an idle sign-out is in progress or could not remove the session (for example offline). */
 export const IDLE_SIGNOUT_KEY = "idle_signout_pending";
 export const IDLE_MESSAGE = "Boli ste odhlásený z dôvodu nečinnosti.";
+/** Najdlhšie odloženie odhlásenia, keď server nie je dosiahnuteľný: počíta sa od vypršania limitu, potom sa odhlási vždy. */
+export const IDLE_GRACE_MS = 12 * HOUR_MS;
+/** Po neúspešnom overení dosiahnuteľnosti servera sa ďalšie robí najskôr o túto dobu (návrat spojenia ho vynúti). */
+export const PROBE_RETRY_MS = 2 * 60 * 1000;
 
 type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -112,6 +120,60 @@ export function isIdleExpired(
   return now - reference > limitMs;
 }
 
+/** Time when the idle limit runs out (the later of last activity and sign-in plus the limit); null without stored activity. */
+export function idleDeadline(
+  lastActivity: number | null,
+  signedInAt?: number | null,
+  limitMs: number = IDLE_LIMIT_MS,
+): number | null {
+  if (lastActivity == null) return null;
+  const reference = Math.max(lastActivity, Number.isFinite(signedInAt) ? (signedInAt as number) : 0);
+  return reference + limitMs;
+}
+
+export type IdleDecision = "active" | "signout" | "defer";
+
+let lastFailedProbe: number | null = null;
+
+/** Zabudne posledné neúspešné overenie servera (napr. po návrate spojenia, v testoch). */
+export function resetServerProbe() {
+  lastFailedProbe = null;
+}
+
+/** Overí cez databázu (GET /auth/v1/user, ten istý dopyt ako koniec prihlásenia), či by sa prihlásenie teraz podarilo. */
+export function probeSupabaseServer(): Promise<boolean> {
+  return isServerReachable(() => supabase.auth.getUser());
+}
+
+/**
+ * Rozhodne, čo urobiť pri vypršanom limite nečinnosti. "active": limit nevypršal. "signout": odhlásiť. "defer": server nie je
+ * dosiahnuteľný, odhlásenie sa odloží, aby sa zamestnanec nemusel prihlasovať, keď sa nevie prihlásiť; razenia ostávajú
+ * možné a idú do fronty. Odloženie trvá najviac `graceMs` po vypršaní limitu a nič sa nepíše do úložiska, takže po
+ * obnovení stránky platí to isté. Počas odloženia sa aktivita nezapisuje (limit sa nepredlžuje). Neúspešné overenie sa
+ * opakuje najskôr po PROBE_RETRY_MS.
+ */
+export async function decideIdleExpiry(opts: {
+  lastActivity: number | null;
+  now: number;
+  signedInAt?: number | null;
+  limitMs?: number;
+  graceMs?: number;
+  probe?: (() => Promise<boolean>) | undefined;
+}): Promise<IdleDecision> {
+  const limitMs = opts.limitMs ?? IDLE_LIMIT_MS;
+  if (!isIdleExpired(opts.lastActivity, opts.now, opts.signedInAt, limitMs)) return "active";
+  const deadline = idleDeadline(opts.lastActivity, opts.signedInAt, limitMs);
+  if (deadline == null || opts.now - deadline > (opts.graceMs ?? IDLE_GRACE_MS)) return "signout";
+  if (lastFailedProbe != null && opts.now - lastFailedProbe < PROBE_RETRY_MS) return "defer";
+  const reachable = await (opts.probe ?? probeSupabaseServer)();
+  if (reachable) {
+    lastFailedProbe = null;
+    return "signout";
+  }
+  lastFailedProbe = opts.now;
+  return "defer";
+}
+
 /** Stores the activity time at most once a minute (always when `force`). Returns true when written. */
 export function recordActivity(
   now: number,
@@ -187,29 +249,53 @@ const ACTIVITY_EVENTS = ["keydown", "pointerdown", "touchstart"] as const;
 
 /**
  * Watches user activity while signed in. Calls `onExpire` once when more than the limit (12 hours by
- * default, see readIdleLimitMs) passed since the last activity: checked every minute, when the tab becomes visible or focused, and before any
- * new activity is recorded.
+ * default, see readIdleLimitMs) passed since the last activity and the server can be reached (see decideIdleExpiry; without
+ * a connection the sign-out is deferred): checked every minute, when the tab becomes visible or focused, when the connection
+ * returns, and before any new activity is recorded. An expired limit never counts the activity as fresh.
  */
 export function useIdleSignOut(opts: {
   enabled: boolean;
   signedInAt: number | null;
   onExpire: () => void;
+  probe?: () => Promise<boolean>;
 }) {
   const { enabled, signedInAt } = opts;
   const onExpire = useRef(opts.onExpire);
   onExpire.current = opts.onExpire;
+  const probe = useRef(opts.probe);
+  probe.current = opts.probe;
 
   useEffect(() => {
     if (!enabled) return;
     let fired = false;
+    let deciding = false;
+    let cancelled = false;
+    const expired = () => isIdleExpired(readLastActivity(), Date.now(), signedInAt, readIdleLimitMs());
+    const evaluate = async () => {
+      if (deciding || fired) return;
+      deciding = true;
+      try {
+        const decision = await decideIdleExpiry({
+          lastActivity: readLastActivity(),
+          now: Date.now(),
+          signedInAt,
+          limitMs: readIdleLimitMs(),
+          probe: probe.current,
+        });
+        // Po overení servera sa stav mohol zmeniť (aktivita v inej karte, odhlásenie): rozhodnutie sa potvrdí znova.
+        if (decision === "signout" && !cancelled && !fired && expired()) {
+          fired = true;
+          onExpire.current();
+        }
+      } finally {
+        deciding = false;
+      }
+    };
     const check = () => {
       if (fired) return true;
-      if (isIdleExpired(readLastActivity(), Date.now(), signedInAt, readIdleLimitMs())) {
-        fired = true;
-        onExpire.current();
-        return true;
-      }
-      return false;
+      if (!expired()) return false;
+      void evaluate();
+      return true;
     };
     const onActivity = () => {
       if (!check()) recordActivity(Date.now());
@@ -217,15 +303,22 @@ export function useIdleSignOut(opts: {
     const onVisible = () => {
       if (typeof document === "undefined" || document.visibilityState === "visible") check();
     };
+    const onOnline = () => {
+      resetServerProbe();
+      check();
+    };
     if (!check() && readLastActivity() == null) recordActivity(Date.now(), undefined, true);
     for (const e of ACTIVITY_EVENTS) window.addEventListener(e, onActivity, { passive: true });
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
+    window.addEventListener("online", onOnline);
     const iv = setInterval(check, IDLE_CHECK_INTERVAL_MS);
     return () => {
+      cancelled = true;
       for (const e of ACTIVITY_EVENTS) window.removeEventListener(e, onActivity);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
+      window.removeEventListener("online", onOnline);
       clearInterval(iv);
     };
   }, [enabled, signedInAt]);

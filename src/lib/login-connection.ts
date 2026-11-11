@@ -49,7 +49,8 @@ export async function setSessionWithRetry(
 ): Promise<SetSessionOutcome> {
   const retries = opts.retries ?? 1;
   const delayMs = opts.delayMs ?? 1500;
-  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const sleep =
+    opts.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const isOnline = opts.online ?? browserOnline;
   for (let i = 0; ; i += 1) {
     let error: unknown = null;

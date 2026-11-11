@@ -23,7 +23,9 @@ describe("isConnectionFailure", () => {
     expect(isConnectionFailure(new SyntaxError("Unexpected token <"), true)).toBe(true);
   });
   it("is false for a clear rejection and for an empty or unknown error while online", () => {
-    expect(isConnectionFailure({ status: 400, message: "Invalid login credentials" }, true)).toBe(false);
+    expect(isConnectionFailure({ status: 400, message: "Invalid login credentials" }, true)).toBe(
+      false,
+    );
     expect(isConnectionFailure({ status: 401 }, true)).toBe(false);
     expect(isConnectionFailure(new Error("Neplatný PIN"), true)).toBe(false);
     expect(isConnectionFailure(null, true)).toBe(false);
@@ -46,7 +48,9 @@ describe("setSessionWithRetry", () => {
   it("retries once after a connection failure and succeeds", async () => {
     const attempt = vi
       .fn()
-      .mockResolvedValueOnce({ error: { name: "AuthRetryableFetchError", message: "Failed to fetch" } })
+      .mockResolvedValueOnce({
+        error: { name: "AuthRetryableFetchError", message: "Failed to fetch" },
+      })
       .mockResolvedValueOnce({ error: null });
     expect(await setSessionWithRetry(attempt, fast)).toEqual({ ok: true, connection: false });
     expect(attempt).toHaveBeenCalledTimes(2);

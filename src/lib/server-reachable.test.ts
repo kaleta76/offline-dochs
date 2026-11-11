@@ -13,7 +13,9 @@ describe("serverAnswered", () => {
     expect(serverAnswered({ status: 403, message: "forbidden" })).toBe(true);
   });
   it("is false for network errors, gateway answers, timeouts and throttling", () => {
-    expect(serverAnswered({ name: "AuthRetryableFetchError", message: "Failed to fetch" })).toBe(false);
+    expect(serverAnswered({ name: "AuthRetryableFetchError", message: "Failed to fetch" })).toBe(
+      false,
+    );
     expect(serverAnswered({ message: "Failed to fetch" })).toBe(false);
     expect(serverAnswered({ status: 502 })).toBe(false);
     expect(serverAnswered({ status: 503 })).toBe(false);
@@ -30,7 +32,9 @@ describe("isServerReachable", () => {
   });
   it("is true when the server answers, also with a clear rejection", async () => {
     expect(await isServerReachable(async () => ({ error: null }), { online: true })).toBe(true);
-    expect(await isServerReachable(async () => ({ error: { status: 401 } }), { online: true })).toBe(true);
+    expect(
+      await isServerReachable(async () => ({ error: { status: 401 } }), { online: true }),
+    ).toBe(true);
   });
   it("is false when the request throws or returns a connection error", async () => {
     expect(
@@ -42,9 +46,12 @@ describe("isServerReachable", () => {
       ),
     ).toBe(false);
     expect(
-      await isServerReachable(async () => ({ error: { name: "AuthRetryableFetchError", message: "x" } }), {
-        online: true,
-      }),
+      await isServerReachable(
+        async () => ({ error: { name: "AuthRetryableFetchError", message: "x" } }),
+        {
+          online: true,
+        },
+      ),
     ).toBe(false);
   });
   it("is false when the server does not answer in time", async () => {

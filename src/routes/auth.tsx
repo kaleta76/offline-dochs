@@ -171,7 +171,9 @@ function AuthPage() {
           password: f.password,
         });
         if (error)
-          setMsg(isConnectionFailure(error) ? OFFLINE_LOGIN_MESSAGE : "Nesprávny e-mail alebo heslo.");
+          setMsg(
+            isConnectionFailure(error) ? OFFLINE_LOGIN_MESSAGE : "Nesprávny e-mail alebo heslo.",
+          );
         else {
           beginActiveSession();
           navigate({ to: "/terminal" });
@@ -189,7 +191,9 @@ function AuthPage() {
             navigate({ to: "/terminal" });
           } else {
             setMsg(
-              started.connection ? OFFLINE_LOGIN_MESSAGE : "Prihlásenie sa nepodarilo. Skúste to znova.",
+              started.connection
+                ? OFFLINE_LOGIN_MESSAGE
+                : "Prihlásenie sa nepodarilo. Skúste to znova.",
             );
           }
         }
@@ -244,7 +248,11 @@ function AuthPage() {
     } catch (e) {
       // Zlyhanie spojenia nie je chyba zadaných údajov: zamestnanec nemá hľadať preklep, keď nefunguje sieť.
       if (isConnectionFailure(e)) {
-        setMsg(mode === "register" || mode === "recover" ? OFFLINE_ACTION_MESSAGE : OFFLINE_LOGIN_MESSAGE);
+        setMsg(
+          mode === "register" || mode === "recover"
+            ? OFFLINE_ACTION_MESSAGE
+            : OFFLINE_LOGIN_MESSAGE,
+        );
       } else {
         setMsg(
           "Skontrolujte zadané údaje: osobné číslo má 7 alebo 8 číslic, kód organizácie 8 znakov a nové heslo aspoň 12 znakov.",

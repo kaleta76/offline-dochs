@@ -11,7 +11,7 @@ Správca môže celú svoju organizáciu (účty s hashmi PIN a hesiel, osobné 
 3. Na **cieľovom serveri** sa súbor nahrá, dešifruje, skúšobne naimportuje, importuje a overí. Cieľ vypíše **kód potvrdenia prenosu** (`XXXX-XXXX`).
 4. Na **pôvodnom serveri** správca zadá kód a názov organizácie (`org_transfer_confirm_and_delete`). Organizácia sa zruší až vtedy. Bez správneho kódu sa zrušiť nedá.
 
-Terminály (PWA) si pamätajú spárovanie podľa adresy servera, preto sa na novom serveri musia spárovať znova.
+Terminály sa na nový server neprepnú samy a zariadenia sa musia na novom serveri schváliť znova, pozri nižšie „Čo sa stane s terminálmi“.
 
 ## Čo dodáva migrácia 0016
 
@@ -40,6 +40,19 @@ Všetky volá prihlásený **správca** a pracujú vždy len s jeho organizácio
 - **Veľkosť:** každé volanie po stránkach trvá okolo 0,1 s. Drahý je len `org_export_begin` (a `org_export_finish`, `org_transfer_status`), ktoré prejdú celé tabuľky: na skúšobnom stroji trvalo približne 2,5 s pri 100 000 razeniach (súbor 60 MB, 53 stránok, najpomalšia 0,13 s). Databáza povoľuje prihlásenému používateľovi približne 8 s na príkaz (v Supabase rola `authenticated`), preto sa organizácia s niekoľkými stovkami tisíc razení z aplikácie exportovať nemusí (odhad podľa skúšobného stroja, na ostrej databáze to môže byť skôr; neoverené). Zlyhanie je bezpečné (nič sa nezapíše, zámok sa vráti späť) a také organizácie sa prenášajú operátorským postupom cez psql (súkromný balík 0015, bez časového limitu).
 - Súbor obsahuje hashe PIN a hesiel, takže na sile hesla súboru záleží (min. 12 znakov).
 - Zámok sa týka len zápisu razení. Ostatné zmeny správcu po exporte (zamestnanci, opravy) zámok nebrzdí; odhalí ich porovnanie pri zrušení.
+
+## Čo sa stane s terminálmi napojenými na starý server
+
+Podľa kódu aplikácie (`offline-queue.ts`, `device.ts`, `auth-guard.ts`, `pwa.ts`); správanie starého servera po zrušení organizácie je z kódu odvodené, na ostrom serveri neoverené.
+
+* **Terminál sa na nový server sám neprepne.** Adresa databázy je zabudovaná v zostavení aplikácie a front razení čakajúcich na odoslanie aj kľúč zariadenia sú uložené v prehliadači (IndexedDB) len pre adresu, z ktorej sa aplikácia otvorila. Nový server s inou adresou je pre prehliadač nová stránka: prázdna fronta, žiadny kľúč zariadenia, žiadne prihlásenie. Staré terminály zostanú napojené na starý server.
+* **Kým organizácia na starom serveri existuje a razenia nie sú zamknuté**, starý terminál na ňom razí ďalej. Také razenia na nový server neprejdú, pri zrušení sa vypíšu ako zmeny od exportu.
+* **So zámkom razení** ostanú nové razenia vo fronte terminálu (pruh „čaká na odoslanie: N“) a skúšajú sa odoslať každú minútu. Po zrušení organizácie na starom serveri už nemajú kam ísť: účty tam zaniknú, prihlásenia sú neplatné a front sa ďalej neodosiela. Razenia ostanú uložené v tom prehliadači, na novom serveri sa neobjavia. **Preto pred potvrdením zrušenia overte na každom termináli, že „čaká na odoslanie“ je 0** (server nevie, čo majú terminály vo fronte, takže to nemôže skontrolovať za vás). Ak nie, prenos radšej zrušte (odomkne razenia, odošlú sa) a zopakujte ho v čase, keď sa nerazí (mimo pracovného času).
+* **Po presune** zamestnanec otvorí novú adresu, aplikáciu si znova pridá do záložiek alebo nainštaluje a prihlási sa. Kód organizácie, osobné čísla aj heslá a PIN sa prenášajú, takže prihlasovacie údaje sú rovnaké (prihlásenie na reálnom novom serveri sa neoverovalo).
+* **Zariadenie bude nové.** Kľúč zariadenia sa neprenáša (je len v pôvodnom prehliadači), preto sa razenia z neho najprv označia „neoverené“, kým vedúci nové zariadenie nepotvrdí (Nahradiť pôvodné zariadenie, potom schválenie v Môj tím → Zariadenia). Razenia sa počítajú aj dovtedy. Pozri [`OVERENIE-ZARIADENI.md`](OVERENIE-ZARIADENI.md).
+* **Staré inštalácie odstráňte.** Ak starý server vypnete úplne, nainštalovaná aplikácia sa ešte otvorí z vyrovnávacej pamäte a razenia ukladá do fronty, ktorá sa už nikdy neodošle, a zamestnanec si to nemusí všimnúť. Všetkým oznámte novú adresu.
+* **Najplynulejší presun:** ak terminály používajú vlastnú doménu, ktorú pri presune len prepojíte na nový server, ostane pôvodná adresa (a teda kľúč zariadenia aj front razení); zamestnanci sa len znova prihlásia a razenia vo fronte sa odošlú na nový server (účty majú rovnaké id a razenie je podľa `client_uuid` idempotentné). Neoverené: závisí od hostingu a od zostavenia aplikácie s adresou novej databázy.
+* **Zatiaľ nie je** upozornenie na starom serveri typu „organizácia sa presťahovala na adresu …“ ani odoslanie fronty z terminálu na nový server. Je to vhodný ďalší krok, ktorý by odstránil riziko tichej straty razení na starých termináloch.
 
 ## Ručné vyskúšanie (SQL editor, ako správca)
 

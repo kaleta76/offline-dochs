@@ -123,10 +123,11 @@ export function AutoApprovalPanel({ uid, isAdmin }: { uid: string; isAdmin: bool
         <p className="mb-3 text-xs text-muted-foreground">
           Zapnuté pri zamestnancovi schváli samo jeho žiadosti o opravu, ktoré podal zo svojho
           overeného zariadenia: príchod, odchod a prerušenia bez príznaku „vyžaduje schválenie“,
-          najviac {AUTO_APPROVAL_PER_DAY} za deň a nie staršie ako {AUTO_APPROVAL_DAYS} dní. Všetko
-          ostatné (žiadosti z neoverených zariadení, schvaľovanie zariadení, čakajúce žiadosti spred
-          zapnutia) schvaľujete ručne. Zapnúť voľbu smie len priamy vedúci, vypnúť ju smie aj
-          správca. Pri zmene vedúceho voľba zanikne.
+          najviac {AUTO_APPROVAL_PER_DAY} za deň a nie staršie ako {AUTO_APPROVAL_DAYS} dní, a len
+          keď zapadajú do poradia príchodov a odchodov v ten deň. Všetko ostatné (žiadosti z
+          neoverených zariadení, schvaľovanie zariadení, čakajúce žiadosti spred zapnutia, opravy,
+          ktoré nezapadajú do poradia) schvaľujete ručne. Zapnúť voľbu smie len priamy vedúci,
+          vypnúť ju smie aj správca. Pri zmene vedúceho voľba zanikne.
         </p>
         {message && (
           <p role="alert" className="mb-2 text-sm text-destructive">

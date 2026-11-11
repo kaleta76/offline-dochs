@@ -24,7 +24,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       for (const method of ["select", "eq", "neq", "gte", "in", "order", "limit"]) {
         query[method] = () => query;
       }
-      query.then = (resolve: (v: DbResult) => unknown, reject?: (e: unknown) => unknown) =>
+      query["then"] = (resolve: (v: DbResult) => unknown, reject?: (e: unknown) => unknown) =>
         Promise.resolve(result).then(resolve, reject);
       return query;
     },
@@ -158,7 +158,7 @@ describe("AutoApprovalPanel", () => {
   });
 
   it("upozornenie sa ukáže len pri jednom zamestnancovi naraz", async () => {
-    mocks.tables.correction_auto_approvals = { data: [], error: null };
+    mocks.tables["correction_auto_approvals"] = { data: [], error: null };
     mount(true);
     await screen.findByText("9000003");
     const buttons = screen.getAllByRole("button", { name: "Zapnúť" });
@@ -187,7 +187,7 @@ describe("AutoApprovalPanel", () => {
   });
 
   it("správca vidí cudziu zapnutú voľbu a vie ju len vypnúť, nie zapnúť", async () => {
-    mocks.tables.correction_auto_approvals = {
+    mocks.tables["correction_auto_approvals"] = {
       data: [{ user_id: E3, manager_id: OTHER_MGR, enabled_at: "2026-11-09T08:00:00Z" }],
       error: null,
     };
@@ -211,7 +211,7 @@ describe("AutoApprovalPanel", () => {
   });
 
   it("databáza bez migrácie 0013: karta sa neukáže vôbec", async () => {
-    mocks.tables.correction_auto_approvals = {
+    mocks.tables["correction_auto_approvals"] = {
       data: null,
       error: {
         code: "PGRST205",
@@ -225,7 +225,10 @@ describe("AutoApprovalPanel", () => {
   });
 
   it("chyba spojenia ukáže krátke hlásenie, nie prázdnu stránku", async () => {
-    mocks.tables.correction_auto_approvals = { data: null, error: { message: "Failed to fetch" } };
+    mocks.tables["correction_auto_approvals"] = {
+      data: null,
+      error: { message: "Failed to fetch" },
+    };
     mount(false);
     expect(await screen.findByText(/Nepodarilo sa načítať/)).toBeTruthy();
   });

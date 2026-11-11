@@ -7,6 +7,12 @@ import { loadMonth, labelOf } from "@/lib/month";
 import { personnelLabel } from "@/lib/personnel";
 import { useTerminalConfig } from "@/lib/use-terminal-actions";
 import { correctionDeadlineOk, correctionTypes, needsApprovalCodes } from "@/lib/terminal-actions";
+import { getDeviceKey } from "@/lib/device";
+import {
+  correctionErrorMessage,
+  correctionSuccessMessage,
+  submitCorrection,
+} from "@/lib/correction-request";
 import { MonthPicker, MonthTable } from "@/components/MonthTable";
 import { useVoidRequest } from "@/components/VoidRequest";
 import { Button } from "@/components/ui/button";
@@ -110,22 +116,22 @@ function MyMonth() {
         throw new Error(
           `Lehota na korekciu tohto mesiaca už vypršala (do ${deadlineDay}. dňa nasledujúceho mesiaca).`,
         );
-      const { error } = await supabase.from("corrections").insert({
-        user_id: uid!,
-        code,
-        direction,
-        at_time: at.toISOString(),
-        reason: form.reason.trim(),
-      });
-      if (error) throw error;
+      // Kľúč zariadenia dokazuje, že žiadosť prišla z overeného zariadenia; server ho porovná a nikde neukladá.
+      const key = uid ? await getDeviceKey(uid) : undefined;
+      return submitCorrection(
+        supabase,
+        { userId: uid!, code, direction, at, reason: form.reason },
+        key?.token ?? null,
+      );
     },
-    onSuccess: () => {
-      setMsg("Žiadosť odoslaná manažérovi.");
+    onSuccess: (outcome) => {
+      setMsg(correctionSuccessMessage(outcome));
       setForm({ ...form, reason: "" });
       qc.invalidateQueries({ queryKey: ["corr"] });
+      // Automaticky schválená oprava vytvorí razenie: mesiac sa musí prekresliť.
+      if (outcome === "approved") qc.invalidateQueries({ queryKey: ["month"] });
     },
-    onError: (e: Error) =>
-      setMsg(e.message.includes("row-level") ? "Mesiac je uzavretý." : e.message),
+    onError: (e: Error) => setMsg(correctionErrorMessage(e)),
   });
 
   // žiadosť o zneplatnenie razenia (napr. duplicitné razenie); rozhodne vedúci alebo správca
@@ -259,7 +265,7 @@ function MyMonth() {
                           : "text-muted-foreground"
                     }
                   >
-                    {STATUS[c.status]}
+                    {c.auto_approved ? "schválená automaticky" : STATUS[c.status]}
                   </span>
                 </li>
               ))}

@@ -22,7 +22,7 @@ const WATCH_INTERVAL_MS = 60_000;
 const box = "rounded-sm border-2 border-foreground bg-card p-4";
 
 /**
- * Diagnostika spojenia pre správcu: test známych dopytov a záznam zlyhaných dopytov (čas, tvar dopytu bez hodnôt, druh chyby).
+ * Diagnostika spojenia pre správcu aj zamestnanca: test známych dopytov a záznam zlyhaných dopytov (čas, tvar dopytu bez hodnôt, druh chyby).
  * Text „Kopírovať pre SOC“ neobsahuje osobné údaje ani tokeny. Podrobnosti: src/lib/net-log.ts. Kedy sa panel zobrazuje: src/lib/diagnostics-visibility.ts.
  */
 export function ConnectionDiagnostics() {
@@ -146,8 +146,11 @@ export function ConnectionDiagnostics() {
         mená, tokeny ani obsah odpovedí. Test pošle tie isté čítania, aké aplikácia používa, a nič nemení.
       </p>
       <p className="mb-3 text-xs text-muted-foreground">
-        Panel je určený pre IT. Je v karte Servis a testovanie. V testovacej organizácii je viditeľná vždy, v ostrej sa odkryje po pridaní <span className="num">?diagnostika=1</span> k
-        adrese Správy.
+        Panel je dostupný každému prihlásenému na stránke <span className="num">/diagnostika</span>.
+        Odkaz „Diagnostika“ sa ukáže v hornej lište, keď zlyhá odoslanie razenia alebo načítanie
+        údajov o účte. Správca ho nájde aj v Správe, v karte Servis a testovanie: v testovacej
+        organizácii vždy, v ostrej po pridaní <span className="num">?servis=1</span> alebo{" "}
+        <span className="num">?diagnostika=1</span> k adrese Správy.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={() => void runOnce()} disabled={busy || watching || !userId}>

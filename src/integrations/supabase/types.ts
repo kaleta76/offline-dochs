@@ -122,39 +122,66 @@ export type Database = {
         }
         Relationships: []
       }
+      correction_auto_approvals: {
+        Row: {
+          enabled_at: string
+          manager_id: string
+          user_id: string
+        }
+        Insert: {
+          enabled_at?: string
+          manager_id: string
+          user_id: string
+        }
+        Update: {
+          enabled_at?: string
+          manager_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       corrections: {
         Row: {
           at_time: string
+          auto_approved: boolean
           code: string
           created_at: string
           decided_at: string | null
           decided_by: string | null
+          device_verified: boolean
           direction: string
           id: string
+          punch_id: number | null
           reason: string
           status: string
           user_id: string
         }
         Insert: {
           at_time: string
+          auto_approved?: boolean
           code: string
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
+          device_verified?: boolean
           direction: string
           id?: string
+          punch_id?: number | null
           reason: string
           status?: string
           user_id: string
         }
         Update: {
           at_time?: string
+          auto_approved?: boolean
           code?: string
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
+          device_verified?: boolean
           direction?: string
           id?: string
+          punch_id?: number | null
           reason?: string
           status?: string
           user_id?: string
@@ -166,6 +193,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "absence_codes"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "corrections_punch_id_fkey"
+            columns: ["punch_id"]
+            isOneToOne: false
+            referencedRelation: "punches"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -853,6 +887,16 @@ export type Database = {
           status: string
         }[]
       }
+      request_correction: {
+        Args: {
+          _at_time: string
+          _code: string
+          _device_token?: string
+          _direction: string
+          _reason: string
+        }
+        Returns: Json
+      }
       request_punch_void: {
         Args: { _punch_id: number; _reason: string }
         Returns: string
@@ -863,6 +907,10 @@ export type Database = {
       }
       rotate_organization_invite: { Args: never; Returns: string }
       same_organization: { Args: { _user: string }; Returns: boolean }
+      set_correction_auto_approval: {
+        Args: { _enabled: boolean; _user: string }
+        Returns: undefined
+      }
       set_idle_timeout: { Args: { _hours: number }; Returns: undefined }
       set_organization_test: { Args: { _is_test: boolean }; Returns: undefined }
       test_organization_summary: { Args: never; Returns: Json }

@@ -26,8 +26,9 @@ const box = "rounded-sm border-2 border-foreground bg-card p-4";
  * Text „Kopírovať pre SOC“ neobsahuje osobné údaje ani tokeny. Podrobnosti: src/lib/net-log.ts. Kedy sa panel zobrazuje: src/lib/diagnostics-visibility.ts.
  */
 export function ConnectionDiagnostics() {
-  const { session } = useAuth();
+  const { session, roles } = useAuth();
   const userId = session?.user.id;
+  const isAdmin = roles.includes("admin");
   const [state, setState] = useState<NetLogState>(emptyState);
   const [runs, setRuns] = useState<ProbeResult[][]>([]);
   const [report, setReport] = useState("");
@@ -63,7 +64,7 @@ export function ConnectionDiagnostics() {
     busyRef.current = true;
     setBusy(true);
     try {
-      const results = await runProbes(buildProbes(userId, new Date()), {
+      const results = await runProbes(buildProbes(userId, new Date(), { admin: isAdmin }), {
         pauseMs: 400,
         offline: () => navigator.onLine === false,
       });
@@ -74,7 +75,7 @@ export function ConnectionDiagnostics() {
       setBusy(false);
       refresh();
     }
-  }, [userId, refresh]);
+  }, [userId, isAdmin, refresh]);
 
   const runOnceRef = useRef(runOnce);
   useEffect(() => {
@@ -145,7 +146,7 @@ export function ConnectionDiagnostics() {
         mená, tokeny ani obsah odpovedí. Test pošle tie isté čítania, aké aplikácia používa, a nič nemení.
       </p>
       <p className="mb-3 text-xs text-muted-foreground">
-        Panel je určený pre IT. V testovacej organizácii je viditeľný vždy, v ostrej sa zobrazí po pridaní <span className="num">?diagnostika=1</span> k
+        Panel je určený pre IT. Je v karte Servis a testovanie. V testovacej organizácii je viditeľná vždy, v ostrej sa odkryje po pridaní <span className="num">?diagnostika=1</span> k
         adrese Správy.
       </p>
       <div className="flex flex-wrap items-center gap-2">

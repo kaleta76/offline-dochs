@@ -36,6 +36,10 @@ function Report() {
               <div className="text-xs uppercase tracking-widest text-muted-foreground">Mesačný výkaz dochádzky</div>
               <div className="text-xl font-black">{personnelLabel(d.profile)}</div>
               <div className="text-sm">{d.profile?.department}</div>
+              {/* Terminál meno nepozná (len osobné číslo), preto riadok na ručné doplnenie pri tlači. */}
+              <div className="mt-2 text-sm">
+                Meno a priezvisko: <span className="inline-block w-64 border-b border-foreground align-bottom">&nbsp;</span>
+              </div>
             </div>
             <div className="text-right text-lg font-bold">{MONTHS[m - 1]} {y}</div>
           </div>

@@ -26,8 +26,9 @@ const box = "rounded-sm border-2 border-foreground bg-card p-4";
  * Text „Kopírovať pre SOC“ neobsahuje osobné údaje ani tokeny. Podrobnosti: src/lib/net-log.ts. Kedy sa panel zobrazuje: src/lib/diagnostics-visibility.ts.
  */
 export function ConnectionDiagnostics() {
-  const { session } = useAuth();
+  const { session, roles } = useAuth();
   const userId = session?.user.id;
+  const isAdmin = roles.includes("admin");
   const [state, setState] = useState<NetLogState>(emptyState);
   const [runs, setRuns] = useState<ProbeResult[][]>([]);
   const [report, setReport] = useState("");
@@ -63,7 +64,7 @@ export function ConnectionDiagnostics() {
     busyRef.current = true;
     setBusy(true);
     try {
-      const results = await runProbes(buildProbes(userId, new Date()), {
+      const results = await runProbes(buildProbes(userId, new Date(), { admin: isAdmin }), {
         pauseMs: 400,
         offline: () => navigator.onLine === false,
       });
@@ -74,7 +75,7 @@ export function ConnectionDiagnostics() {
       setBusy(false);
       refresh();
     }
-  }, [userId, refresh]);
+  }, [userId, isAdmin, refresh]);
 
   const runOnceRef = useRef(runOnce);
   useEffect(() => {

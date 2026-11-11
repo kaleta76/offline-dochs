@@ -81,6 +81,11 @@ export function AppShell() {
             Odoslať teraz
           </button>
         )}
+        {online && (syncFailed || parked) && (
+          <Link to="/diagnostika" className="normal-case tracking-normal underline underline-offset-2">
+            Diagnostika
+          </Link>
+        )}
       </div>
       {parked && (
         <RejectedPunchNotice
@@ -126,6 +131,7 @@ export function AppShell() {
                 : <>Údaje o účte sa nepodarilo načítať ({meError}), preto môžu chýbať ponuky (napríklad Správa).</>}
             </span>
             <button type="button" onClick={refetchMe} className="font-bold underline underline-offset-4">Skúsiť znova</button>
+            <Link to="/diagnostika" className="font-bold underline underline-offset-4">Diagnostika</Link>
           </div>
         </div>
       )}

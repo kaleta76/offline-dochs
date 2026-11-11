@@ -12,6 +12,7 @@ import { ACTIVE_WINDOW_MS, pollInterval, useRefetchOnResume, useUserActive } fro
 import { MonthPicker } from "@/components/MonthTable";
 import { Button } from "@/components/ui/button";
 import { DevicesPanel } from "@/components/DevicesPanel";
+import { AutoApprovalPanel } from "@/components/AutoApprovalPanel";
 
 export const Route = createFileRoute("/_authenticated/tim")({
   head: () => ({ meta: [{ title: "Môj tím – Dochádzka" }, { name: "description", content: "Schvaľovanie korekcií a uzávierka mesiaca." }, { property: "og:title", content: "Môj tím – Dochádzka" }, { property: "og:description", content: "Schvaľovanie korekcií a uzávierka mesiaca." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -188,6 +189,8 @@ function Team() {
         </ul>
         <p className="mt-2 text-xs text-muted-foreground">Zneplatnené razenie ostáva v zázname (nemaže sa), ale nepočíta sa do dochádzky a do Accessu ide v zozname zneplatnených razení.</p>
       </section>
+
+      {uid && <AutoApprovalPanel uid={uid} isAdmin={isAdmin} />}
 
       {uid && <DevicesPanel uid={uid} />}
 

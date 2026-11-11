@@ -32,6 +32,7 @@ export function useVoidRequest(): { open: (t: VoidTarget) => void; panel: ReactN
       setTarget(null);
       setReason("");
       qc.invalidateQueries({ queryKey: ["month"] });
+      qc.invalidateQueries({ queryKey: ["pending-voids"] });
     },
     onError: (e: Error) => setMsg({ ok: false, text: e.message }),
   });

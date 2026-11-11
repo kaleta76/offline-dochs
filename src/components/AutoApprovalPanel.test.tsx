@@ -101,12 +101,71 @@ describe("AutoApprovalPanel", () => {
     // Jedno „Vypnúť“ pri zapnutom zamestnancovi.
     expect(screen.getAllByRole("button", { name: "Vypnúť" })).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Zapnúť" }));
+    // Jedno kliknutie voľbu nezapne: najprv sa ukáže upozornenie a súhlas.
+    expect(
+      await screen.findByRole("group", { name: /Zapnúť automatické schvaľovanie opráv/ }),
+    ).toBeTruthy();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("zapnutie až po začiarknutí súhlasu: bez neho je potvrdzovacie tlačidlo zakázané", async () => {
+    mount(false);
+    fireEvent.click(await screen.findByRole("button", { name: "Zapnúť" }));
+    const confirm = (await screen.findByRole("button", {
+      name: "Zapnúť automatické schvaľovanie",
+    })) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    fireEvent.click(confirm);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Rozumiem, že opravy zamestnanca/ }));
+    expect(confirm.disabled).toBe(false);
+    fireEvent.click(confirm);
     await waitFor(() =>
       expect(mocks.rpc).toHaveBeenCalledWith("set_correction_auto_approval", {
         _user: E1,
         _enabled: true,
       }),
     );
+    // Po úspešnom zapnutí upozornenie zmizne.
+    await waitFor(() => expect(screen.queryByRole("group")).toBeNull());
+  });
+
+  it("upozornenie pomenuje, čo voľba znamená: okamžité schválenie, zodpovednosť, limity, ručné schvaľovanie", async () => {
+    mount(false);
+    fireEvent.click(await screen.findByRole("button", { name: "Zapnúť" }));
+    const group = await screen.findByRole("group");
+    const text = group.textContent ?? "";
+    expect(text).toContain("okamžite a bez vášho rozhodnutia");
+    expect(text).toContain("Zodpovednosť za tieto opravy ostáva na vás");
+    expect(text).toContain("Najviac 5 za deň");
+    expect(text).toContain("14 dní");
+    expect(text).toContain("neoverených zariadení");
+    expect(text).toContain("Pri zmene vedúceho");
+    expect(text).toContain("smie ju vypnúť aj správca");
+  });
+
+  it("zrušenie upozornenia nezapne nič a zatvorí ho", async () => {
+    mount(false);
+    fireEvent.click(await screen.findByRole("button", { name: "Zapnúť" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Zrušiť" }));
+    await waitFor(() => expect(screen.queryByRole("group")).toBeNull());
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    // Po opätovnom otvorení je súhlas znova nezačiarknutý.
+    fireEvent.click(screen.getByRole("button", { name: "Zapnúť" }));
+    const checkbox = (await screen.findByRole("checkbox")) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+  });
+
+  it("upozornenie sa ukáže len pri jednom zamestnancovi naraz", async () => {
+    mocks.tables.correction_auto_approvals = { data: [], error: null };
+    mount(true);
+    await screen.findByText("9000003");
+    const buttons = screen.getAllByRole("button", { name: "Zapnúť" });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons.at(0) as HTMLElement);
+    fireEvent.click(screen.getAllByRole("button", { name: "Zapnúť" }).at(1) as HTMLElement);
+    await waitFor(() => expect(screen.getAllByRole("group")).toHaveLength(1));
   });
 
   it("vypnutie volá funkciu s _enabled = false", async () => {
@@ -144,7 +203,11 @@ describe("AutoApprovalPanel", () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: "Nemáte oprávnenie" } });
     mount(false);
     fireEvent.click(await screen.findByRole("button", { name: "Zapnúť" }));
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Zapnúť automatické schvaľovanie" }));
     expect((await screen.findByRole("alert")).textContent).toContain("Nemáte oprávnenie");
+    // Pri chybe ostáva upozornenie otvorené, vedúci to môže skúsiť znova alebo zrušiť.
+    expect(screen.getByRole("group")).toBeTruthy();
   });
 
   it("databáza bez migrácie 0013: karta sa neukáže vôbec", async () => {

@@ -10,6 +10,7 @@ import {
   autoApprovalSince,
   isAutoApprovalUnavailable,
 } from "@/lib/auto-approval";
+import { AutoApprovalConsent } from "@/components/AutoApprovalConsent";
 import { useVoidRequest } from "@/components/VoidRequest";
 import { Button } from "@/components/ui/button";
 
@@ -29,6 +30,8 @@ const when = (iso: string) =>
 export function AutoApprovalPanel({ uid, isAdmin }: { uid: string; isAdmin: boolean }) {
   const qc = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
+  // Zamestnanec, pri ktorom vedúci práve potvrdzuje zapnutie (pred zapnutím musí prečítať a odsúhlasiť upozornenie).
+  const [confirming, setConfirming] = useState<string | null>(null);
   const voidRequest = useVoidRequest();
 
   const people = useQuery({
@@ -155,7 +158,10 @@ export function AutoApprovalPanel({ uid, isAdmin }: { uid: string; isAdmin: bool
                 <Button
                   size="sm"
                   disabled={toggle.isPending}
-                  onClick={() => toggle.mutate({ user: r.person.id, enabled: true })}
+                  onClick={() => {
+                    setMessage(null);
+                    setConfirming(r.person.id);
+                  }}
                 >
                   Zapnúť
                 </Button>
@@ -169,6 +175,19 @@ export function AutoApprovalPanel({ uid, isAdmin }: { uid: string; isAdmin: bool
                 >
                   Vypnúť
                 </Button>
+              )}
+              {r.canEnable && confirming === r.person.id && (
+                <AutoApprovalConsent
+                  name={personnelLabel(r.person)}
+                  busy={toggle.isPending}
+                  onCancel={() => setConfirming(null)}
+                  onConfirm={() =>
+                    toggle.mutate(
+                      { user: r.person.id, enabled: true },
+                      { onSuccess: () => setConfirming(null) },
+                    )
+                  }
+                />
               )}
             </li>
           ))}

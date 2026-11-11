@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { guardDecision } from "@/lib/auth-guard";
 import {
-  isIdleExpired,
+  decideIdleExpiry,
   isIdleSignOutPending,
   readIdleLimitMs,
   readLastActivity,
@@ -18,9 +18,19 @@ export const Route = createFileRoute("/_authenticated")({
     if (isIdleSignOutPending()) throw redirect({ to: "/auth" });
     const local = await supabase.auth.getSession();
     const s = local.data.session;
-    if (s && isIdleExpired(readLastActivity(), Date.now(), signedInAtOf(s), readIdleLimitMs())) {
-      await signOutForInactivity(s.user.id);
-      throw redirect({ to: "/auth" });
+    // Po vypršaní limitu nečinnosti sa odhlási len vtedy, keď je server dosiahnuteľný (inak by sa zamestnanec nevedel
+    // znova prihlásiť): pri výpadku sa odhlásenie odloží (pozri decideIdleExpiry), razenia idú do fronty.
+    if (s) {
+      const decision = await decideIdleExpiry({
+        lastActivity: readLastActivity(),
+        now: Date.now(),
+        signedInAt: signedInAtOf(s),
+        limitMs: readIdleLimitMs(),
+      });
+      if (decision === "signout") {
+        await signOutForInactivity(s.user.id);
+        throw redirect({ to: "/auth" });
+      }
     }
     // Bez spojenia platí lokálna relácia. Pri zlyhaní spojenia (výpadok, firemný proxy) sa tiež nepresmerúva:
     // na prihlásenie vedie len jasné odmietnutie servera (pozri auth-guard.ts).

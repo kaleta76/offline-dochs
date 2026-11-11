@@ -2,6 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { beginActiveSession, IDLE_MESSAGE, isIdleSignOutPending } from "@/lib/idle-timeout";
+import {
+  isConnectionFailure,
+  OFFLINE_ACTION_MESSAGE,
+  OFFLINE_LOGIN_MESSAGE,
+  setSessionWithRetry,
+} from "@/lib/login-connection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -137,13 +143,14 @@ function AuthPage() {
     access_token: string | null;
     refresh_token: string | null;
   }) {
-    if (!tokens.access_token || !tokens.refresh_token) return false;
-    const { error } = await supabase.auth.setSession({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-    });
-    if (!error) beginActiveSession();
-    return !error;
+    if (!tokens.access_token || !tokens.refresh_token) return { ok: false, connection: false };
+    const { access_token, refresh_token } = tokens;
+    // Jeden opakovaný pokus pri chybe spojenia; odmietnutie tokenov serverom sa neopakuje.
+    const result = await setSessionWithRetry(() =>
+      supabase.auth.setSession({ access_token, refresh_token }),
+    );
+    if (result.ok) beginActiveSession();
+    return result;
   }
 
   async function submit(e: React.FormEvent) {
@@ -163,7 +170,10 @@ function AuthPage() {
           email: f.email,
           password: f.password,
         });
-        if (error) setMsg("Nesprávny e-mail alebo heslo.");
+        if (error)
+          setMsg(
+            isConnectionFailure(error) ? OFFLINE_LOGIN_MESSAGE : "Nesprávny e-mail alebo heslo.",
+          );
         else {
           beginActiveSession();
           navigate({ to: "/terminal" });
@@ -173,11 +183,20 @@ function AuthPage() {
           data: { orgCode: f.orgCode, number: f.number, password: f.password },
         });
         if (!r.ok) setMsg(r.error);
-        else if (await startSession(r)) {
-          rememberOrgCode(f.orgCode);
-          rememberNumber(browserStorage(), f.number, remember);
-          navigate({ to: "/terminal" });
-        } else setMsg("Prihlásenie sa nepodarilo. Skúste to znova.");
+        else {
+          const started = await startSession(r);
+          if (started.ok) {
+            rememberOrgCode(f.orgCode);
+            rememberNumber(browserStorage(), f.number, remember);
+            navigate({ to: "/terminal" });
+          } else {
+            setMsg(
+              started.connection
+                ? OFFLINE_LOGIN_MESSAGE
+                : "Prihlásenie sa nepodarilo. Skúste to znova.",
+            );
+          }
+        }
       } else if (mode === "pin") {
         const r = await enrollEmployee({
           data: { orgCode: f.orgCode, number: f.number, pin: f.pin, password: f.password },
@@ -187,7 +206,7 @@ function AuthPage() {
           // heslo je nastavené (aj keď sa reláciu nepodarilo začať), číslo si prehliadač zapamätá
           rememberOrgCode(f.orgCode);
           rememberNumber(browserStorage(), f.number, remember);
-          if (await startSession(r)) navigate({ to: "/terminal" });
+          if ((await startSession(r)).ok) navigate({ to: "/terminal" });
           else {
             go("employee");
             setMsg("Heslo je nastavené. Prihláste sa osobným číslom a novým heslom.");
@@ -226,10 +245,19 @@ function AuthPage() {
         if (!r.ok) setMsg(r.error);
         else setIssued({ kind: "recover", orgCode: null, recoveryCode: r.recoveryCode });
       }
-    } catch {
-      setMsg(
-        "Skontrolujte zadané údaje: osobné číslo má 7 alebo 8 číslic, kód organizácie 8 znakov a nové heslo aspoň 12 znakov.",
-      );
+    } catch (e) {
+      // Zlyhanie spojenia nie je chyba zadaných údajov: zamestnanec nemá hľadať preklep, keď nefunguje sieť.
+      if (isConnectionFailure(e)) {
+        setMsg(
+          mode === "register" || mode === "recover"
+            ? OFFLINE_ACTION_MESSAGE
+            : OFFLINE_LOGIN_MESSAGE,
+        );
+      } else {
+        setMsg(
+          "Skontrolujte zadané údaje: osobné číslo má 7 alebo 8 číslic, kód organizácie 8 znakov a nové heslo aspoň 12 znakov.",
+        );
+      }
     }
     setBusy(false);
   }

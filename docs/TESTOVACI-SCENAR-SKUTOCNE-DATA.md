@@ -39,7 +39,7 @@ Stav databázy terminála: po čistení v nej nie je žiadna organizácia ani ú
 3. Po registrácii sa zobrazí **kód organizácie** (8 znakov) a **obnovovací kód správcu** (zobrazí sa len raz). Uložte oba do správcu hesiel.
    * Očakávané: ste prihlásený ako správca novej organizácie.
    * Ak zlyhá: pošlite presný text hlásenia a čas pokusu.
-4. **Ihneď označte organizáciu ako testovaciu**: Správa > sekcia **Testovacia organizácia** > **Označiť „…“ ako testovaciu**. Bez toho sa na konci nedá zrušiť.
+4. **Ihneď označte organizáciu ako testovaciu**: Správa > pridajte k adrese `?servis=1` (odkryje kartu **Servis a testovanie**; v ostrej organizácii je inak skrytá) > sekcia **Testovacia organizácia** > **Označiť „…“ ako testovaciu**. Bez toho sa na konci nedá zrušiť. Po označení je karta Servis v tejto organizácii viditeľná stále.
 5. **Kontrola databázy po prvej registrácii.** V SQL editore spustite `docs/zaloha/stav_databazy.sql` (Raw, celý obsah) a výsledok pošlite. Očakávané: 1 organizácia, 1 účet, žiadne `POZOR`.
    Ak je to v poriadku, môžete zmazať dva snapshoty z 4. 11.: `DROP SCHEMA zaloha_20261104_1104 CASCADE;` a `DROP SCHEMA zaloha_20261104_1430 CASCADE;` (každý príkaz samostatne).
 
@@ -54,7 +54,7 @@ Stav databázy terminála: po čistení v nej nie je žiadna organizácia ani ú
 
 1. **Access (kópia A)**, karta 7: **Vytvoriť verziu konfigurácie prerušení pre terminál**. Vznikne `dochs_config.json`.
 2. Kontrola súboru: `python3 -I contract/tools/verify_config.py dochs_config.json`. Očakávané: „V poriadku“ (upozornenia sú prípustné, chyby nie). Pri chybe súbor neimportujte a pošlite výpis.
-3. Terminál > Správa > **Konfigurácia z Accessu** > vyberte súbor.
+3. Terminál > Správa > karta **Servis a testovanie** > **Konfigurácia z Accessu** > vyberte súbor.
    * Očakávané: „Súbor … je v poriadku: verzia …, N zamestnancov, M mesačných plánov, okno …“. N má zodpovedať počtu aktívnych zamestnancov v Accesse.
 4. **Náhľad (nič sa nezapíše)**.
    * Očakávané: „Nová verzia …“, „Zatiaľ sa nič nezapísalo“. „Bez účtu v termináli“ je približne N mínus počet zamestnancov vzorky (správca 9000001 v súbore nie je). Osobné čísla sa vypíšu len prvých 50.
@@ -77,8 +77,8 @@ Stav databázy terminála: po čistení v nej nie je žiadna organizácia ani ú
 3. Prečítajte **`report_prevodu`**:
    * **Dni, ktoré sa nepreviedli**: ide o dni s prerušením, ktoré terminál nemá (iné než lekár, služobná cesta, dovolenka, PN, rodina, súkromné, obed). V porovnaní sa preskočia. Ak ich je veľa, pošlite mi zoznam prerušení, rozhodneme, či ich doplniť.
    * **Denný fond**: tabuľka ukáže, kto má ktorý fond, a odporúčanú hodnotu `DENNY_FOND_HODIN`.
-4. Terminál > Správa > **Pravidlá výpočtu**: `DENNY_FOND_HODIN` podľa odporúčania (7,5 = 450 minút), `ZAOKRUHLENIE_PRICHOD` a `ZAOKRUHLENIE_ODCHOD` = 0, `OBED_PAUZA_MIN` = 30, `OBED_PO_HODINACH` = 6. Skontrolujte aj **Sviatky** v danom mesiaci proti Accessu (v `dochs_config.json` je ich zoznam).
-5. Správa > **Testovacia prevádzka a porovnanie s Accessom** > **Zapnúť testovaciu prevádzku**. Pre každý súbor `import_do_terminalu_*.csv`: vyberte ho, **Skontrolovať** (nič nezapíše), potom **Importovať**.
+4. Terminál > Správa > karta **Servis a testovanie** > **Pravidlá výpočtu**: `DENNY_FOND_HODIN` podľa odporúčania (7,5 = 450 minút), `ZAOKRUHLENIE_PRICHOD` a `ZAOKRUHLENIE_ODCHOD` = 0, `OBED_PAUZA_MIN` = 30, `OBED_PO_HODINACH` = 6. Skontrolujte aj **Sviatky** (karta Prevádzka) v danom mesiaci proti Accessu (v `dochs_config.json` je ich zoznam).
+5. Správa > karta **Servis a testovanie** > **Testovacia prevádzka a porovnanie s Accessom** > **Zapnúť testovaciu prevádzku**. Pre každý súbor `import_do_terminalu_*.csv`: vyberte ho, **Skontrolovať** (nič nezapíše), potom **Importovať**.
    * Očakávané: „Kontrola prešla: N razení“, potom „Zapísaných N razení … Reťaz je v poriadku“.
    * Ten istý import zopakujte: „Zapísaných 0 razení, N už existovalo“, nič sa nezdvojí.
 
@@ -132,7 +132,7 @@ Overuje, že razenia, ktoré terminál vydá, Access správne prevezme (pätičk
 ## 7. Upratanie (asi 10 minút)
 
 1. Terminál > **Vypnúť testovaciu prevádzku**.
-2. Správa > **Testovacia organizácia** > prepíšte názov > **Zrušiť organizáciu natrvalo**. Zmaže razenia, účty, konfiguráciu aj plán z Accessu tejto organizácie. Pôvodnú ani ostrú organizáciu zrušiť nejde.
+2. Správa > karta **Servis a testovanie** > **Testovacia organizácia** > prepíšte názov > **Zrušiť organizáciu natrvalo**. Zmaže razenia, účty, konfiguráciu aj plán z Accessu tejto organizácie. Pôvodnú ani ostrú organizáciu zrušiť nejde.
 3. V SQL editore znova spustite `stav_databazy.sql`. Očakávané: bez testovacej organizácie, bez `POZOR`.
 4. Zmažte kópie A a B a priečinok `C:\dochadzka_test\` (alebo ho uložte tam, kde súbory s osobnými číslami smú byť). Originálnu databázu Accessu test nezmenil.
 

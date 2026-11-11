@@ -145,7 +145,7 @@ export function ConnectionDiagnostics() {
         mená, tokeny ani obsah odpovedí. Test pošle tie isté čítania, aké aplikácia používa, a nič nemení.
       </p>
       <p className="mb-3 text-xs text-muted-foreground">
-        Panel je určený pre IT. V testovacej organizácii je viditeľný vždy, v ostrej sa zobrazí po pridaní <span className="num">?diagnostika=1</span> k
+        Panel je určený pre IT. Je v karte Servis a testovanie. V testovacej organizácii je viditeľná vždy, v ostrej sa odkryje po pridaní <span className="num">?diagnostika=1</span> k
         adrese Správy.
       </p>
       <div className="flex flex-wrap items-center gap-2">

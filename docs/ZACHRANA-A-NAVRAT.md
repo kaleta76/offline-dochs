@@ -48,6 +48,11 @@ Skript [`migracie/0007_spat_zachranny.sql`](migracie/0007_spat_zachranny.sql) zr
 Kód od PR s touto migráciou volá funkcie len z obrazovky Správa → Testovacia organizácia a stĺpec `is_test` číta nepovinne, preto sa po skripte ostatné obrazovky nezmenia. Spustenie: SQL editor v Lovable Cloud, alebo v chate *„Spusti migráciu zo súboru docs/migracie/0007_spat_zachranny.sql presne tak, ako je, nič nemeň.“*
 **Overené:** na lokálnom PostgreSQL 16 (spustený dvakrát, po ňom platí pôvodná ochrana posledného správcu). **Neoverené:** beh na ostrej databáze Lovable Cloud.
 
+### Migrácia 0016 späť
+
+Skript [`migracie/0016_spat_zachranny.sql`](migracie/0016_spat_zachranny.sql) zruší spúšťače `a_punches_transfer_lock` (zámok razení pri prenose) a `a_organizations_transfer_guard` (ochrana pred predčasným zrušením), funkcie `org_export_begin`, `org_export_page`, `org_export_finish`, `org_transfer_status`, `org_transfer_cancel`, `org_transfer_confirm_and_delete` a schému `org_transfer` s históriou prenosov (ak v nej nie je súkromný balík 0015, vtedy schéma ostane). Údaje organizácií ani razenia sa nemenia. Skript **nevracia** označenie „testovacia organizácia“, ktoré nastavil prenos (vráťte ho tlačidlom v karte Servis alebo `set_organization_test(false)`). Aplikácia na týchto funkciách zatiaľ nezávisí. Spustenie: SQL editor v Lovable Cloud. Skript je opakovateľný. Popis prenosu: [`PRENOS-ORGANIZACIE.md`](PRENOS-ORGANIZACIE.md).
+**Overené:** na lokálnom PostgreSQL 16 (stav funkcií, spúšťačov a počtov riadkov je po skripte rovnaký ako pred migráciou, aj opakovane a s nainštalovaným balíkom 0015). **Neoverené:** beh na ostrej databáze Lovable Cloud.
+
 ### Zálohy databázy
 
 Lovable Cloud robí denné zálohy databázy (približne 14 dní) a ponúka Export celej databázy. Postup, overenie stiahnutého súboru a poistka pred ručným zásahom: [`ZALOHA-DATABAZY.md`](ZALOHA-DATABAZY.md). Kým sú v databáze len testovacie údaje, strata nie je riziko. Pred zapísaním reálnych osobných čísel treba u Lovable overiť, kde sa zálohy ukladajú a kto k nim má prístup.

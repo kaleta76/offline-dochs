@@ -1,4 +1,4 @@
-// Dopyty testu spojenia v karte Správa. Sú to tie isté tvary dopytov, ktoré aplikácia posiela (a na ktoré firemný proxy
+// Dopyty testu spojenia (karta Servis v Správe a stránka /diagnostika pre každého prihláseného). Sú to tie isté tvary dopytov, ktoré aplikácia posiela (a na ktoré firemný proxy
 // v minulosti zatváral spojenie), spustené cez skutočného klienta databázy. Nič nemenia a výsledok sa nezobrazuje:
 // ukladá sa len stav, čas a počet riadkov, nie obsah (osobné čísla, pozývací kód).
 import { supabase } from "@/integrations/supabase/client";
@@ -36,11 +36,16 @@ function fromAuth(res: AuthResult): ProbeResponse {
 const two = (n: number) => String(n).padStart(2, "0");
 const ymd = (d: Date) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
 
-/** Dopyty testu; `userId` a mesiac určujú rovnaký tvar dopytu na razenia ako pri načítaní mesiaca. */
-export function buildProbes(userId: string, today: Date): ProbeDef[] {
+/**
+ * Dopyty testu; `userId` a mesiac určujú rovnaký tvar dopytu na razenia ako pri načítaní mesiaca.
+ * Dopyty, ktoré smie robiť len správca (zoznam zamestnancov, pozývací kód), sa pre ostatných nezaradia: zamestnanec by inak videl
+ * zlyhanie, ktoré nie je chyba spojenia.
+ */
+export function buildProbes(userId: string, today: Date, opts: { admin?: boolean } = {}): ProbeDef[] {
+  const admin = opts.admin ?? true;
   const from = new Date(today.getFullYear(), today.getMonth(), 1);
   const to = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  return [
+  const all: (ProbeDef & { adminOnly?: boolean })[] = [
     {
       id: "auth-user",
       label: "Overenie prihlásenia",
@@ -57,6 +62,7 @@ export function buildProbes(userId: string, today: Date): ProbeDef[] {
     },
     {
       id: "rpc-admin-overview",
+      adminOnly: true,
       label: "Správa: zoznam zamestnancov (RPC)",
       method: "POST",
       request: "/rest/v1/rpc/get_admin_overview",
@@ -88,6 +94,7 @@ export function buildProbes(userId: string, today: Date): ProbeDef[] {
     },
     {
       id: "get-invites",
+      adminOnly: true,
       label: "Pozývací kód (staré čítanie)",
       method: "GET",
       request: "/rest/v1/organization_invites?select=code",
@@ -119,4 +126,5 @@ export function buildProbes(userId: string, today: Date): ProbeDef[] {
         ),
     },
   ];
+  return all.filter((p) => admin || !p.adminOnly).map(({ adminOnly: _adminOnly, ...probe }) => probe);
 }

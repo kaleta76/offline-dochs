@@ -1,10 +1,10 @@
 # Zrušenie testovacej organizácie
 
-Správca môže skúšobnú firmu natrvalo zrušiť aj s jej razeniami, zamestnancami a prihlasovacími účtami. Migrácia `docs/migracie/0007_zrusenie_testovacej_organizacie.sql`, obrazovka *Správa → Testovacia organizácia*.
+Správca môže skúšobnú firmu natrvalo zrušiť aj s jej razeniami, zamestnancami a prihlasovacími účtami. Migrácia `docs/migracie/0007_zrusenie_testovacej_organizacie.sql`, obrazovka *Správa → Servis a testovanie → Testovacia organizácia*.
 
 ## Ako sa to používa
 
-1. Prihláste sa ako **správca** testovacej organizácie, otvorte **Správa** a dole sekciu **Testovacia organizácia**.
+1. Prihláste sa ako **správca** testovacej organizácie, otvorte **Správa** a kartu **Servis a testovanie** so sekciou **Testovacia organizácia**. V testovacej organizácii je karta vždy vidieť; v organizácii, ktorú ešte neoznačíte ako testovaciu, ju odkryje `?servis=1` pridané k adrese Správy (napr. `…/admin?servis=1`). Karta nie je určená pre bežnú prevádzku a skrytie nie je ochrana: oprávnenia a ochranu pôvodnej organizácie vynucuje databáza.
 2. **Označiť „názov“ ako testovaciu.** V hlavičke sa zobrazí odznak „Testovacia organizácia“. Označenie sa dá kedykoľvek vrátiť tlačidlom „Vrátiť: nie je testovacia“.
 3. Sekcia ukáže, čo sa zmaže (počet účtov, razení a zariadení). Na potvrdenie napíšte **názov organizácie presne tak, ako je zapísaný** (rozlišujú sa veľké a malé písmená aj pomlčky; názov je v poli ako nápoveda).
 4. **Zrušiť organizáciu natrvalo.** Aplikácia vás odhlási a organizácia aj všetky jej účty prestanú existovať.

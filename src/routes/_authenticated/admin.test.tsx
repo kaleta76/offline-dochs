@@ -41,7 +41,6 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 }));
 
 const OPERATION = [
-  "Export pre mzdovú účtáreň (SAP)",
   "Export pre dochádzkový systém (Access)",
   "Konfigurácia z Accessu",
   "Prístup zamestnancov (osobné čísla a PIN)",
@@ -54,6 +53,7 @@ const SERVICE_TOOLS = [
   "Sviatky",
   "Odhlásenie pri nečinnosti",
   "Testovacia prevádzka a porovnanie s Accessom",
+  "Export pre SAP (len na skúšku)",
   "Testovacia organizácia",
 ];
 const DIAGNOSTICS = "Diagnostika spojenia";
@@ -98,7 +98,7 @@ describe("Správa: karty Prevádzka a Servis a testovanie", () => {
     expect(
       screen.getByRole("tab", { name: "Servis a testovanie" }).getAttribute("aria-selected"),
     ).toBe("true");
-    const operationHeading = screen.getByText("Export pre mzdovú účtáreň (SAP)");
+    const operationHeading = screen.getByText("Export pre dochádzkový systém (Access)");
     expect(operationHeading.closest("[hidden]")).not.toBeNull();
   });
 

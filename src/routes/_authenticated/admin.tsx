@@ -98,15 +98,6 @@ function Admin() {
         openService={visibility.openByDefault}
         operation={
           <>
-            <section className={box}>
-              <H>Export pre mzdovú účtáreň (SAP)</H>
-              <div className="flex flex-wrap items-center gap-3">
-                <MonthPicker ym={ym} onChange={setYm} />
-                <Button onClick={exportSap} disabled={exporting || people.isPending || !!people.error}>{exporting ? "Pripravujem…" : "Stiahnuť .xlsx"}</Button>
-                <span className="text-xs text-muted-foreground">Hodiny podľa mzdových druhov za každého zamestnanca.</span>
-              </div>
-            </section>
-
             <AccessExport />
 
             <AccessConfigImport />
@@ -212,6 +203,16 @@ function Admin() {
                 <IdleTimeoutSetting />
 
                 <TestImport />
+
+                <section className={box}>
+                  <H>Export pre SAP (len na skúšku)</H>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <MonthPicker ym={ym} onChange={setYm} />
+                    <Button onClick={exportSap} disabled={exporting || people.isPending || !!people.error}>{exporting ? "Pripravujem…" : "Stiahnuť .xlsx"}</Button>
+                    <span className="text-xs text-muted-foreground">Hodiny podľa mzdových druhov za každého zamestnanca.</span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Len na skúšku: formát súboru pre SAP nie je určený a pevný fond v SAP sa nezlučuje s pružnou pracovnou dobou, preto sa do mzdovej účtárne neodovzdáva. Do Accessu idú len razenia (karta Prevádzka).</p>
+                </section>
               </>
             )}
             {visibility.diagnostics && <ConnectionDiagnostics />}

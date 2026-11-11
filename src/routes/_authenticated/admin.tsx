@@ -9,6 +9,7 @@ import { loadMonth, MONTHS } from "@/lib/month";
 import { MonthPicker } from "@/components/MonthTable";
 import { AccessConfigImport } from "@/components/AccessConfigImport";
 import { AccessExport } from "@/components/AccessExport";
+import { ReportList } from "@/components/ReportList";
 import { ConnectionDiagnostics } from "@/components/ConnectionDiagnostics";
 import { serviceVisibility } from "@/lib/service-visibility";
 import { AdminTabs } from "@/components/AdminTabs";
@@ -99,6 +100,8 @@ function Admin() {
         operation={
           <>
             <AccessExport />
+
+            <ReportList people={people.data ?? []} loading={people.isPending} failed={!!people.error} />
 
             <AccessConfigImport />
 

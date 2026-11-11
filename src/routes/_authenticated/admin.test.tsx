@@ -38,10 +38,12 @@ vi.mock("@/lib/admin-overview", () => ({
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),
   useNavigate: () => () => undefined,
+  Link: ({ children }: { children?: React.ReactNode }) => <a href="#vykaz">{children}</a>,
 }));
 
 const OPERATION = [
   "Export pre dochádzkový systém (Access)",
+  "Výkazy dochádzky na tlač",
   "Konfigurácia z Accessu",
   "Prístup zamestnancov (osobné čísla a PIN)",
 ];

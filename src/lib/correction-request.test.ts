@@ -6,8 +6,11 @@ import {
   correctionErrorMessage,
   correctionSuccessMessage,
   parseCorrectionOutcome,
+  parseCorrectionResult,
   submitCorrection,
+  type ManualReason,
 } from "./correction-request";
+import { AUTO_APPROVAL_DAYS, AUTO_APPROVAL_PER_DAY } from "./auto-approval";
 
 type DbError = { message: string; code?: string };
 interface Calls {
@@ -78,13 +81,97 @@ describe("parseCorrectionOutcome", () => {
   });
 });
 
+describe("parseCorrectionResult (dôvod čakania, migrácia 0014)", () => {
+  const REASONS: ManualReason[] = [
+    "device",
+    "type",
+    "future",
+    "too_old",
+    "limit",
+    "duplicate",
+    "sequence",
+  ];
+  it("pri čakajúcej žiadosti vráti dôvod z databázy", () => {
+    for (const reason of REASONS) {
+      expect(
+        parseCorrectionResult({
+          id: "x",
+          status: "pending",
+          auto_approved: false,
+          manual_reason: reason,
+        }),
+      ).toEqual({ outcome: "pending", reason });
+    }
+  });
+  it("bez dôvodu (null, chýba, stará databáza 0013) je dôvod null", () => {
+    expect(
+      parseCorrectionResult({
+        id: "x",
+        status: "pending",
+        auto_approved: false,
+        manual_reason: null,
+      }),
+    ).toEqual({ outcome: "pending", reason: null });
+    expect(parseCorrectionResult({ id: "x", status: "pending", auto_approved: false })).toEqual({
+      outcome: "pending",
+      reason: null,
+    });
+  });
+  it("neznámy dôvod nepokazí výsledok: čaká a dôvod je null", () => {
+    expect(
+      parseCorrectionResult({
+        id: "x",
+        status: "pending",
+        auto_approved: false,
+        manual_reason: "niečo_nové",
+      }),
+    ).toEqual({ outcome: "pending", reason: null });
+  });
+  it("neznámy dôvod pri schválenej žiadosti nezmení schválenie", () => {
+    expect(
+      parseCorrectionResult({
+        id: "x",
+        status: "approved",
+        auto_approved: true,
+        manual_reason: "niečo_nové",
+      }),
+    ).toEqual({ outcome: "approved", reason: null });
+  });
+  it("dôvod sa neberie z názvov zo prototypu objektu", () => {
+    for (const bad of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+      expect(
+        parseCorrectionResult({ status: "pending", auto_approved: false, manual_reason: bad }),
+      ).toEqual({ outcome: "pending", reason: null });
+    }
+  });
+  it("poškodený tvar je čakajúca žiadosť bez dôvodu", () => {
+    expect(parseCorrectionResult(null)).toEqual({ outcome: "pending", reason: null });
+    expect(parseCorrectionResult({ status: "approved", manual_reason: "x" })).toEqual({
+      outcome: "pending",
+      reason: null,
+    });
+  });
+});
+
 describe("submitCorrection", () => {
+  it("odovzdá dôvod čakania z odpovede databázy", async () => {
+    const { client } = fakeClient({
+      rpc: {
+        data: { id: "c1", status: "pending", auto_approved: false, manual_reason: "future" },
+      },
+    });
+    expect(await submitCorrection(client, INPUT, TOKEN)).toEqual({
+      outcome: "pending",
+      reason: "future",
+    });
+  });
+
   it("volá request_correction so všetkými poľami a kľúčom zariadenia, dôvod orezaný", async () => {
     const { client, calls } = fakeClient({
       rpc: { data: { id: "c1", status: "approved", auto_approved: true } },
     });
-    const outcome = await submitCorrection(client, INPUT, TOKEN);
-    expect(outcome).toBe("approved");
+    const result = await submitCorrection(client, INPUT, TOKEN);
+    expect(result).toEqual({ outcome: "approved", reason: null });
     expect(calls.rpc).toEqual([
       {
         name: "request_correction",
@@ -104,8 +191,8 @@ describe("submitCorrection", () => {
     const { client, calls } = fakeClient({
       rpc: { data: { id: "c1", status: "pending", auto_approved: false } },
     });
-    const outcome = await submitCorrection(client, INPUT, null);
-    expect(outcome).toBe("pending");
+    const result = await submitCorrection(client, INPUT, null);
+    expect(result).toEqual({ outcome: "pending", reason: null });
     expect(calls.rpc[0]?.args).not.toHaveProperty("_device_token");
   });
 
@@ -127,8 +214,8 @@ describe("submitCorrection", () => {
         },
       },
     });
-    const outcome = await submitCorrection(client, INPUT, TOKEN);
-    expect(outcome).toBe("pending");
+    const result = await submitCorrection(client, INPUT, TOKEN);
+    expect(result).toEqual({ outcome: "pending", reason: null });
     expect(calls.inserts).toEqual([
       {
         user_id: UID,
@@ -176,6 +263,44 @@ describe("správy pre zamestnanca", () => {
     expect(correctionSuccessMessage("approved")).toBe(CORRECTION_AUTO_APPROVED_MESSAGE);
     expect(correctionSuccessMessage("pending")).toBe(CORRECTION_SENT_MESSAGE);
     expect(CORRECTION_AUTO_APPROVED_MESSAGE).not.toBe(CORRECTION_SENT_MESSAGE);
+  });
+  it("čakajúca žiadosť s dôvodom hovorí, prečo sa neschválila sama", () => {
+    const text = (reason: ManualReason) => correctionSuccessMessage("pending", reason);
+    for (const reason of [
+      "device",
+      "type",
+      "future",
+      "too_old",
+      "limit",
+      "duplicate",
+      "sequence",
+    ] as const) {
+      expect(text(reason)).toMatch(
+        /^Žiadosť odoslaná manažérovi\. Automaticky sa neschválila: .+\.$/,
+      );
+    }
+    expect(text("future")).toContain("v budúcnosti");
+    expect(text("sequence")).toContain("poradia príchodov a odchodov");
+    expect(text("too_old")).toContain(`${AUTO_APPROVAL_DAYS} dní`);
+    expect(text("limit")).toContain(`${AUTO_APPROVAL_PER_DAY} automatických opráv`);
+    expect(text("device")).toContain("overené");
+  });
+  it("každý dôvod má vlastný text", () => {
+    const reasons = [
+      "device",
+      "type",
+      "future",
+      "too_old",
+      "limit",
+      "duplicate",
+      "sequence",
+    ] as const;
+    const texts = reasons.map((r) => correctionSuccessMessage("pending", r));
+    expect(new Set(texts).size).toBe(reasons.length);
+  });
+  it("bez dôvodu ostáva pôvodná správa; pri schválení sa dôvod nepridáva", () => {
+    expect(correctionSuccessMessage("pending", null)).toBe(CORRECTION_SENT_MESSAGE);
+    expect(correctionSuccessMessage("approved", "future")).toBe(CORRECTION_AUTO_APPROVED_MESSAGE);
   });
   it("chyba pravidla riadkov znamená uzavretý mesiac, ostatné správy ostávajú", () => {
     expect(

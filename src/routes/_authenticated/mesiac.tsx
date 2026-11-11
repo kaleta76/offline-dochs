@@ -124,8 +124,8 @@ function MyMonth() {
         key?.token ?? null,
       );
     },
-    onSuccess: (outcome) => {
-      setMsg(correctionSuccessMessage(outcome));
+    onSuccess: ({ outcome, reason }) => {
+      setMsg(correctionSuccessMessage(outcome, reason));
       setForm({ ...form, reason: "" });
       qc.invalidateQueries({ queryKey: ["corr"] });
       // Automaticky schválená oprava vytvorí razenie: mesiac sa musí prekresliť.

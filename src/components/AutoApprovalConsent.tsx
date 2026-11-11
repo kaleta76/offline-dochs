@@ -40,6 +40,11 @@ export function AutoApprovalConsent({
           ako {AUTO_APPROVAL_DAYS} dní.
         </li>
         <li>
+          Oprava sa schváli sama len vtedy, keď zapadá do poradia príchodov a odchodov v ten deň.
+          Napríklad druhý príchod po príchode alebo odchod bez príchodu v ten deň ostane na vašom
+          rozhodnutí.
+        </li>
+        <li>
           Schválená oprava vytvorí razenie, ktoré sa započíta do dochádzky a odíde do mzdového
           exportu. <strong>Zodpovednosť za tieto opravy ostáva na vás</strong> ako na vedúcom,
           rovnako ako keby ste ich schválili ručne.

@@ -141,8 +141,18 @@ describe("AutoApprovalPanel", () => {
     expect(text).toContain("Najviac 5 za deň");
     expect(text).toContain("14 dní");
     expect(text).toContain("neoverených zariadení");
+    expect(text).toContain("poradia príchodov a odchodov v ten deň");
+    expect(text).toContain("druhý príchod po príchode");
     expect(text).toContain("Pri zmene vedúceho");
     expect(text).toContain("smie ju vypnúť aj správca");
+  });
+
+  it("popis karty hovorí, že sa schvaľuje len to, čo zapadá do poradia príchodov a odchodov", async () => {
+    mount(false);
+    await screen.findByRole("button", { name: "Zapnúť" });
+    const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toContain("zapadajú do poradia príchodov a odchodov v ten deň");
+    expect(text).toContain("ktoré nezapadajú do poradia");
   });
 
   it("zrušenie upozornenia nezapne nič a zatvorí ho", async () => {

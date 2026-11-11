@@ -41,17 +41,17 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 }));
 
 const OPERATION = [
-  "Pozývací kód pre zamestnancov",
   "Export pre mzdovú účtáreň (SAP)",
   "Export pre dochádzkový systém (Access)",
+  "Konfigurácia z Accessu",
   "Prístup zamestnancov (osobné čísla a PIN)",
-  "Zamestnanci",
-  "Sviatky",
 ];
 const SERVICE_TOOLS = [
-  "Konfigurácia z Accessu",
+  "Pozývací kód pre zamestnancov",
+  "Zamestnanci",
   "Pravidlá výpočtu",
   "Číselník prerušení",
+  "Sviatky",
   "Odhlásenie pri nečinnosti",
   "Testovacia prevádzka a porovnanie s Accessom",
   "Testovacia organizácia",

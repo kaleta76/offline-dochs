@@ -54,7 +54,7 @@ Stav databázy terminála: po čistení v nej nie je žiadna organizácia ani ú
 
 1. **Access (kópia A)**, karta 7: **Vytvoriť verziu konfigurácie prerušení pre terminál**. Vznikne `dochs_config.json`.
 2. Kontrola súboru: `python3 -I contract/tools/verify_config.py dochs_config.json`. Očakávané: „V poriadku“ (upozornenia sú prípustné, chyby nie). Pri chybe súbor neimportujte a pošlite výpis.
-3. Terminál > Správa > karta **Servis a testovanie** > **Konfigurácia z Accessu** > vyberte súbor.
+3. Terminál > Správa > karta **Prevádzka** > **Konfigurácia z Accessu** > vyberte súbor.
    * Očakávané: „Súbor … je v poriadku: verzia …, N zamestnancov, M mesačných plánov, okno …“. N má zodpovedať počtu aktívnych zamestnancov v Accesse.
 4. **Náhľad (nič sa nezapíše)**.
    * Očakávané: „Nová verzia …“, „Zatiaľ sa nič nezapísalo“. „Bez účtu v termináli“ je približne N mínus počet zamestnancov vzorky (správca 9000001 v súbore nie je). Osobné čísla sa vypíšu len prvých 50.
@@ -77,7 +77,7 @@ Stav databázy terminála: po čistení v nej nie je žiadna organizácia ani ú
 3. Prečítajte **`report_prevodu`**:
    * **Dni, ktoré sa nepreviedli**: ide o dni s prerušením, ktoré terminál nemá (iné než lekár, služobná cesta, dovolenka, PN, rodina, súkromné, obed). V porovnaní sa preskočia. Ak ich je veľa, pošlite mi zoznam prerušení, rozhodneme, či ich doplniť.
    * **Denný fond**: tabuľka ukáže, kto má ktorý fond, a odporúčanú hodnotu `DENNY_FOND_HODIN`.
-4. Terminál > Správa > karta **Servis a testovanie** > **Pravidlá výpočtu**: `DENNY_FOND_HODIN` podľa odporúčania (7,5 = 450 minút), `ZAOKRUHLENIE_PRICHOD` a `ZAOKRUHLENIE_ODCHOD` = 0, `OBED_PAUZA_MIN` = 30, `OBED_PO_HODINACH` = 6. Skontrolujte aj **Sviatky** (karta Prevádzka) v danom mesiaci proti Accessu (v `dochs_config.json` je ich zoznam).
+4. Terminál > Správa > karta **Servis a testovanie** > **Pravidlá výpočtu**: `DENNY_FOND_HODIN` podľa odporúčania (7,5 = 450 minút), `ZAOKRUHLENIE_PRICHOD` a `ZAOKRUHLENIE_ODCHOD` = 0, `OBED_PAUZA_MIN` = 30, `OBED_PO_HODINACH` = 6. Skontrolujte aj **Sviatky** (karta Servis a testovanie) v danom mesiaci proti Accessu (v `dochs_config.json` je ich zoznam).
 5. Správa > karta **Servis a testovanie** > **Testovacia prevádzka a porovnanie s Accessom** > **Zapnúť testovaciu prevádzku**. Pre každý súbor `import_do_terminalu_*.csv`: vyberte ho, **Skontrolovať** (nič nezapíše), potom **Importovať**.
    * Očakávané: „Kontrola prešla: N razení“, potom „Zapísaných N razení … Reťaz je v poriadku“.
    * Ten istý import zopakujte: „Zapísaných 0 razení, N už existovalo“, nič sa nezdvojí.

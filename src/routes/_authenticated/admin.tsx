@@ -38,10 +38,10 @@ function Admin() {
     setSearch(window.location.search);
   }, []);
   const visibility = serviceVisibility({ isTestOrganization: organization?.is_test === true, search });
-  // Pravidlá výpočtu a číselník prerušení sú len v skrytej karte Servis, preto sa bežne ani nenačítavajú.
+  // Pravidlá výpočtu, číselník prerušení a sviatky sú len v skrytej karte Servis (majú prísť z Accessu), preto sa bežne ani nenačítavajú.
   const settings = useQuery({ queryKey: ["settings", organization?.id, session?.user.id], enabled: roles.includes('admin') && visibility.tools, queryFn: async () => (await supabase.from("organization_settings").select("*").order("key")).data ?? [] });
   const codes = useQuery({ queryKey: ["codes", organization?.id, session?.user.id], enabled: roles.includes('admin') && visibility.tools, queryFn: async () => (await supabase.from("organization_codes").select("*").order("sort")).data ?? [] });
-  const holidays = useQuery({ queryKey: ["holidays", organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: async () => (await supabase.from("organization_holidays").select("*").order("day")).data ?? [] });
+  const holidays = useQuery({ queryKey: ["holidays", organization?.id, session?.user.id], enabled: roles.includes('admin') && visibility.tools, queryFn: async () => (await supabase.from("organization_holidays").select("*").order("day")).data ?? [] });
   // Pozývací kód a zamestnanci prídu jedným POST dopytom (RPC get_admin_overview, pozri src/lib/admin-overview.ts). Oba pohľady majú
   // rovnaký kľúč dopytu, takže sa vykoná jediný dopyt; invalidácia kľúča "people" obnoví oba.
   const overview = { queryKey: ["people", organization?.id, session?.user.id], enabled: roles.includes('admin'), queryFn: () => loadAdminOverview(supabase) };
@@ -98,17 +98,6 @@ function Admin() {
         openService={visibility.openByDefault}
         operation={
           <>
-            <section className="space-y-3 border-b-2 border-foreground pb-5">
-              <H>{organization?.name ?? 'Organizácia'}</H>
-              <label className="block text-sm font-semibold" htmlFor="organization-invite">Pozývací kód pre zamestnancov</label>
-              <div className="flex flex-wrap gap-2">
-                <Input id="organization-invite" readOnly value={invite.data ?? ''} className="num min-w-0 flex-1" />
-                <Button variant="outline" disabled={!invite.data} onClick={async () => { try { await navigator.clipboard.writeText(invite.data ?? ''); setInviteMessage('Kód bol skopírovaný.'); } catch { setInviteMessage('Kód označte a skopírujte.'); } }}>Kopírovať</Button>
-                <Button variant="outline" onClick={async () => { if (!window.confirm('Zneplatniť pôvodný pozývací kód?')) return; const { error } = await supabase.rpc('rotate_organization_invite'); setInviteMessage(error ? error.message : 'Pôvodný kód už neplatí.'); qc.invalidateQueries({ queryKey: ['people'] }); }}>Obnoviť kód</Button>
-              </div>
-              {inviteMessage && <p role="status" className="text-sm">{inviteMessage}</p>}
-            </section>
-
             <section className={box}>
               <H>Export pre mzdovú účtáreň (SAP)</H>
               <div className="flex flex-wrap items-center gap-3">
@@ -120,67 +109,61 @@ function Admin() {
 
             <AccessExport />
 
+            <AccessConfigImport />
+
             <EmployeeAccess />
-
-            <section className={box}>
-              <H>Zamestnanci</H>
-              {people.error && <p role="alert" className="text-destructive">Zoznam zamestnancov sa nepodarilo načítať.</p>}
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead><tr className="border-b-2 border-foreground text-left text-xs uppercase"><th className="py-1">Zamestnanec</th><th>Stredisko</th><th>Osobné číslo SAP</th><th>Fond h</th><th>Manažér</th><th>Roly</th></tr></thead>
-                  <tbody>
-                    {(people.data ?? []).map((p) => (
-                      <tr key={p.id} className="border-b border-border align-middle">
-                        <td className="py-1.5 pr-2"><div className="font-semibold">{personnelLabel(p)}</div></td>
-                        <td className="pr-2"><Input defaultValue={p.department ?? ""} onBlur={(e) => run(supabase.from("profiles").update({ department: e.target.value }).eq("id", p.id), "people")} /></td>
-                        <td className="pr-2"><Input key={p.sap_id ?? "missing"} aria-label={`Osobné číslo SAP · ${p.id.slice(0, 8)}`} defaultValue={p.sap_id ?? ""} inputMode="numeric" maxLength={8} className="w-28" onBlur={(e) => { if (e.target.value === (p.sap_id ?? "")) return; const result = personnelNumberSchema.safeParse(e.target.value); if (!result.success) { alert("Osobné číslo zo SAP musí mať 7 alebo 8 číslic."); e.target.value = p.sap_id ?? ""; return; } void run(supabase.from("profiles").update({ sap_id: result.data }).eq("id", p.id), "people"); }} /></td>
-                        <td className="pr-2"><Input type="number" step="0.25" defaultValue={p.daily_fund} className="w-20" onBlur={(e) => run(supabase.from("profiles").update({ daily_fund: Number(e.target.value) }).eq("id", p.id), "people")} /></td>
-                        <td className="pr-2">
-                          <select className="h-9 rounded-sm border border-input bg-background px-2" value={p.manager_id ?? ""} onChange={(e) => run(supabase.from("profiles").update({ manager_id: e.target.value || null }).eq("id", p.id), "people")}>
-                            <option value="">—</option>
-                            {(people.data ?? []).filter((x) => x.id !== p.id).map((x) => <option key={x.id} value={x.id}>{personnelLabel(x)}</option>)}
-                          </select>
-                        </td>
-                        <td className="whitespace-nowrap">
-                          {(["manager", "admin"] as const).map((r) => (
-                            <label key={r} className="mr-3 inline-flex items-center gap-1 text-xs">
-                              <input type="checkbox" checked={p.roles.includes(r)} onChange={(e) => run(
-                                e.target.checked ? supabase.from("user_roles").insert({ user_id: p.id, role: r }) : supabase.from("user_roles").delete().eq("user_id", p.id).eq("role", r),
-                                "people")} />
-                              {r === "manager" ? "manažér" : "správca"}
-                            </label>
-                          ))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            <section className={box}>
-              <H>Sviatky</H>
-              <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); run(supabase.from("organization_holidays").insert(newHol), "holidays"); setNewHol({ day: "", name: "" }); }}>
-                <Input type="date" required value={newHol.day} onChange={(e) => setNewHol({ ...newHol, day: e.target.value })} className="w-40" />
-                <Input required placeholder="Názov" value={newHol.name} onChange={(e) => setNewHol({ ...newHol, name: e.target.value })} />
-                <Button type="submit">Pridať</Button>
-              </form>
-              <ul className="max-h-64 space-y-1 overflow-y-auto text-sm">
-                {(holidays.data ?? []).map((h) => (
-                  <li key={h.day} className="flex justify-between border-b border-border pb-1">
-                    <span><span className="num">{new Date(h.day).toLocaleDateString("sk-SK")}</span> {h.name}</span>
-                    <Button variant="link" className="text-xs text-destructive" onClick={() => run(supabase.from("organization_holidays").delete().eq("day", h.day), "holidays")}>odstrániť</Button>
-                  </li>
-                ))}
-              </ul>
-            </section>
           </>
         }
         service={
           <>
             {visibility.tools && (
               <>
-                <AccessConfigImport />
+                <section className="space-y-3 border-b-2 border-foreground pb-5">
+                  <H>{organization?.name ?? 'Organizácia'}</H>
+                  <label className="block text-sm font-semibold" htmlFor="organization-invite">Pozývací kód pre zamestnancov</label>
+                  <div className="flex flex-wrap gap-2">
+                    <Input id="organization-invite" readOnly value={invite.data ?? ''} className="num min-w-0 flex-1" />
+                    <Button variant="outline" disabled={!invite.data} onClick={async () => { try { await navigator.clipboard.writeText(invite.data ?? ''); setInviteMessage('Kód bol skopírovaný.'); } catch { setInviteMessage('Kód označte a skopírujte.'); } }}>Kopírovať</Button>
+                    <Button variant="outline" onClick={async () => { if (!window.confirm('Zneplatniť pôvodný pozývací kód?')) return; const { error } = await supabase.rpc('rotate_organization_invite'); setInviteMessage(error ? error.message : 'Pôvodný kód už neplatí.'); qc.invalidateQueries({ queryKey: ['people'] }); }}>Obnoviť kód</Button>
+                  </div>
+                  {inviteMessage && <p role="status" className="text-sm">{inviteMessage}</p>}
+                </section>
+
+                <section className={box}>
+                  <H>Zamestnanci</H>
+                  {people.error && <p role="alert" className="text-destructive">Zoznam zamestnancov sa nepodarilo načítať.</p>}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead><tr className="border-b-2 border-foreground text-left text-xs uppercase"><th className="py-1">Zamestnanec</th><th>Stredisko</th><th>Osobné číslo SAP</th><th>Fond h</th><th>Manažér</th><th>Roly</th></tr></thead>
+                      <tbody>
+                        {(people.data ?? []).map((p) => (
+                          <tr key={p.id} className="border-b border-border align-middle">
+                            <td className="py-1.5 pr-2"><div className="font-semibold">{personnelLabel(p)}</div></td>
+                            <td className="pr-2"><Input defaultValue={p.department ?? ""} onBlur={(e) => run(supabase.from("profiles").update({ department: e.target.value }).eq("id", p.id), "people")} /></td>
+                            <td className="pr-2"><Input key={p.sap_id ?? "missing"} aria-label={`Osobné číslo SAP · ${p.id.slice(0, 8)}`} defaultValue={p.sap_id ?? ""} inputMode="numeric" maxLength={8} className="w-28" onBlur={(e) => { if (e.target.value === (p.sap_id ?? "")) return; const result = personnelNumberSchema.safeParse(e.target.value); if (!result.success) { alert("Osobné číslo zo SAP musí mať 7 alebo 8 číslic."); e.target.value = p.sap_id ?? ""; return; } void run(supabase.from("profiles").update({ sap_id: result.data }).eq("id", p.id), "people"); }} /></td>
+                            <td className="pr-2"><Input type="number" step="0.25" defaultValue={p.daily_fund} className="w-20" onBlur={(e) => run(supabase.from("profiles").update({ daily_fund: Number(e.target.value) }).eq("id", p.id), "people")} /></td>
+                            <td className="pr-2">
+                              <select className="h-9 rounded-sm border border-input bg-background px-2" value={p.manager_id ?? ""} onChange={(e) => run(supabase.from("profiles").update({ manager_id: e.target.value || null }).eq("id", p.id), "people")}>
+                                <option value="">—</option>
+                                {(people.data ?? []).filter((x) => x.id !== p.id).map((x) => <option key={x.id} value={x.id}>{personnelLabel(x)}</option>)}
+                              </select>
+                            </td>
+                            <td className="whitespace-nowrap">
+                              {(["manager", "admin"] as const).map((r) => (
+                                <label key={r} className="mr-3 inline-flex items-center gap-1 text-xs">
+                                  <input type="checkbox" checked={p.roles.includes(r)} onChange={(e) => run(
+                                    e.target.checked ? supabase.from("user_roles").insert({ user_id: p.id, role: r }) : supabase.from("user_roles").delete().eq("user_id", p.id).eq("role", r),
+                                    "people")} />
+                                  {r === "manager" ? "manažér" : "správca"}
+                                </label>
+                              ))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
 
                 <div className="grid gap-8 lg:grid-cols-2">
                   <section className={box}>
@@ -195,16 +178,35 @@ function Admin() {
                     </div>
                   </section>
 
-                  <section className={box}>
-                    <H>Číselník prerušení</H>
-                    {(codes.data ?? []).map((c) => (
-                      <div key={c.code} className="mb-1.5 grid grid-cols-[70px_80px_1fr] items-center gap-2">
-                        <span className="num text-xs font-bold">{c.code}</span>
-                        <Input defaultValue={c.sap_code} onBlur={(e) => run(supabase.from("organization_codes").update({ sap_code: e.target.value }).eq("code", c.code), "codes")} aria-label="SAP kód" />
-                        <Input defaultValue={c.name} onBlur={(e) => run(supabase.from("organization_codes").update({ name: e.target.value }).eq("code", c.code), "codes")} aria-label="Názov" />
-                      </div>
-                    ))}
-                  </section>
+                  <div className="space-y-8">
+                    <section className={box}>
+                      <H>Číselník prerušení</H>
+                      {(codes.data ?? []).map((c) => (
+                        <div key={c.code} className="mb-1.5 grid grid-cols-[70px_80px_1fr] items-center gap-2">
+                          <span className="num text-xs font-bold">{c.code}</span>
+                          <Input defaultValue={c.sap_code} onBlur={(e) => run(supabase.from("organization_codes").update({ sap_code: e.target.value }).eq("code", c.code), "codes")} aria-label="SAP kód" />
+                          <Input defaultValue={c.name} onBlur={(e) => run(supabase.from("organization_codes").update({ name: e.target.value }).eq("code", c.code), "codes")} aria-label="Názov" />
+                        </div>
+                      ))}
+                    </section>
+
+                    <section className={box}>
+                      <H>Sviatky</H>
+                      <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); run(supabase.from("organization_holidays").insert(newHol), "holidays"); setNewHol({ day: "", name: "" }); }}>
+                        <Input type="date" required value={newHol.day} onChange={(e) => setNewHol({ ...newHol, day: e.target.value })} className="w-40" />
+                        <Input required placeholder="Názov" value={newHol.name} onChange={(e) => setNewHol({ ...newHol, name: e.target.value })} />
+                        <Button type="submit">Pridať</Button>
+                      </form>
+                      <ul className="max-h-64 space-y-1 overflow-y-auto text-sm">
+                        {(holidays.data ?? []).map((h) => (
+                          <li key={h.day} className="flex justify-between border-b border-border pb-1">
+                            <span><span className="num">{new Date(h.day).toLocaleDateString("sk-SK")}</span> {h.name}</span>
+                            <Button variant="link" className="text-xs text-destructive" onClick={() => run(supabase.from("organization_holidays").delete().eq("day", h.day), "holidays")}>odstrániť</Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  </div>
                 </div>
 
                 <IdleTimeoutSetting />

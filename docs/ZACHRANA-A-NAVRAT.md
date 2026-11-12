@@ -46,6 +46,8 @@ Spustenie v Lovable chate: „Spusti migráciu zo súboru docs/migracie/0006_spa
 
 Skript [`migracie/0007_spat_zachranny.sql`](migracie/0007_spat_zachranny.sql) zruší funkcie `set_organization_test`, `test_organization_summary`, `purge_organization` a `delete_test_organization`, vráti pôvodnú funkciu `guard_last_admin` a zmaže stĺpec `organizations.is_test`. Údaje organizácií sa nemenia. **Už zrušené testovacie organizácie sa týmto neobnovia**, vráti ich len záloha ([`ZALOHA-DATABAZY.md`](ZALOHA-DATABAZY.md)).
 Kód od PR s touto migráciou volá funkcie len z obrazovky Správa → Testovacia organizácia a stĺpec `is_test` číta nepovinne, preto sa po skripte ostatné obrazovky nezmenia. Spustenie: SQL editor v Lovable Cloud, alebo v chate *„Spusti migráciu zo súboru docs/migracie/0007_spat_zachranny.sql presne tak, ako je, nič nemeň.“*
+
+Skript [`migracie/0018_spat_zachranny.sql`](migracie/0018_spat_zachranny.sql) vráti funkciu `purge_organization` do znenia z migrácie 0007 (záznam o zrušení organizácie s účtom správcu v `actor`). Nič iné nemení, záznamy v audite ostávajú. Skript je opakovateľný.
 **Overené:** na lokálnom PostgreSQL 16 (spustený dvakrát, po ňom platí pôvodná ochrana posledného správcu). **Neoverené:** beh na ostrej databáze Lovable Cloud.
 
 ### Migrácia 0016 späť

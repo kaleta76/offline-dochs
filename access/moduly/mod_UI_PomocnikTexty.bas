@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_PomocnikTexty"
-'@Verzia 1.3.2
+'@Verzia 1.3.3
 Option Compare Database
 Option Explicit
 
@@ -304,6 +304,8 @@ Private Sub SeedExport()
     Riadok "KROK", "Exportovať konfiguráciu", "Tlačidlo EXPORTOVAŤ KONFIGURÁCIU A TESTOVACIE DÁTA vytvorí dochs_config.json (pravidlá, fondy, číselníky) a dochs_test_sample.json (surové razenia a očakávané výsledky na overenie logiky)."
     Riadok "MOZNOST", "Konfigurácia pre terminál", "Tlačidlo Vytvoriť verziu konfigurácie prerušení pre terminál vytvorí JSON bez osobných údajov. Terminál ho použije s rovnakými kódmi, aké má tento systém."
     Riadok "MOZNOST", "Prijaté pípnutia", "Tlačidlo Spracovať prijaté pípnutia z terminálu prevedie záznamy z fronty TerminalInbox do dochádzky. Potom ich skontrolujte a prepočítajte (karty 3 až 6)."
+    Riadok "MOZNOST", "Klient na razenie v Accesse", "Zamestnanci razia z Accessu na svojom počítači; každé razenie je malý súbor v zdieľanom priečinku prijem. Tlačidlo Klient na razenie v Accesse: nastaviť priečinok vytvorí podpriečinky a zapíše konfiguráciu tlačidiel (rovnaké ako v termináli). Práva na priečinky nastaví správca siete (zamestnanci v prijem len vytvárajú súbory)."
+    Riadok "MOZNOST", "Prijať razenia z klientov", "Tlačidlo Prijať razenia z klientov skontroluje súbory (tvar, účet zamestnanca, vlastníka súboru, čas) a prevedie ich na razenia rovnako ako pri termináli. Najprv ho spustite nanečisto. Razenia dnešného dňa čakajú na ďalší deň. Neoverené razenia sa počítajú, ale skontrolujte ich v reporte pred uzávierkou mesiaca."
     Riadok "POZOR", "Komunikácia s terminálom", "Priama komunikácia s terminálom zatiaľ nie je zapnutá. Pripravený je prenos súborom a front TerminalInbox. Karty 1 až 6 fungujú aj bez terminálu."
     Riadok "DALEJ", "Čo potom", "Po spracovaní pípnutí sa vráťte ku karte 3 Kontrola a automatické opravy."
 End Sub

@@ -97,7 +97,7 @@ CI na GitHube (`.github/workflows/ci.yml`) spúšťa po každom PR a pushi do `m
 | [`docs/ZACHRANA-A-NAVRAT.md`](docs/ZACHRANA-A-NAVRAT.md) | návrat k bezpečnému stavu: kód, databáza, záchranné skripty k migráciám 0006, 0007 a 0016 |
 | [`docs/ZALOHA-DATABAZY.md`](docs/ZALOHA-DATABAZY.md) | záloha a návrat databázy v Lovable Cloud: Export, overenie súboru, snapshot pred zásahom, výpis aktuálneho stavu |
 | [`docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md`](docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md) | označenie a zrušenie testovacej organizácie správcom, ručné zrušenie |
-| [`docs/PRENOS-ORGANIZACIE.md`](docs/PRENOS-ORGANIZACIE.md) | prenos celej organizácie na iný server: export po stránkach, zámok razení, kód potvrdenia, zrušenie pôvodnej organizácie (databázová časť, migrácia 0016) |
+| [`docs/PRENOS-ORGANIZACIE.md`](docs/PRENOS-ORGANIZACIE.md) | prenos celej organizácie na iný server: export po stránkach, zámok razení, kód potvrdenia, zrušenie pôvodnej organizácie (migrácia 0016), import tlačidlom na cieľovom serveri (migrácia 0017) |
 | [`access/README.md`](access/README.md), [`access/CHANGELOG.md`](access/CHANGELOG.md) | inštalácia a zmeny dochádzkového systému v Accesse |
 | [`roadmap.md`](roadmap.md) | hotové a otvorené úlohy |
 

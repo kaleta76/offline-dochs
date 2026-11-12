@@ -2,13 +2,13 @@
 
 Správca môže celú svoju organizáciu (účty s hashmi PIN a hesiel, osobné čísla, zariadenia, razenia s hash reťazou, opravy, uzávierky, nastavenia, konfigurácia z Accessu, audit) vyexportovať do súboru a na inom serveri ju znova vytvoriť. Identifikátory zostávajú, preto zostáva rovnaký aj **kód organizácie** a zamestnanci sa prihlásia rovnakými údajmi ako predtým.
 
-> **Stav:** hotový je **export**: databázová časť (migrácia [`0016`](migracie/0016_prenos_organizacie_export.sql)) aj obrazovka v skrytej karte Servis (karta *Prenos organizácie na iný server*, šifrovanie súboru heslom v prehliadači, kontrola súboru, okno na zrušenie po potvrdení kódom). **Ešte nie je:** import priamo v aplikácii na cieľovom serveri (zatiaľ sa súbor naimportuje operátorským postupom, pozri nižšie), upozornenie „organizácia sa presťahovala“ na starom serveri a Docker/GitHub nasadenie nového servera.
+> **Stav:** hotový je **export** (migrácia [`0016`](migracie/0016_prenos_organizacie_export.sql), karta *Prenos organizácie na iný server*) aj **import tlačidlom** na cieľovom serveri (migrácia [`0017`](migracie/0017_prenos_organizacie_import.sql), karta *Import organizácie z iného servera*). Obe karty sú v skrytej karte Servis. **Ešte nie je:** upozornenie „organizácia sa presťahovala“ na starom serveri a Docker/GitHub nasadenie nového servera.
 
 ## Ako má celý prenos prebiehať
 
 1. Na **cieľovom serveri** sa správca zaregistruje a vytvorí organizáciu (pripraví sa tým prihlasovanie a prázdna databáza).
 2. Na **pôvodnom serveri** v skrytej karte Servis spustí *Prenos na iný server*, zvolí, či sa majú zamknúť razenia, a zadá heslo súboru. Aplikácia stránkovaním vyžiada údaje (`org_export_begin`, `org_export_page`), v prehliadači ich zašifruje heslom a stiahne súbor. Heslo sa na server neposiela. Potom prenos uzavrie (`org_export_finish`): organizácia sa označí ako **testovacia** a správca sa presmeruje do okna zrušenia.
-3. Na **cieľovom serveri** sa súbor nahrá, dešifruje, skúšobne naimportuje, importuje a overí. Cieľ vypíše **kód potvrdenia prenosu** (`XXXX-XXXX`).
+3. Na **cieľovom serveri** správca tej čerstvej prázdnej organizácie v karte Servis (`?servis=1`) otvorí *Import organizácie z iného servera*, vyberie súbor a zadá heslo. Prehliadač súbor dešifruje a po častiach nahrá, databáza ho skontroluje. Po potvrdení v dialógu (súhlas a opísanie názvu prázdnej organizácie) databáza prázdnu organizáciu aj s účtom správcu **nahradí** organizáciou zo súboru, overí ju a vypíše **kód potvrdenia prenosu** (`XXXX-XXXX`). Správca sa odhlási a prihlási účtom z prenesenej organizácie; kód potom vidí v tej istej karte znova.
 4. Na **pôvodnom serveri** správca zadá kód a názov organizácie (`org_transfer_confirm_and_delete`). Organizácia sa zruší až vtedy. Bez správneho kódu sa zrušiť nedá.
 
 Terminály sa na nový server neprepnú samy a zariadenia sa musia na novom serveri schváliť znova, pozri nižšie „Čo sa stane s terminálmi“.
@@ -52,7 +52,38 @@ Karta je v skrytej časti Servis (`serviceVisibility`), oprávnenia vynucuje dat
 - **Riadky sa do súboru vkladajú ako text, presne ako ich vrátila databáza.** Kontrolné súčty sa počítajú z textu `to_jsonb(riadok)`, v ktorom je napr. `7.50` alebo vnorené `1.0`. Ak by ich prehliadač prečítal cez `JSON.parse` a zapísal cez `JSON.stringify`, stali by sa `7.5` a `1`, súčet na cieľovom serveri by sa nezhodoval a import by sa odmietol (overené: import takto prepísaného súboru skončí chybou *obsah riadkov sa líši od súboru*). Preto `org_export_page` vracia `rows` ako reťazec a `exportOrganization` (`src/lib/org-transfer.ts`) ho do súboru vloží bez spracovania. Pri úprave exportu to treba zachovať.
 - Súbor je potrebné pred importom dešifrovať. Na to slúži [`tools/prenos-desifruj.mjs`](../tools/prenos-desifruj.mjs) (Node.js 18 a novší, bez závislostí; formát číta nezávisle od aplikácie cez `node:crypto`): `node tools/prenos-desifruj.mjs prenos-XXXX-….dochs-enc [vystup.json] [--prepisat]`. Heslo sa pýta bez zobrazenia (v skriptoch ho možno dať do premennej `PRENOS_HESLO`, nie do príkazového riadka). Nástroj zapisuje do dočasného súboru a premenuje ho až po overení všetkých blokov, takže pri zlom hesle či poškodení nezostane polovičný výstup a existujúci súbor sa nestratí; bez `--prepisat` existujúci výstup neprepíše. Výstup (JSON formátu 2) obsahuje hashe hesiel a osobné čísla, preto sa po importe maže. Importuje ho balík 0015 (`prenos_import.cmd`).
 
+## Import tlačidlom (migrácia 0017)
+
+Kto a kam: importovať smie len **správca organizácie, v ktorej je jediným účtom** a ktorá nemá razenia, opravy, žiadosti, uzávierky, plán ani konfiguráciu z Accessu a nemá rozpracovaný vlastný export. Pôvodnú organizáciu nahradiť nejde. Organizácia s údajmi sa nikdy neprepíše; ak organizácia zo súboru (alebo jej účty, razenia, kód) na serveri už je, import sa odmietne.
+
+| Funkcia (volá prihlásený správca) | Čo robí |
+|---|---|
+| `org_import_status()` | či je organizácia spôsobilá (s dôvodmi), rozpracovaný import, kód potvrdenia posledného importu tejto organizácie |
+| `org_import_begin(hlavička)` | skontroluje hlavičku súboru voči serveru (formát 2, tabuľky, stĺpce) a založí import; predchádzajúci rozpracovaný import zahodí |
+| `org_import_chunk(import, tabuľka, poradie, riadky)` | uloží časť riadkov do odkladacej tabuľky `org_transfer.import_rows`; tá istá časť sa dá poslať znova |
+| `org_import_check(import)` | skontroluje celý súbor a cieľ; nič v aplikácii nemení |
+| `org_import_commit(import, názov)` | v jednej transakcii zmaže prázdnu organizáciu, vloží organizáciu zo súboru, overí ju a vráti kód potvrdenia; pri akejkoľvek chybe sa nezmení nič |
+| `org_import_cancel()` | zahodí rozpracovaný import |
+
+**Súboru sa neverí** (mohol ho vyrobiť alebo upraviť ktokoľvek, kto pozná formát). Databáza preto pri kontrole a zápise vynucuje:
+
+- každý riadok patrí organizácii zo súboru a každý odkaz (účet, nadriadený, zariadenie, razenie, žiadosť) vedie na riadok z toho istého súboru. Zoznam odkazov je v `org_transfer.import_refs()`; **nový stĺpec typu uuid alebo s cudzím kľúčom, ktorý v zozname chýba, import zastaví**, kým sa nedoplní;
+- prihlasovacie účty sa nevkladajú tak, ako sú v súbore: `role` a `aud` sú vždy `authenticated` (rola účtu ide do prístupového tokenu, `service_role` by obišla všetky pravidlá), žiadny super admin, SSO ani telefón, tokeny na obnovu sa nulujú, `instance_id` je tunajšie, v `app_metadata` sú povolené len kľúče z `org_transfer.import_app_meta_keys()`, identity len typu e-mail;
+- identifikátory zo súboru nesmú na cieli existovať; čísla razení sa zachovajú, len ak sa s ničím nezrazia a nie sú neprimerane vysoké, inak sa prečíslujú v rovnakom poradí (hash reťaz ostáva platná);
+- po vložení sa overia počty a odtlačky každej tabuľky, hash reťaz a poradie razení (rovnako ako pri operátorskom importe) a to, že žiadny účet nemá inú rolu než `authenticated`;
+- názvy tabuliek a stĺpcov v príkazoch sú len z `org_transfer.spec()` a z katalógu databázy; funkcie sú `SECURITY DEFINER` s pevným `search_path`, bez práv pre `anon`; veľkosť častí aj celého importu je obmedzená (`org_transfer.import_limits()`: 1,5 milióna riadkov).
+
+Súbor je dôveryhodný len pre vlastné údaje organizácie: kto smie na serveri založiť organizáciu, vie do nej cez import vložiť, čo chce (aj účty), ale nič mimo nej.
+
+Počas zápisu sú na pár sekúnd vypnuté spúšťače aplikácie, preto ostatné organizácie v tej chvíli so zápisom čakajú (terminál razenie nezahodí, skúsi znova). Zvyšky auditu po skoršom zrušení tej istej organizácie na cieli sa od účtov odpoja (`actor = NULL`, pôvodný účet v `details.actor_pred_importom`), takže opakovaný import po zmazaní prejde.
+
+V prehliadači (`src/lib/org-transfer-import.ts`) sa dešifrovaný súbor **nečíta cez `JSON.parse`**: krája sa podľa zátvoriek a riadky idú na server ako pôvodný text (inak by `7.50` zmenilo zápis a overenie odtlačkov by import vrátilo). Časti majú najviac 1000 riadkov a 1 MB; pri zlyhaní spojenia sa časť pošle znova, zápis sa neopakuje nikdy. Ak sa spojenie preruší počas zápisu, výsledok nie je istý: po obnovení stránky to ukáže prihlásenie (starý účet už neexistuje = import prebehol).
+
+Operátorský postup (dešifrovanie nástrojom a súkromný balík 0015 cez `psql`) ostáva ako záloha pre organizácie nad limit a pre servery bez migrácie 0017.
+
 ## Overenie
+
+- Import (0017): skúšobný Postgres, 28 kontrol okruhu export → import → kód odomkne zrušenie na zdroji, **55 útokov so 174 kontrolami** (účet s rolou `service_role`, super admin, cudzie `organization_id`, `user_id`, `manager_id`, zariadenie a razenie cudzej organizácie, kolízie id, e-mailov a kódu, nepovolený kľúč v `app_metadata`, poškodený tvar; obeť je po všetkých nedotknutá), 57 kontrol oprávnení a spôsobilosti (zamestnanec, anon, organizácia s údajmi, cudzí import, opakovaný import po zmazaní), 100 000 razení (kontrola 0,9 s, zápis 4,7 s, pod limitom 8 s), inštalácia a návrat, 6 zámerných pokazení migrácie (všetky odhalené) a integračný test so **skutočnou knižnicou** exportu aj importu cez šifrovaný súbor (čísla `8.00`, `1.0`, `0.10` a zátvorky v texte sa preniesli nezmenené). Jednotkové testy knižnice a karty (30).
 
 - Databáza: skúšobný Postgres s dvoma databázami, 91 kontrol exportu (oprávnenia, izolácia organizácií, zámok, zmeny od exportu, kód potvrdenia, návrat), test s 100 000 razeniami (časy pod limitom 8 s), súbežnosť (razenie počas začiatku exportu), návrat migrácie a 24 zámerných pokazení (mutácií), ktoré testy musia zachytiť.
 - Knižnica a karta: jednotkové testy (šifrovanie vrátane útokov na súbor, stránkovanie, opakovanie čítania, prerušenie, kontrola súboru, stavy karty a dialóg zrušenia) a **integračný test**: skutočná knižnica exportuje z PostgreSQL pod rolou `authenticated` (každé volanie osobitná transakcia s limitom 8 s), súbor sa dešifruje, naimportuje do druhej databázy balíkom 0015 a výpis organizácie sa zhoduje so zdrojom.
@@ -94,6 +125,9 @@ Ak `uncovered_tables()` vráti nejakú tabuľku, niektorá novšia migrácia pri
 
 1. Záloha podľa [`ZALOHA-DATABAZY.md`](ZALOHA-DATABAZY.md).
 2. Spustiť `docs/migracie/0016_prenos_organizacie_export.sql` (opakovateľné). Predpoklad: migrácie 0001 až 0008.
-3. Návrat: [`migracie/0016_spat_zachranny.sql`](migracie/0016_spat_zachranny.sql), pozri [`ZACHRANA-A-NAVRAT.md`](ZACHRANA-A-NAVRAT.md).
+3. Na serveri, ktorý má organizácie **prijímať**, spustiť aj `docs/migracie/0017_prenos_organizacie_import.sql` (opakovateľné, predpoklad 0016). Kontrola: `SELECT org_transfer.import_version(), org_transfer.import_unclassified();` vráti verziu a `{}`.
+4. Návrat: [`migracie/0017_spat_zachranny.sql`](migracie/0017_spat_zachranny.sql) a až potom [`migracie/0016_spat_zachranny.sql`](migracie/0016_spat_zachranny.sql), pozri [`ZACHRANA-A-NAVRAT.md`](ZACHRANA-A-NAVRAT.md).
+
+**Import (0017) nie je overený na ostrej databáze Lovable Cloud ani na lokálnom Supabase so skutočným prihlasovacím serverom:** práva vlastníka migrácie na vypnutie spúšťačov a na `auth.users` z funkcie volanej prihláseným správcom, prihlásenie preneseným účtom po importe tlačidlom a to, či server rešpektuje dlhší časový limit funkcie (bez neho platí 8 s, čo stačí približne do 100 000 razení).
 
 **Overené** na dočasných databázach PostgreSQL 16 s kópiou schémy aplikácie a napodobeninou Supabase: oprávnenia (správca, zamestnanec, cudzia organizácia, anon), stránkovanie a zhoda odtlačkov, zámok razení vrátane súbehu, zmeny od exportu, kód potvrdenia na oboch stranách, zrušenie, import súboru a zhoda údajov, veľká organizácia (100 000 razení), návrat a zámerné pokazenia migrácie. **Neoverené:** beh na ostrej databáze Lovable Cloud (práva vlastníka migrácie na `LOCK TABLE`, vytvorenie schémy `org_transfer`), časové limity na jej hardvéri.

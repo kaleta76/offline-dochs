@@ -51,6 +51,8 @@ Kód od PR s touto migráciou volá funkcie len z obrazovky Správa → Testovac
 ### Migrácia 0016 späť
 
 Skript [`migracie/0016_spat_zachranny.sql`](migracie/0016_spat_zachranny.sql) zruší spúšťače `a_punches_transfer_lock` (zámok razení pri prenose) a `a_organizations_transfer_guard` (ochrana pred predčasným zrušením), funkcie `org_export_begin`, `org_export_page`, `org_export_finish`, `org_transfer_status`, `org_transfer_cancel`, `org_transfer_confirm_and_delete` a schému `org_transfer` s históriou prenosov (ak v nej nie je súkromný balík 0015, vtedy schéma ostane). Údaje organizácií ani razenia sa nemenia. Skript **nevracia** označenie „testovacia organizácia“, ktoré nastavil prenos (vráťte ho tlačidlom v karte Servis alebo `set_organization_test(false)`). Aplikácia na týchto funkciách zatiaľ nezávisí. Spustenie: SQL editor v Lovable Cloud. Skript je opakovateľný. Popis prenosu: [`PRENOS-ORGANIZACIE.md`](PRENOS-ORGANIZACIE.md).
+
+Skript [`migracie/0017_spat_zachranny.sql`](migracie/0017_spat_zachranny.sql) zruší import organizácie tlačidlom: funkcie `org_import_status`, `org_import_begin`, `org_import_chunk`, `org_import_check`, `org_import_commit`, `org_import_cancel`, odkladacie tabuľky `org_transfer.import_rows` a `org_transfer.imports` (rozpracované importy a história) a pomocné funkcie importu. Už importované organizácie ani audit nemaže; export (0016) ostáva. Ak vraciate aj 0016, spustite najprv tento skript. Karta importu potom len oznámi, že funkcia v databáze chýba. Skript je opakovateľný.
 **Overené:** na lokálnom PostgreSQL 16 (stav funkcií, spúšťačov a počtov riadkov je po skripte rovnaký ako pred migráciou, aj opakovane a s nainštalovaným balíkom 0015). **Neoverené:** beh na ostrej databáze Lovable Cloud.
 
 ### Zálohy databázy

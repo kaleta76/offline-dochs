@@ -57,10 +57,12 @@ export const DEFAULT_PAGE_SIZE = 2000;
 export const MAX_PAGE_SIZE = 5000;
 const PAGE_RETRIES = 3;
 
-interface CallOptions {
+export interface CallOptions {
   retries?: number | undefined;
   signal?: AbortSignal | undefined;
   sleep?: ((ms: number) => Promise<void>) | undefined;
+  /** Text chyby, keď funkcia v databáze chýba (iná migrácia než 0016). */
+  missingMessage?: string | undefined;
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -69,8 +71,8 @@ function abortError() {
   return new TransferError("aborted", "Prenos bol prerušený.");
 }
 
-/** Jedno volanie databázovej funkcie. Len čítania sa opakujú (pri zlyhaní spojenia); zápisy sa neopakujú nikdy. */
-async function call(
+/** Jedno volanie databázovej funkcie. Opakujú sa (pri zlyhaní spojenia) len volania, ktoré o to požiadajú cez `retries`. */
+export async function call(
   client: TransferClient,
   fn: string,
   args: Record<string, unknown>,
@@ -87,7 +89,8 @@ async function call(
       res = { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
     }
     if (!res.error) return res.data;
-    if (isMissingFunction(res.error)) throw new TransferError("missing", MISSING_MESSAGE);
+    if (isMissingFunction(res.error))
+      throw new TransferError("missing", options.missingMessage ?? MISSING_MESSAGE);
     const kind = classifySyncError(res.error, res.status ?? res.error.status);
     if (kind === "transport" || kind === "certificate") {
       if (kind === "transport" && attempt < retries) {

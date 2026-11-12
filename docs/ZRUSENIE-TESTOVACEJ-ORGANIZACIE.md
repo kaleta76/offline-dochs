@@ -54,6 +54,8 @@ SELECT public.purge_organization('00000000-0000-0000-0000-000000000000');
 
 Funkcia `purge_organization` nekontroluje oprávnenia a spustiť ju môže len správca databázy (nie používateľ aplikácie). Odmietne neoznačenú a „Pôvodnú organizáciu“. Pri ručnom spustení nie je prihlásený používateľ, preto v audite ostanú aj záznamy bez autora (úpravy rolí a profilov z tohto mazania).
 
+Záznam o zrušení (`organization.deleted`) má od migrácie [`0018`](migracie/0018_audit_zrusenia_organizacie.sql) `actor = NULL`, ak organizáciu zrušil jej vlastný správca (jeho účet zrušením zanikol); jeho id je v `details.by`. Predtým ostával v audite záznam s id neexistujúceho účtu, ktorý po opätovnom importe tej istej organizácie pokazil počet riadkov auditu pri overení prenosu. Staré záznamy sa nemenia (import ich odpojí sám). Návrat: [`migracie/0018_spat_zachranny.sql`](migracie/0018_spat_zachranny.sql).
+
 ## Čo je overené a čo nie
 
 Overené na lokálnom PostgreSQL 16 s napodobeninou Supabase (`tools/sql_test/run.sh` s `0007_priprava.sql`, `0007_testy.sql`, záchranným skriptom dvakrát a `0007_po_navrate.sql`; 67 kontrol): práva funkcií (anon nič, používateľ nevolá pracovnú funkciu), zamestnanec nič nezmení, neoznačená a pôvodná organizácia sa nedajú zrušiť, zlý názov sa odmietne, po zrušení nezostanú siroty (účty, identity, relácie, role, razenia, zariadenia, žiadosti), cudzie organizácie sa nezmenia, ochrana posledného správcu platí ďalej, ručné zrušenie, návrat a jeho opakovanie. Logika potvrdenia v prehliadači má jednotkové testy (`src/lib/organization-delete.test.ts`).

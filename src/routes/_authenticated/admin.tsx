@@ -17,6 +17,7 @@ import { EmployeeAccess } from "@/components/EmployeeAccess";
 import { IdleTimeoutSetting } from "@/components/IdleTimeoutSetting";
 import { TestImport } from "@/components/TestImport";
 import { TestOrganization } from "@/components/TestOrganization";
+import { OrganizationTransfer } from "@/components/OrganizationTransfer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -219,6 +220,7 @@ function Admin() {
               </>
             )}
             {visibility.diagnostics && <ConnectionDiagnostics />}
+            {visibility.tools && <OrganizationTransfer />}
             {visibility.tools && <TestOrganization />}
           </>
         }

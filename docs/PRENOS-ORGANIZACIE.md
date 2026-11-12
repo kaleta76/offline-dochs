@@ -2,7 +2,7 @@
 
 Správca môže celú svoju organizáciu (účty s hashmi PIN a hesiel, osobné čísla, zariadenia, razenia s hash reťazou, opravy, uzávierky, nastavenia, konfigurácia z Accessu, audit) vyexportovať do súboru a na inom serveri ju znova vytvoriť. Identifikátory zostávajú, preto zostáva rovnaký aj **kód organizácie** a zamestnanci sa prihlásia rovnakými údajmi ako predtým.
 
-> **Stav:** hotová je **databázová časť exportu** (migrácia [`0016`](migracie/0016_prenos_organizacie_export.sql)). Obrazovka v skrytej karte Servis, šifrovanie súboru heslom v prehliadači, import na cieľovom serveri a Docker nasadenie ešte nie sú. Bez nich sa funkcie dajú volať len ručne (pozri nižšie).
+> **Stav:** hotový je **export**: databázová časť (migrácia [`0016`](migracie/0016_prenos_organizacie_export.sql)) aj obrazovka v skrytej karte Servis (karta *Prenos organizácie na iný server*, šifrovanie súboru heslom v prehliadači, kontrola súboru, okno na zrušenie po potvrdení kódom). **Ešte nie je:** import priamo v aplikácii na cieľovom serveri (zatiaľ sa súbor naimportuje operátorským postupom, pozri nižšie), upozornenie „organizácia sa presťahovala“ na starom serveri a Docker/GitHub nasadenie nového servera.
 
 ## Ako má celý prenos prebiehať
 
@@ -18,7 +18,7 @@ Terminály sa na nový server neprepnú samy a zariadenia sa musia na novom serv
 | Funkcia | Čo robí |
 |---|---|
 | `org_export_begin(_lock boolean default true)` | Založí prenos, voliteľne zamkne razenia a uloží kontrolné súčty údajov. Vráti id prenosu, hlavičku súboru a zoznam tabuliek s počtami. Nový export nahrádza predchádzajúci neukončený. |
-| `org_export_page(_transfer, _rel, _offset, _limit)` | Jedna stránka tabuľky (najviac 5 000 riadkov, odporúča sa 2 000). Tabuľka musí byť zo zoznamu prenosu. |
+| `org_export_page(_transfer, _rel, _offset, _limit)` | Jedna stránka tabuľky (najviac 5 000 riadkov, odporúča sa 2 000). Tabuľka musí byť zo zoznamu prenosu. Riadky vracia ako **text** (pole `rows` je reťazec s JSON), pozri „Súbor a šifrovanie“. |
 | `org_export_finish(_transfer, _received)` | Overí, že súbor je úplný (`_received` = počty prijatých riadkov) a že sa údaje počas exportu nezmenili; označí organizáciu ako testovaciu. |
 | `org_transfer_status()` | Stav prenosu, či je zámok aktívny, a zmeny od exportu (pre obrazovku). |
 | `org_transfer_cancel()` | Zruší prenos, odomkne razenia, vráti označenie „testovacia“, ak ho nastavil prenos. |
@@ -34,6 +34,29 @@ Všetky volá prihlásený **správca** a pracujú vždy len s jeho organizácio
 - **Zmeny od exportu:** `org_transfer_status` a zrušenie porovnajú dnešný stav s exportom. Samovoľné zmeny (`devices.last_seen_at`, príznak testovacia, audit) sa nepočítajú.
 - **Pôvodná organizácia** (`00000000-0000-4000-8000-000000000001`) sa dá exportovať, ale nedá sa označiť ako testovacia ani zrušiť (platí 0007).
 - Súbor vo formáte 2 nemá súčet celého súboru, obsah overujú odtlačky tabuliek, počty, reťaz hashov a poradie razení pri importe.
+
+## Obrazovka (Správa → Servis a testovanie → Prenos organizácie na iný server)
+
+Karta je v skrytej časti Servis (`serviceVisibility`), oprávnenia vynucuje databáza. Podľa stavu prenosu ukazuje:
+
+- **Bez prenosu:** formulár exportu: voľba *Zamknúť razenia na čas prenosu* (predvolene zapnutá), heslo súboru (aspoň 12 znakov) a jeho zopakovanie. Po spustení ukazuje priebeh (kľúč, začiatok, čítanie *N z M* riadkov, šifrovanie, uzavretie) a tlačidlo *Prerušiť*. Chyba alebo prerušenie prenos na serveri **sám zruší** (odomkne razenia), aby organizácia nezostala zamknutá.
+- **Po exporte:** súbor `prenos-<kód organizácie>-<dátum a čas>.dochs-enc` sa stiahne a hneď sa skontroluje (dešifruje sa a overia sa počty riadkov všetkých tabuliek). Organizácia je označená ako testovacia. Karta ukáže okno na zrušenie: pole *Kód potvrdenia z cieľového servera* a presný názov organizácie. Tlačidlo *Zrušiť pôvodnú organizáciu…* sa odomkne až po správnom kóde a názve; ak sa údaje od exportu zmenili, treba výslovne odsúhlasiť, že sa stratia. Potom sa otvorí dialóg, ktorý vyžaduje potvrdenie, že na každom termináli je „čaká na odoslanie: 0“ (razenia vo fronte by sa zrušením stratili). Po zrušení sa správca odhlási a presmeruje na prihlásenie.
+- **Skontrolovať uložený súbor:** rozbaľovacia časť, v ktorej správca vyberie súbor, ktorý má uložený, a zadá heslo; karta overí, že sa dá otvoriť a je úplný, a upozorní, ak je súbor z inej organizácie. Súbor sa nikam neodosiela.
+- **Po opätovnom načítaní stránky** šifrovaný súbor v prehliadači už nie je (drží sa len v pamäti). Karta to povie: ak ho správca nemá uložený, prenos zruší (*Zrušiť prenos*) a export zopakuje.
+- **Rozpracovaný prenos** (napr. po zatvorení karty počas exportu): ponúkne sa *Zrušiť rozpracovaný prenos*.
+- **Pôvodná organizácia** sa dá exportovať ako kópia, ale nedá sa zrušiť: karta ponúkne len *Ukončiť prenos* (odomkne razenia).
+
+## Súbor a šifrovanie
+
+- Obsah je JSON `{"meta": …, "tables": {"<schéma.tabuľka>": [riadky…], …}}` (formát 2). Šifruje sa **v prehliadači** (WebCrypto): kľúč z hesla cez PBKDF2-HMAC-SHA256 (600 000 iterácií, náhodná soľ), obsah AES-256-GCM po blokoch po 1 MiB. Hlavička (`DOCHSENC`, verzia, parametre) je overovaná; poradie, odstránenie či zámena blokov sa pri dešifrovaní odhalí. Heslo sa nikam neposiela a nedá sa obnoviť. Implementácia: `src/lib/org-transfer-crypto.ts`.
+- **Riadky sa do súboru vkladajú ako text, presne ako ich vrátila databáza.** Kontrolné súčty sa počítajú z textu `to_jsonb(riadok)`, v ktorom je napr. `7.50` alebo vnorené `1.0`. Ak by ich prehliadač prečítal cez `JSON.parse` a zapísal cez `JSON.stringify`, stali by sa `7.5` a `1`, súčet na cieľovom serveri by sa nezhodoval a import by sa odmietol (overené: import takto prepísaného súboru skončí chybou *obsah riadkov sa líši od súboru*). Preto `org_export_page` vracia `rows` ako reťazec a `exportOrganization` (`src/lib/org-transfer.ts`) ho do súboru vloží bez spracovania. Pri úprave exportu to treba zachovať.
+- Súbor je potrebné pred importom dešifrovať. Nástroj pre operátora (dešifrovanie na čistý JSON, prípadne rovno import cez psql) zatiaľ nie je; funkcia `decryptToText` z `org-transfer-crypto.ts` to vie.
+
+## Overenie
+
+- Databáza: skúšobný Postgres s dvoma databázami, 91 kontrol exportu (oprávnenia, izolácia organizácií, zámok, zmeny od exportu, kód potvrdenia, návrat), test s 100 000 razeniami (časy pod limitom 8 s), súbežnosť (razenie počas začiatku exportu), návrat migrácie a 24 zámerných pokazení (mutácií), ktoré testy musia zachytiť.
+- Knižnica a karta: jednotkové testy (šifrovanie vrátane útokov na súbor, stránkovanie, opakovanie čítania, prerušenie, kontrola súboru, stavy karty a dialóg zrušenia) a **integračný test**: skutočná knižnica exportuje z PostgreSQL pod rolou `authenticated` (každé volanie osobitná transakcia s limitom 8 s), súbor sa dešifruje, naimportuje do druhej databázy balíkom 0015 a výpis organizácie sa zhoduje so zdrojom.
+- Neoverené na ostrej databáze (Lovable/Supabase): správanie proxy pri dlhom exporte, skutočné časy a limity. Pozri „Obmedzenia“.
 
 ## Obmedzenia
 

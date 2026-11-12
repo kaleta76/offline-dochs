@@ -133,6 +133,7 @@ function FileCheck({ status }: { status: TransferStatus }) {
       <input
         id="transfer-check-file"
         type="file"
+        className="block w-full cursor-pointer text-sm file:mr-3 file:cursor-pointer file:rounded-sm file:border-2 file:border-foreground file:bg-background file:px-3 file:py-2 file:font-semibold"
         accept=".dochs-enc"
         onChange={(e) => {
           setFile(e.target.files?.[0] ?? null);

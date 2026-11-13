@@ -129,8 +129,12 @@ describe("fronta a prenos organizácie na iný server", () => {
     // enqueue samo spustí odoslanie na pozadí (už so spojením): stačí počkať na jeho udalosť
     await enqueue({ user_id: "user-b", code: "WORK", direction: "IN" });
     await enqueue({ user_id: "user-c", code: "WORK", direction: "IN" });
+    // poradie účtov v udalosti určuje poradie riadkov v IndexedDB (kľúč je náhodné client_uuid), preto sa porovnáva zoradené
     await vi.waitFor(() =>
-      expect(events).toContainEqual({ type: "unsent", userIds: ["user-b", "user-c"] }),
+      expect(events.map((e) => (e.type === "unsent" ? [...e.userIds].sort() : []))).toContainEqual([
+        "user-b",
+        "user-c",
+      ]),
     );
     expect(events.every((e) => e.type === "unsent")).toBe(true);
     expect(mocks.insert).not.toHaveBeenCalled();

@@ -861,7 +861,7 @@ export type Database = {
         Returns: undefined
       }
       delete_test_organization: {
-        Args: { _confirm_name: string }
+        Args: { _confirm_name: string; _message?: string }
         Returns: Json
       }
       device_manager_ok: { Args: { _user: string }; Returns: boolean }
@@ -925,6 +925,10 @@ export type Database = {
       }
       org_transfer_get_destination: { Args: never; Returns: Json }
       org_transfer_set_destination: { Args: { _url: string }; Returns: Json }
+      org_transfer_set_notice: {
+        Args: { _message: string; _url: string }
+        Returns: Json
+      }
       org_transfer_status: { Args: never; Returns: Json }
       punch_move_notice: { Args: { _users: string[] }; Returns: Json }
       purge_organization: { Args: { _org: string }; Returns: Json }

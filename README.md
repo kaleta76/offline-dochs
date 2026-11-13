@@ -94,6 +94,7 @@ CI na GitHube (`.github/workflows/ci.yml`) spúšťa po každom PR a pushi do `m
 | [`docs/REGISTRACIA.md`](docs/REGISTRACIA.md) | registrácia firiem a zamestnancov bez e-mailu |
 | [`docs/OVERENIE-ZARIADENI.md`](docs/OVERENIE-ZARIADENI.md) | čo overenie zariadenia zaručuje a čo nie, neoverené razenia, záchranný kód, zmeny zariadení |
 | [`docs/LOVABLE-KREDITY.md`](docs/LOVABLE-KREDITY.md) | čo míňa kredity, synchronizácia s GitHubom |
+| [`docs/LOVABLE-VETVY.md`](docs/LOVABLE-VETVY.md) | vetvy `main` a `lovable`, tok zmien medzi nimi, pravidlá |
 | [`docs/ZACHRANA-A-NAVRAT.md`](docs/ZACHRANA-A-NAVRAT.md) | návrat k bezpečnému stavu: kód, databáza, záchranné skripty k migráciám 0006, 0007, 0016, 0020 a 0021 |
 | [`docs/ZALOHA-DATABAZY.md`](docs/ZALOHA-DATABAZY.md) | záloha a návrat databázy v Lovable Cloud: Export, overenie súboru, snapshot pred zásahom, výpis aktuálneho stavu |
 | [`docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md`](docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md) | označenie a zrušenie testovacej organizácie správcom, ručné zrušenie |

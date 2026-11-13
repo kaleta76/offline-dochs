@@ -98,42 +98,49 @@ Terminál má **dva nezávislé zdroje** nastavení výpočtu:
 
 Výpočet (`engine.ts`) číta len prvý zdroj. Keby sa teraz písal „výpočet podľa plánu z Accessu“ popri ňom, mal by dve cesty a pre každú organizáciu by záviselo, ktorá platí.
 
-### 5.2 Princíp: jeden model, dve sady, jeden vlastník
+### 5.2 Princíp: jeden model, verzie s platnosťou od mesiaca
 
 1. **Jeden model nastavení výpočtu** v termináli, rovnaký tvar ako kontrakt 1.5.0: pravidlá (`rules`), prerušenia s vlastnosťami (`calc`, hranica celého dňa, príznaky, tlačidlá), režimy, fondy so šablónami a kalendárom, sviatky a plán zamestnanca po mesiacoch (typ dňa, denný fond, okno práce, režim). Model je od začiatku **úplný**, nie jeho jednoduchá podmnožina.
-2. **Každá organizácia má dve sady nastavení v tomto modeli:**
-   - **vlastná sada (terminál)**: vznikne pri registrácii z predvolených hodnôt, ktoré správca upraví;
-   - **sada z Accessu**: posledný prijatý import, len na čítanie.
-3. **Vlastník** (`terminal` alebo `access`) určuje, ktorá sada platí. Nová organizácia je `terminal`.
-4. **Výpočet číta len „platné nastavenia“**, jednu funkciu, ktorá podľa vlastníka vyberie sadu. Nemá „režim Access“ a „režim terminál“.
+2. **Nastavenia sú verzie, každá s „platí od mesiaca“** (tak ako v Accesse platia fondy a pravidlá od mesiaca). Verzia je buď **terminálová** (pri registrácii vznikne z predvolených hodnôt, správca ju upravuje), alebo **z Accessu** (každý import je nová verzia, len na čítanie). Staré verzie sa nemažú, tvoria históriu.
+3. **Vlastník je daný časovou osou.** Pre každý mesiac platí práve jedna verzia: tá s najneskorším „platí od“, ktoré nie je neskoršie než daný mesiac. Ak je to verzia z Accessu, mesiac **patrí Accessu**, inak terminálu. Nová organizácia má terminálovú verziu od mesiaca registrácie.
+4. **Výpočet číta len „platné nastavenia pre mesiac“**, jednu funkciu, ktorá podľa mesiaca vyberie verziu. Nemá „režim Access“ a „režim terminál“.
+5. **Uzavretý mesiac sa nikdy neprepočíta.** Uzavretý mesiac zamestnanca drží uložený výsledok a snímku nastavení, podľa ktorých sa počítal (tak ako Access ukladá snímku parametrov pri uzavretí). Pri mesiaci, ktorý patrí terminálu, ju ukladá uzávierka v termináli; pri mesiaci, ktorý patrí Accessu, správa o uzávierke (kapitola 5.7).
 
-| Vlastník   | Platí                            | Správa (nastavenia výpočtu)                                                                               |
-| ---------- | -------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `terminal` | vlastná sada                     | upraviteľná v editoroch; Access sa nepoužíva alebo počíta samostatne                                      |
-| `access`   | sada z Accessu (posledný import) | všetko, čo ovplyvňuje výpočet, je len na čítanie; údaj „verzia a dátum importu“; zmena len novým importom |
+| Mesiac patrí | Platí                                | Správa (nastavenia výpočtu)                                                                               |
+| ------------ | ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| terminálu    | terminálová verzia platná pre mesiac | upraviteľná v editoroch; úprava platí od mesiaca, ktorý správca určí (predvolene aktuálny)                |
+| Accessu      | verzia z Accessu platná pre mesiac   | všetko, čo ovplyvňuje výpočet, je len na čítanie; údaj „verzia a dátum importu“; zmena len novým importom |
 
-**Spárovanie vlastnú sadu neprepisuje, len prepne, ktorá platí.** Počas párovania je vlastná sada zamknutá a nemení sa, takže odpárovanie ju vráti presne takú, aká bola. Nič sa nekopíruje a nič sa nestratí.
+**Príklad.** Sep a okt 2026: terminál je sám, platia jeho nastavenia. 13. 11. import z Accessu platný od novembra: september a október ostanú podľa terminálových nastavení, ich výsledky sa nezmenia. Január 2027: nový import platný od januára, december ostane podľa novembrovej verzie. Marec 2027: odpárovanie, od marca platí terminálová verzia (kapitola 5.4).
 
-Bez čiastočných výnimiek: ak by sa pri vlastníkovi `access` dalo zmeniť jedno pravidlo v termináli, terminál a Access by počítali rôzne a saldo by sa nedalo overiť.
+**Spárovanie nič neprepíše, len pridá verziu z Accessu od zvoleného mesiaca.** Terminálové verzie ostávajú uložené, takže sa k nim dá vrátiť.
+
+Bez čiastočných výnimiek: ak by sa pri mesiaci, ktorý patrí Accessu, dalo zmeniť jedno pravidlo v termináli, terminál a Access by počítali rôzne a saldo by sa nedalo overiť.
 
 ### 5.3 Čo zamykanie pokrýva
 
-- **Zamknuté pri `access`**: pravidlá výpočtu, prerušenia a ich vlastnosti, tlačidlá, fondy, šablóny, kalendár, sviatky, režimy, plán zamestnancov.
+- **Zamknuté pre mesiace, ktoré patria Accessu**: pravidlá výpočtu, prerušenia a ich vlastnosti, tlačidlá, fondy, šablóny, kalendár, sviatky, režimy, plán zamestnancov.
 - **Vždy upraviteľné v termináli** (Access to neposiela): politika terminálu (kto schvaľuje, viditeľnosť salda a prítomnosti), zamestnanci, roly, vedúci, PIN-y, zariadenia, odhlásenie pri nečinnosti.
 
 ### 5.4 Spárovanie a odpárovanie
 
-- **Spárovanie** je automatické pri prijatí prvého importu z Accessu. Náhľad pred prijatím **upozorní správcu**, že po prijatí platia nastavenia z Accessu, ich vlastná sada ostane uložená a vráti sa po odpárovaní, a vyžiada výslovné potvrdenie.
-- **Ďalšie importy** prepisujú len sadu z Accessu, nikdy vlastnú.
-- **Odpárovanie** je samostatné tlačidlo len pre správcu, s potvrdením a záznamom do auditu. Platnou sa stane vlastná sada. Sada z Accessu ostane uložená ako história a na porovnanie.
-- **Minulé mesiace**: mesiace, ktoré sa počítali podľa plánu z Accessu, ostávajú s týmto plánom ako história. Nové mesiace počíta terminál podľa vlastnej sady. V organizácii vlastnenej Accessom ukáže deň bez plánu „bez plánu z Accessu, nepotvrdené“, nie tichý odhad.
+- **Spárovanie** je automatické pri prijatí prvého importu z Accessu. Náhľad pred prijatím **upozorní správcu**, že od zvoleného mesiaca platia nastavenia z Accessu, terminálové verzie ostanú uložené a dajú sa k nim vrátiť, a vyžiada výslovné potvrdenie.
+- **Import platí od mesiaca importu** (predvolene). Ak sú predchádzajúce mesiace ešte otvorené, náhľad to ukáže: „Október nie je uzavretý u N zamestnancov, ostane s pôvodnými nastaveniami. Použiť Access aj pre október?“ Odpoveď „áno“ prepočíta len **neuzavreté** mesiace zamestnancov; uzavretý mesiac sa nezmení nikdy. Nie je to tvrdá podmienka (jeden neuzavretý zamestnanec by zablokoval celý import). Plán z Accessu za mesiace pred platnosťou sa uloží, ale nepoužije.
+- **Ďalšie importy** sú nové verzie z Accessu s rovnakými pravidlami platnosti; terminálové verzie sa nikdy neprepíšu.
+- **Odpárovanie** je samostatné tlačidlo len pre správcu, s potvrdením a záznamom do auditu. Správca **vyberie, s čím terminál pokračuje**:
+  - **kópia posledných nastavení z Accessu** (predvolené): pravidlá sa uprostred roka nezmenia a správca ich môže upraviť; vhodné, ak firma Access prestane používať alebo ho len mení;
+  - **posledná terminálová verzia spred spárovania**: vhodné, ak to boli skutočne udržiavané nastavenia; ak boli len predvolenými hodnotami z registrácie, priniesla by zbytočný skok.
+
+  Pred voľbou sa ukáže rozdiel (napríklad „zaokrúhlenie 5 min → 0, obed 30 → 45“). Nová terminálová verzia platí od zvoleného mesiaca podľa rovnakých pravidiel o neuzavretých mesiacoch. Verzie z Accessu ostanú v histórii.
+
+- **Minulé mesiace** ostávajú s verziou, podľa ktorej sa počítali; plán z Accessu ostáva pri mesiacoch, ktoré patria Accessu. Deň bez plánu v takom mesiaci ukáže „bez plánu z Accessu, nepotvrdené“, nie tichý odhad.
 - Odpárovanie nie je prepínač pre každodenné použitie: kto Access používa na záväzný výpočet, nemá odpárovať, nastavenia by sa rozišli.
 
 ### 5.5 Úplné rozhranie nastavení v termináli
 
 Pre firmu bez Accessu je terminál jediný systém, nie orientačný pohľad. Jednoduchá podmnožina editorov by jej zafixovala zvyšok nastavení na predvolených hodnotách a výpočet by nemusel zodpovedať jej pracovnému poriadku. Preto sa v termináli robí **úplné rozhranie** pre celý model, po etapách (kapitola 8), a model je úplný už od prvej etapy, lebo sa dodatočne mení najdrahšie.
 
-- **Predvolená sada pri registrácii** pokrýva celý model (kódy prerušení s príznakmi, fond, pravidlá, sviatky). Hodnoty sú orientačné, kým ich nepotvrdí smernica.
+- **Predvolená terminálová verzia pri registrácii** pokrýva celý model (kódy prerušení s príznakmi, fond, pravidlá, sviatky). Hodnoty sú orientačné, kým ich nepotvrdí smernica.
 - **Cena**: každá zmena kontraktu znamená zmenu v Accesse, kontrakte, editore aj výpočte. Zmierňuje to tvar modelu podľa kontraktu 1.5.0 a kontrola voči jeho schéme (`contract/config-export.schema.json`).
 - **Overenie**: generátor plánu v TypeScripte sa porovná s referenčným Pythonom (`contract/tools/build_config_example.py`) na súbore vstupov (rovnaká metóda ako pri prechode na zod 4, PR #75); výpočet sa overí na zlatom scenári `contract/scenare/2026-10`.
 - **Osobné údaje**: terminál ich nezbiera ani pri firme bez Accessu. Tlačený výkaz má riadok na ručné doplnenie mena, ostatné políčka ostanú prázdne.
@@ -141,9 +148,9 @@ Pre firmu bez Accessu je terminál jediný systém, nie orientačný pohľad. Je
 
 ### 5.6 Čo z toho vyplýva pre výpočet
 
-- Ostáva čistou funkciou bez I/O v `src/lib/engine.ts` (pravidlo z `AGENTS.md`). Vstup: razenia dňa, plán dňa (typ dňa, denný fond, okno práce, režim), platné pravidlá dňa (po uplatnení režimu) a vlastnosti prerušení. Deň bez plánu pri vlastníkovi `access` vráti stav „bez plánu, nepotvrdené“.
+- Ostáva čistou funkciou bez I/O v `src/lib/engine.ts` (pravidlo z `AGENTS.md`). Vstup: razenia dňa, plán dňa (typ dňa, denný fond, okno práce, režim), platné nastavenia pre mesiac dňa (po uplatnení režimu) a vlastnosti prerušení. Deň bez plánu v mesiaci, ktorý patrí Accessu, vráti stav „bez plánu, nepotvrdené“. Uzavretý mesiac zamestnanca sa nepočíta, použije sa jeho uložený výsledok.
 - Plán zamestnanca sa v zariadení **nekešuje** (`AGENTS.md`): výpočet s plánom potrebuje spojenie so serverom.
-- Pri vlastníkovi `terminal` plán dňa vyrobí terminál sám podľa vlastnej sady (fond, deň v týždni, kalendár, sviatky, úväzok). Referenčný výpočet plánu je v `contract/tools/build_config_example.py` a v Accesse v `mod_08.NacitajKontextMesiaca`.
+- Pri mesiaci, ktorý patrí terminálu, plán dňa vyrobí terminál sám podľa terminálovej verzie (fond, deň v týždni, kalendár, sviatky, úväzok). Referenčný výpočet plánu je v `contract/tools/build_config_example.py` a v Accesse v `mod_08.NacitajKontextMesiaca`.
 - Overenie: zlatý scenár `contract/scenare/2026-10` a porovnanie sald s Accessom (`docs/TESTOVANIE-S-ACCESSOM.md`). Rozdiely, ktoré ostanú, sa vypíšu s dôvodom.
 
 ### 5.7 Uzávierka mesiaca pri spárovanej organizácii
@@ -152,16 +159,17 @@ Vyžaduje **kontrakt 1.6.0** (správa o uzávierke, smer Access → terminál). 
 
 - Access uzavrie mesiac a pošle správu o uzávierke. Terminál ju prijme a **zosúladí**: mesiac zamestnanca označí ako uzavretý Accessom a ukáže záverečné čísla z Accessu.
 - **Razenia mimo uzávierky** (Access ich nezarátal, napríklad prišli neskôr) terminál uloží do auditu a upozorní na ne vedúceho.
-- **Razenie sa vždy prijme**: pri vlastníkovi `access` uzavretie mesiaca razenie neblokuje (cieľový stav z `AGENTS.md`, bod 5).
+- **Razenie sa vždy prijme**: pri mesiaci, ktorý patrí Accessu, uzavretie mesiaca razenie neblokuje (cieľový stav z `AGENTS.md`, bod 5).
 - Správa nesie pre zamestnanca (osobné číslo) a mesiac záverečné čísla a odtlačok zarátaných razení (počet a stav hash reťaze; vzorec sa nemení). Presný tvar určí kontrakt 1.6.0.
-- Organizácia s vlastníkom `terminal` si uzávierku robí sama ako dnes.
+- Mesiac, ktorý patrí terminálu, uzatvára terminál sám ako dnes (a uloží výsledok a snímku nastavení).
 - Kým kontrakt 1.6.0 nie je schválený a zavedený aj v Accesse, platí dnešné správanie (`month_closures`).
 
 ### 5.8 Otvorené
 
-1. **Platnosť sád po mesiacoch**: ktoré pravidlá platia pre minulý mesiac po odpárovaní a po opätovnom spárovaní. Treba buď verzovať model po mesiacoch, alebo uložiť výsledok uzavretého mesiaca. Rozhodne etapa 1 a skontroluje ju nezávislá kontrola.
-2. **Starší terminál, novší kontrakt**: súbor s neznámymi kľúčmi sa dnes odmietne celý. Treba určiť verziu sady a správanie pri nezhode.
-3. **Správa o uzávierke**: tvar, opakovaná alebo opravná uzávierka, znovuotvorenie mesiaca v Accesse.
+1. **Snímka uzavretého mesiaca**: čo presne obsahuje (verzia nastavení, výsledok mesiaca) a ako sa ukladá pri uzávierke v termináli aj pri správe z Accessu. Rozhodne etapa 1 a skontroluje ju nezávislá kontrola.
+2. **Platnosť verzie a uzavretie po zamestnancoch**: verzia platí od mesiaca, uzavretie je po zamestnancoch. Treba určiť, ako Správa pri voľbe mesiaca ukáže, ktorí zamestnanci sú uzavretí a ktorých mesiac sa prepočíta.
+3. **Starší terminál, novší kontrakt**: súbor s neznámymi kľúčmi sa dnes odmietne celý. Treba určiť verziu nastavení a správanie pri nezhode.
+4. **Správa o uzávierke**: tvar, opakovaná alebo opravná uzávierka, znovuotvorenie mesiaca v Accesse.
 
 ## 6. Bezpečnostné zásady
 
@@ -173,7 +181,7 @@ Vyžaduje **kontrakt 1.6.0** (správa o uzávierke, smer Access → terminál). 
 ## 7. Čo je overené a čo nie
 
 - **Overené:** testy aplikácie (vitest) a CI na `main`; migrácie 0016 až 0021 v sandboxe PostgreSQL 16 nad lokálnou schémou aplikácie; ručné skúšky prenosu organizácie medzi Lovable a lokálnym Supabase.
-- **Neoverené v prevádzke:** VBA v skutočnom Accesse (kontrola je len statická a skúšobné postupy v `access/CHANGELOG.md`), klient v Accesse, výpočet terminálu podľa plánu a model s dvoma sadami (nie sú napísané), správa o uzávierke (nie je v kontrakte), správanie na ostrej databáze Lovable Cloud pri veľkých súboroch, obrazovky v prehliadači okrem ručne vyskúšaných scenárov.
+- **Neoverené v prevádzke:** VBA v skutočnom Accesse (kontrola je len statická a skúšobné postupy v `access/CHANGELOG.md`), klient v Accesse, výpočet terminálu podľa plánu a model s verziami nastavení (nie sú napísané), správa o uzávierke (nie je v kontrakte), správanie na ostrej databáze Lovable Cloud pri veľkých súboroch, obrazovky v prehliadači okrem ručne vyskúšaných scenárov.
 - Tvrdenia o stave databázy terminálu vychádzajú z kódu, dokumentov a lokálnej databázy; na Lovable Cloud ich treba overiť SQL kontrolou.
 
 ## 8. Poradie prác
@@ -182,7 +190,7 @@ Veľké časti píše jeden agent v samostatnom chate podľa písomného zadania
 
 1. **Architektúra a rozhodnutia** (tento dokument), nezávislá kontrola dokumentu.
 2. **Kontrakt 1.6.0** (správa o uzávierke): len `contract/`, samostatný PR na schválenie vlastníčkou. Zavedenie v termináli a v Accesse až po schválení.
-3. **Etapa 1 – model a výpočet**: úplný model, dve sady, vlastník, predvolená sada pri registrácii, automatické párovanie pri prijatí importu s upozornením, odpárovanie, „platné nastavenia“, výpočet nad modelom, zobrazenie platných nastavení v Správe na čítanie. Rozhodne otvorený bod 5.8/1.
+3. **Etapa 1 – model a výpočet**: úplný model, verzie nastavení s platnosťou od mesiaca (terminálové a z Accessu), predvolená terminálová verzia pri registrácii, automatické párovanie pri prijatí importu s upozornením a voľbou pri otvorených mesiacoch, odpárovanie s výberom, „platné nastavenia pre mesiac“, snímka uzavretého mesiaca, výpočet nad modelom, zobrazenie platných nastavení v Správe na čítanie. Rozhodnú otvorené body 5.8/1 a 5.8/2.
 4. **Etapa 2 – editory** pravidiel, fondov, šablón, kalendára a sviatkov.
 5. **Etapa 3 – editor prerušení** s príznakmi a tlačidlami.
 6. **Etapa 4 – plán zamestnanca**: generátor po mesiacoch, režimy výpočtu.
@@ -191,16 +199,17 @@ Veľké časti píše jeden agent v samostatnom chate podľa písomného zadania
 
 ## 9. Rozhodnutia
 
-| Dátum        | Rozhodnutie                                                                                                                                                              |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 3. 11. 2026  | Terminál je zberač razení, Access záväzný systém záznamov a výpočtu (zásada v `docs/SPOLUPRACA.md`, v `docs/KONFIGURACIA-Z-ACCESSU.md` ako D1); rozhranie je `contract/` |
-| 4. 11. 2026  | Tlačidlá terminálu sa riadia konfiguráciou z Accessu (kontrakt 1.3.0)                                                                                                    |
-| 5. 11. 2026  | Výpočet riadia parametre, ktoré nastavuje správca; kontrakt 1.4.0 a 1.5.0                                                                                                |
-| 11. 11. 2026 | Základom náhrady je Access, terminál je voliteľný; výpočtový motor po vyplnení dotazníkov                                                                                |
-| 12. 11. 2026 | Dve nezávislé inštancie Accessu, nastavenia sa neprenášajú; klient na razenie v Accesse                                                                                  |
-| 13. 11. 2026 | Vetvy `main` (chránená) a `lovable` (pripojená k Lovable), synchronizácia PR-kami                                                                                        |
-| 13. 11. 2026 | Jeden úplný model nastavení výpočtu, dve sady (vlastná z registrácie a z Accessu), vlastník `access` alebo `terminal`; vlastná sada sa počas párovania nemení            |
-| 13. 11. 2026 | Spárovanie automaticky pri prijatí importu s upozornením správcu; odpárovanie tlačidlom obnoví vlastnú sadu                                                              |
-| 13. 11. 2026 | Úplné rozhranie nastavení v termináli po etapách (pre firmy bez Accessu); model úplný od začiatku                                                                        |
-| 13. 11. 2026 | Uzávierka z Accessu: terminál zosúladí mesiac, razenia mimo uzávierky do auditu s upozornením; návrh kontraktu 1.6.0 povolený                                            |
-| 13. 11. 2026 | Terminál osobné údaje nezbiera, mená sa dopisujú ručne na tlačený výkaz; export pre SAP je mimo rozsahu, kým nie je špecifikácia                                         |
+| Dátum        | Rozhodnutie                                                                                                                                                                                                            |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3. 11. 2026  | Terminál je zberač razení, Access záväzný systém záznamov a výpočtu (zásada v `docs/SPOLUPRACA.md`, v `docs/KONFIGURACIA-Z-ACCESSU.md` ako D1); rozhranie je `contract/`                                               |
+| 4. 11. 2026  | Tlačidlá terminálu sa riadia konfiguráciou z Accessu (kontrakt 1.3.0)                                                                                                                                                  |
+| 5. 11. 2026  | Výpočet riadia parametre, ktoré nastavuje správca; kontrakt 1.4.0 a 1.5.0                                                                                                                                              |
+| 11. 11. 2026 | Základom náhrady je Access, terminál je voliteľný; výpočtový motor po vyplnení dotazníkov                                                                                                                              |
+| 12. 11. 2026 | Dve nezávislé inštancie Accessu, nastavenia sa neprenášajú; klient na razenie v Accesse                                                                                                                                |
+| 13. 11. 2026 | Vetvy `main` (chránená) a `lovable` (pripojená k Lovable), synchronizácia PR-kami                                                                                                                                      |
+| 13. 11. 2026 | Jeden úplný model nastavení výpočtu; nastavenia sú verzie s platnosťou od mesiaca (terminálové a z Accessu), vlastník je daný časovou osou; uzavretý mesiac sa nikdy neprepočíta (uložený výsledok a snímka nastavení) |
+| 13. 11. 2026 | Spárovanie automaticky pri prijatí importu s upozornením; import platí od mesiaca importu, pri otvorených minulých mesiacoch upozornenie s voľbou (nie tvrdá podmienka)                                                |
+| 13. 11. 2026 | Odpárovanie tlačidlom s výberom: kópia posledných nastavení z Accessu (predvolené) alebo posledná terminálová verzia spred spárovania                                                                                  |
+| 13. 11. 2026 | Úplné rozhranie nastavení v termináli po etapách (pre firmy bez Accessu); model úplný od začiatku                                                                                                                      |
+| 13. 11. 2026 | Uzávierka z Accessu: terminál zosúladí mesiac, razenia mimo uzávierky do auditu s upozornením; návrh kontraktu 1.6.0 povolený                                                                                          |
+| 13. 11. 2026 | Terminál osobné údaje nezbiera, mená sa dopisujú ručne na tlačený výkaz; export pre SAP je mimo rozsahu, kým nie je špecifikácia                                                                                       |

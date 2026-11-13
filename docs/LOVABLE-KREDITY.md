@@ -16,16 +16,16 @@ Zdroje sú oficiálna dokumentácia Lovable (odkazy na konci). Čo dokumentácia
 - Dôsledok: zostávajúce všeobecné kredity treba držať ako rezervu pre Cloud, nie ich míňať na prompty agenta.
 
 ## GitHub sync
-- Commity do synchronizovanej vetvy (zvyčajne `main`) sa objavia v Lovable automaticky. Dokumentácia: úprava a commit kódu mimo Lovable nespotrebuje kredity.
+- Commity do synchronizovanej vetvy (od 13. 11. 2026 `lovable`, predtým `main`; pozri [`LOVABLE-VETVY.md`](LOVABLE-VETVY.md)) sa objavia v Lovable automaticky. Dokumentácia: úprava a commit kódu mimo Lovable nespotrebuje kredity.
 - Iné vetvy sa nesynchronizujú, kým sa nezlúčia do synchronizovanej vetvy.
-- Nikdy force-push, rebase ani squash už existujúcich commitov na `main`. Bežné zlúčenie pull requestu je v poriadku.
+- Nikdy force-push, rebase ani squash už existujúcich commitov na `main` ani `lovable`. Bežné zlúčenie pull requestu je v poriadku.
 - Sync nespúšťa migrácie ani nenasadzuje edge funkcie (treba požiadať Lovable, alebo SQL spustiť samostatne). Sync nikdy nepublikuje: publikuje sa až z Lovable.
 - Neoverené: či samotné tlačidlo Publish míňa build kredity (pozrieť Workspace settings → Plans & credit usage → Usage details).
 
 ## Odporúčaný postup (minimum kreditov)
 1. Práca na vetve mimo `main` (napr. `claude/kontrakt-v1`), potom pull request. Lovable sa ho nedotkne, 0 kreditov.
 2. Testy a build bežia v GitHub Actions (verejný repozitár). Lokálne v tejto relácii sa nedajú nainštalovať npm balíky (registry je zablokovaný), preto je CI jediný test.
-3. Zlúčenie PR do `main` robí používateľ v GitHube. Lovable ho prevezme sám.
+3. Zlúčenie PR do `main` robí používateľ v GitHube. Do Lovable sa dostane až PR `main` → `lovable` (a potom Publish).
 4. Publikovanie z Lovable (tlačidlo Publish).
 5. Databázové zmeny naraz v jednej dávke na konci (jediný SQL súbor):
    - vlastný SQL v Cloud/Database (0 build kreditov, ak to rozhranie umožňuje), alebo

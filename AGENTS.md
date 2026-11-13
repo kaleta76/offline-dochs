@@ -32,6 +32,10 @@
 - Automatické schvaľovanie opráv rozhoduje len databáza vo funkcii `request_correction` (verí iba overenému zariadeniu zamestnanca, voľba je dvojica zamestnanec + jeho aktuálny priamy vedúci, ktorú zapne len on; typy, limity 14 dní a 5 za deň a audit `correction_auto_approved` sú v migrácii 0013, kontrola poradia razení dňa a dôvod čakania `manual_reason` v migrácii 0014); klient posiela len kľúč zariadenia a nikdy nenastavuje `device_verified` ani `auto_approved` (zapnutie vedúci robí až po prečítaní a odsúhlasení upozornenia v `AutoApprovalConsent`: pri zmene významu voľby treba upraviť aj jeho text), potvrdzovanie razení z neoverených zariadení a schvaľovanie zariadení ostávajú ručné. Zmena limitov znamená zmenu migrácie aj konštánt v `src/lib/auto-approval.ts` — vedúci sa inak spolieha na pravidlá, ktoré databáza nedodržiava.
 - Registrácia firiem a zamestnancov ide výlučne cez server funkcie v `src/lib/accounts.functions.ts` (logika v `accounts-core.ts`, dokumentácia `docs/REGISTRACIA.md`): firma sa zakladá stálym registračným kódom (v repozitári len odtlačok), zamestnanec dostane jednorazový PIN od správcu, e-mail sa nezbiera. Nevracaj `supabase.auth.signUp`, e-mailové potvrdenie ani ukladanie PIN-u v čitateľnej podobe — prvé by obišlo registračný kód, druhé by vrátilo problém s doručením pošty a osobné údaje.
 
+## Vetvy (od 13. 11. 2026)
+
+Lovable má vlastnú pripojenú vetvu `lovable`; `main` je chránená a ide do nej všetko cez PR (len **merge commit**, nikdy force-push, rebase ani squash). Prácu začni vo vetve z `main` a otvor PR do `main`; do Lovable sa zmena dostane až PR `main` → `lovable`. Podrobnosti: `docs/LOVABLE-VETVY.md`.
+
 ## Integrácia s dochádzkovým systémom (Access) – pravidlá pre agenta
 
 Terminál odovzdáva razenia lokálnemu dochádzkovému systému. Rozhranie je definované v `contract/` a **nemení sa bez výslovného pokynu vlastníka**. Dokumentácia: `docs/SPOLUPRACA.md`.

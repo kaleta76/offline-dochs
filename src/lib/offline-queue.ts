@@ -10,7 +10,9 @@
 // - a punch the database definitely rejects (closed month, constraint, unconfirmed by the server) is parked: no timer,
 //   no periodic retry, one attempt only on "Odoslať teraz" or the "online" event; it stays on the device until resolved;
 // - exponential backoff with jitter for everything else; the "online" event and manual triggers reset it;
-// - one module-level runtime (listeners, 30 s check) shared by every useQueue instance.
+// - one module-level runtime (listeners, 30 s check) shared by every useQueue instance;
+// - the queue itself never asks whether the organization moved to another server: it only reports what happened to
+//   observers (observeQueue), and src/lib/server-move.ts decides whether one small request is worth sending.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getDeviceKey } from "@/lib/device";
@@ -72,6 +74,39 @@ async function refresh() {
   );
   listeners.forEach((l) => l());
 }
+
+/**
+ * Čo sa pri odosielaní stalo, pre oznam o presťahovaní organizácie (src/lib/server-move.ts). Fronta sama nič navyše neposiela.
+ * transfer-lock: databáza razenie odmietla, lebo organizáciu práve prenášajú (SQLSTATE 55000); accepted: server razenie prijal;
+ * refused: server odpovedal, ale razenie neprijal (prihlásenie, oprávnenie, odmietnutie); unsent: vo fronte sú razenia účtov,
+ * ktoré teraz nie sú prihlásené.
+ */
+export type QueueEvent =
+  | { type: "transfer-lock" | "accepted" | "refused"; userId: string }
+  | { type: "unsent"; userIds: string[] };
+
+const observers = new Set<(event: QueueEvent) => void>();
+
+/** Prihlási pozorovateľa udalostí fronty; vrátená funkcia ho odhlási. Chyba pozorovateľa odosielanie nikdy nezastaví. */
+export function observeQueue(observer: (event: QueueEvent) => void): () => void {
+  observers.add(observer);
+  return () => {
+    observers.delete(observer);
+  };
+}
+
+function emit(event: QueueEvent) {
+  observers.forEach((observer) => {
+    try {
+      observer(event);
+    } catch {
+      // pozorovateľ je len doplnok; razenia sa odosielajú ďalej
+    }
+  });
+}
+
+/** SQLSTATE zámku razení počas prenosu organizácie (migrácia 0016, punches_transfer_lock). */
+export const TRANSFER_LOCK_CODE = "55000";
 
 export async function enqueue(
   p: Omit<
@@ -207,6 +242,11 @@ async function syncItem(item: QueuedPunch, uid: string): Promise<ItemOutcome> {
         return "certificate";
       }
       if (kind === "transport") return "retry";
+      // The server answered and did not take the punch: let the observer find out whether the organization moved.
+      emit({
+        type: error.code === TRANSFER_LOCK_CODE ? "transfer-lock" : "refused",
+        userId: current.user_id,
+      });
       if (/jwt|token|unauthorized/i.test(error.message) || error.code === "42501") return "retry";
       await save({ ...current, error: error.message });
       // A definite refusal (closed month, constraint, invalid value) never succeeds by waiting: park it.
@@ -218,6 +258,7 @@ async function syncItem(item: QueuedPunch, uid: string): Promise<ItemOutcome> {
     // A generic unique violation is never evidence that this punch was accepted.
     current = { ...current, server_inserted: true };
     await save(current);
+    emit({ type: "accepted", userId: current.user_id });
   }
 
   // Phase 1: read back exact owner and payload before deleting the durable local copy.
@@ -330,6 +371,8 @@ export async function syncQueue(trigger: SyncTrigger = "manual") {
     const { data } = await supabase.auth.getSession();
     const uid = data.session?.user.id;
     const own = uid ? snapshot.filter((p) => p.user_id === uid) : [];
+    const others = [...new Set(snapshot.filter((p) => p.user_id !== uid).map((p) => p.user_id))];
+    if (others.length > 0) emit({ type: "unsent", userIds: others });
     if (!uid || own.length === 0) return;
 
     outcome = "done";
@@ -382,6 +425,38 @@ export function syncNow() {
 
 export async function discard(uuid: string) {
   await tx("readwrite", (s) => s.delete(uuid));
+  await refresh();
+}
+
+/** Všetky razenia vo fronte bez ohľadu na účet, v poradí času (čerstvo prečítané zo zariadenia). */
+export async function listAllQueued(): Promise<QueuedPunch[]> {
+  await refresh();
+  return snapshot;
+}
+
+/**
+ * Odstráni vymenované razenia zo zariadenia jednou transakciou. Volá sa len po výslovnom potvrdení človekom (upratanie po
+ * presťahovaní organizácie, src/lib/device-cleanup.ts); nič iné razenia hromadne nemaže.
+ */
+export async function removeQueued(uuids: string[]): Promise<void> {
+  if (uuids.length > 0) {
+    const db = await openDb();
+    await new Promise<void>((res, rej) => {
+      const transaction = db.transaction(STORE, "readwrite");
+      const store = transaction.objectStore(STORE);
+      for (const uuid of uuids) store.delete(uuid);
+      transaction.oncomplete = () => {
+        db.close();
+        res();
+      };
+      const fail = () => {
+        db.close();
+        rej(transaction.error ?? new Error("Zmazanie razení zlyhalo."));
+      };
+      transaction.onerror = fail;
+      transaction.onabort = fail;
+    });
+  }
   await refresh();
 }
 
@@ -453,6 +528,15 @@ export function startQueueRuntime(): () => void {
 }
 
 const getParked = () => getParkedUuid();
+
+/** Všetky razenia vo fronte bez ohľadu na účet (pre oznam o presťahovaní organizácie, ktorý sa ukazuje aj neprihlásenému). */
+export function useAllQueued(): QueuedPunch[] {
+  const items = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  useEffect(() => {
+    void refresh().catch(() => undefined);
+  }, []);
+  return items;
+}
 
 export function useQueue(userId?: string) {
   const items = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);

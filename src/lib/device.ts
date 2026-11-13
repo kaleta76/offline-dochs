@@ -39,6 +39,11 @@ export async function getDeviceKey(userId: string): Promise<DeviceKey | undefine
   try { return await run<DeviceKey | undefined>("readonly", (s) => s.get(userId)); } catch { return undefined; }
 }
 
+/** Zmaže kľúč zariadenia účtu z tohto prehliadača (upratanie po presťahovaní organizácie; na serveri sa nič nemení). */
+export async function deleteDeviceKey(userId: string): Promise<void> {
+  await run("readwrite", (s) => s.delete(userId));
+}
+
 /**
  * Asks the browser to keep this site's data (the device key) instead of evicting it when disk space runs low.
  * Chrome decides silently from bookmark, installed app, site engagement and notification permission, and the answer

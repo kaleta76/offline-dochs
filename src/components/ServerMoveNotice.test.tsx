@@ -189,3 +189,134 @@ describe("oznam o presťahovaní organizácie", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 });
+
+describe("správa od správcu a organizácia zrušená bez presunu (migrácia 0020)", () => {
+  const MSG = "Testovanie sa po upozornení SOC ukončilo. Ďakujeme.";
+  const ended = (n = 2) => Array.from({ length: n }, (_, i) => punch(i + 1));
+
+  it("správa sa ukazuje vo všetkých troch oknách ako obyčajný text, aj s HTML znakmi", () => {
+    const { rerender, props, container } = view({ moved: [], locked: [punch(1)], message: MSG });
+    expect(screen.getByRole("status").textContent).toContain(`Správa od správcu: ${MSG}`);
+    rerender(<ServerMoveView {...props} moved={[punch(1)]} locked={[]} message={MSG} />);
+    expect(screen.getByRole("alert").textContent).toContain(`Správa od správcu: ${MSG}`);
+    rerender(
+      <ServerMoveView
+        {...props}
+        moved={[]}
+        done={{ removed: 1, remaining: 0, full: true, problems: [] }}
+        message={MSG}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toContain(`Správa od správcu: ${MSG}`);
+    rerender(
+      <ServerMoveView
+        {...props}
+        moved={[punch(1)]}
+        message={'<img src=x onerror=alert(1)> <a href="https://zly.example.test">klik</a>'}
+      />,
+    );
+    // zobrazí sa doslova ako text, nevznikne z neho prvok ani odkaz
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.queryByRole("link", { name: "klik" })).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("<img src=x onerror=alert(1)>");
+  });
+
+  it("bez správy sa riadok „Správa od správcu“ neukáže", () => {
+    view({ message: null });
+    expect(screen.getByRole("alert").textContent).not.toContain("Správa od správcu");
+  });
+
+  it("zrušená organizácia: vlastný nadpis, text bez presunu a nepovinný súbor", () => {
+    view({ moved: [], ended: ended(), url: null, message: MSG, onDiscard: vi.fn() });
+    const alert = screen.getByRole("alert");
+    expect(alert.getAttribute("aria-label")).toBe("Organizácia bola zrušená");
+    expect(alert.textContent).toContain("Organizácia bola zrušená");
+    expect(alert.textContent).toContain("nikam sa nepresťahovala");
+    expect(alert.textContent).toContain("ostalo 2 razení");
+    expect(alert.textContent).toContain("nepovinné");
+    expect(alert.textContent).toContain(`Správa od správcu: ${MSG}`);
+    expect(alert.textContent).not.toContain("Server bol presťahovaný");
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("zrušená organizácia: súbor sa dá uložiť rovnako ako pri presťahovaní", async () => {
+    const { props } = view({ moved: [], ended: ended(), onDiscard: vi.fn() });
+    fill(PW);
+    fireEvent.click(screen.getByRole("button", { name: "Uložiť súbor" }));
+    await waitFor(() => expect(props.onExport).toHaveBeenCalledWith(PW));
+  });
+
+  it("zahodenie bez súboru vyžaduje zaškrtnutie aj druhé potvrdenie a zavolá sa až po „Áno, zahodiť“", async () => {
+    const onDiscard = vi.fn(async () => undefined);
+    const { props } = view({ moved: [], ended: ended(), onDiscard });
+    const discard = screen.getByRole("button", {
+      name: "Zahodiť 2 razení a upratať",
+    }) as HTMLButtonElement;
+    expect(discard.disabled).toBe(true);
+    fireEvent.click(discard);
+    expect(screen.queryByText(/Naozaj zahodiť/)).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(discard.disabled).toBe(false);
+    fireEvent.click(discard);
+    expect(screen.getByText("Naozaj zahodiť 2 razení z tohto zariadenia?")).toBeTruthy();
+    expect(screen.getByText(/Nie je uložená žiadna kópia/)).toBeTruthy();
+    expect(onDiscard).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Nie, ponechať" }));
+    expect(onDiscard).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Zahodiť 2 razení a upratať" }));
+    fireEvent.click(screen.getByRole("button", { name: "Áno, zahodiť" }));
+    await waitFor(() => expect(onDiscard).toHaveBeenCalledTimes(1));
+    expect(props.onCleanup).not.toHaveBeenCalled();
+    expect(props.onExport).not.toHaveBeenCalled();
+  });
+
+  it("chyba pri zahodení (zmenil sa počet razení) sa ukáže", async () => {
+    view({
+      moved: [],
+      ended: ended(),
+      onDiscard: vi.fn(async () => {
+        throw new Error("V zariadení sa počet razení zmenil. Skontrolujte ho a skúste znova.");
+      }),
+    });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /Zahodiť 2 razení/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Áno, zahodiť" }));
+    expect(await screen.findByText(/počet razení zmenil/)).toBeTruthy();
+  });
+
+  it("po uložení súboru sa pri zrušenej organizácii ponúka zmazanie so súborom, nie zahodenie bez neho", () => {
+    view({
+      moved: [],
+      ended: ended(),
+      onDiscard: vi.fn(),
+      exported: { fingerprint: "f", count: 2, name: "x.dochs-enc" },
+    });
+    expect(screen.getByRole("button", { name: "Zmazať 2 razení a upratať" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Zahodiť/ })).toBeNull();
+  });
+
+  it("pri presťahovaní sa zahodenie bez súboru NEPONÚKA, ani keď je onDiscard k dispozícii", () => {
+    view({ onDiscard: vi.fn() });
+    expect(screen.queryByRole("button", { name: /Zahodiť/ })).toBeNull();
+    expect(screen.queryByText(/bez uloženia/)).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("bez onDiscard sa zahodenie neponúka ani pri zrušenej organizácii", () => {
+    view({ moved: [], ended: ended() });
+    expect(screen.queryByRole("button", { name: /Zahodiť/ })).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("presťahované razenia majú prednosť pred zrušenými", () => {
+    view({ moved: [punch(1)], ended: [punch(2, B), punch(3, B)], onDiscard: vi.fn() });
+    expect(screen.getByRole("alert").textContent).toContain("Server bol presťahovaný");
+    expect(screen.getByRole("alert").textContent).toContain("ostalo 1 razenie");
+    expect(screen.queryByRole("button", { name: /Zahodiť/ })).toBeNull();
+  });
+
+  it("počas prenosu sa nič neponúka zmazať ani zahodiť, aj keď je správa", () => {
+    view({ moved: [], locked: [punch(1)], message: MSG, onDiscard: vi.fn() });
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+});

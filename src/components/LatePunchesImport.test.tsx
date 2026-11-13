@@ -38,6 +38,7 @@ const report = (over: Partial<LateReport>): LateReport => ({
   already: 0,
   rejected: 1,
   accounts: 2,
+  byAccount: null,
   reasons: [{ reason: "closed_month", text: "mesiac je uzavretý", count: 1 }],
   items: [
     {
@@ -119,6 +120,56 @@ describe("Neskoré razenia zo zariadenia (karta v Servise)", () => {
     expect(screen.getByText(/už na serveri je/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Zahodiť" }));
     expect(screen.queryByRole("button", { name: /Zapísať/ })).toBeNull();
+  });
+
+  it("rozpis po účtoch ukáže osobné čísla a pri viac než jednom účte upozorní", async () => {
+    mocks.read.mockResolvedValue(FILE);
+    mocks.send.mockResolvedValue(
+      report({
+        byAccount: [
+          {
+            sapId: "1001",
+            count: 2,
+            from: "2026-11-12T06:00:00.000Z",
+            to: "2026-11-12T14:00:00.000Z",
+          },
+          { sapId: null, count: 1, from: null, to: null },
+        ],
+      }),
+    );
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "Skontrolovať súbor" }));
+    await screen.findByRole("button", { name: "Zapísať 3 razení" });
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Razenia po účtoch (osobné číslo)");
+    expect(text).toContain("1001: 2 razenia");
+    expect(text).toContain("bez osobného čísla: 1 razenie");
+    const warning = screen
+      .getAllByRole("alert")
+      .map((a) => a.textContent ?? "")
+      .find((t) => t.includes("zvyčajne patrí jednému človeku"));
+    expect(warning).toContain("tu je účtov 2");
+  });
+
+  it("jeden účet: rozpis je, upozornenie nie; starý server bez rozpisu nič nehlási", async () => {
+    mocks.read.mockResolvedValue(FILE);
+    mocks.send.mockResolvedValueOnce(
+      report({ byAccount: [{ sapId: "1001", count: 3, from: null, to: null }] }),
+    );
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "Skontrolovať súbor" }));
+    await screen.findByRole("button", { name: "Zapísať 3 razení" });
+    expect(document.body.textContent).toContain("1001: 3 razenia");
+    expect(document.body.textContent).not.toContain("zvyčajne patrí jednému človeku");
+  });
+
+  it("server bez migrácie 0020 (bez by_account): karta funguje ako predtým", async () => {
+    mocks.read.mockResolvedValue(FILE);
+    mocks.send.mockResolvedValueOnce(report({ byAccount: null }));
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "Skontrolovať súbor" }));
+    await screen.findByRole("button", { name: "Zapísať 3 razení" });
+    expect(document.body.textContent).not.toContain("Razenia po účtoch");
   });
 
   it("chyba pri zápise povie, ako zistiť, či sa razenia zapísali", async () => {

@@ -10,6 +10,7 @@ import {
   MAX_LATE_FILE_BYTES,
   readLateFile,
   type LateFile,
+  razeniaText,
   type LateReport,
 } from "@/lib/late-punches";
 
@@ -56,6 +57,37 @@ function Report({ report }: { report: LateReport }) {
         )}
         . Účtov: <span className="num">{report.accounts}</span>.
       </p>
+      {report.byAccount && report.byAccount.length > 0 && (
+        <div className="space-y-1 text-xs">
+          <p className="font-semibold">
+            {report.dryRun
+              ? "Razenia po účtoch (osobné číslo)"
+              : "Razenia po účtoch (osobné číslo), ktoré sa dali zapísať"}
+          </p>
+          <ul className="list-disc pl-5">
+            {report.byAccount.map((a) => (
+              <li key={a.sapId ?? "bez-cisla"}>
+                {a.sapId ? <span className="num">{a.sapId}</span> : "bez osobného čísla"}:{" "}
+                {razeniaText(a.count)}
+                {a.from && a.to ? (
+                  <>
+                    {" "}
+                    (<span className="num">{when(a.from)}</span> až{" "}
+                    <span className="num">{when(a.to)}</span>)
+                  </>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {report.byAccount.length > 1 && (
+            <p role="alert" className="text-destructive">
+              Súbor z jedného zariadenia zvyčajne patrí jednému človeku, tu je účtov{" "}
+              <span className="num">{report.byAccount.length}</span>. Skontrolujte, či je to
+              správne, kým razenia zapíšete.
+            </p>
+          )}
+        </div>
+      )}
       {report.reasons.length > 0 && (
         <ul className="list-disc pl-5 text-xs">
           {report.reasons.map((r) => (

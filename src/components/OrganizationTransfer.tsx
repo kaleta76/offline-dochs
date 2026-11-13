@@ -204,6 +204,7 @@ export function OrganizationTransfer() {
   const [queuesEmpty, setQueuesEmpty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [noticeDirty, setNoticeDirty] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const statusQuery = useQuery({
@@ -500,7 +501,7 @@ export function OrganizationTransfer() {
 
           <FileCheck status={status} />
 
-          <TransferDestination transferId={status.transferId} />
+          <TransferDestination transferId={status.transferId} onDirtyChange={setNoticeDirty} />
 
           {status.hasChanges && (
             <div role="alert" className="space-y-2 border-2 border-destructive p-2 text-sm">
@@ -557,6 +558,12 @@ export function OrganizationTransfer() {
                 onChange={(e) => setTypedName(e.target.value)}
                 placeholder={status.name}
               />
+              {noticeDirty && (
+                <p role="alert" className="text-sm font-semibold text-destructive">
+                  V poli s adresou alebo správou je neuložený text. Zariadenia ho neuvidia, kým
+                  nestlačíte „Uložiť“.
+                </p>
+              )}
               <Button type="submit" variant="destructive" disabled={busy || !canDelete}>
                 Zrušiť pôvodnú organizáciu…
               </Button>
@@ -607,6 +614,12 @@ export function OrganizationTransfer() {
                   Razenia, ktoré ešte čakajú vo fronte na termináloch napojených na tento server, sa
                   zrušením stratia (terminál ich nemá kam odoslať).
                 </p>
+                {noticeDirty && (
+                  <p role="alert" className="font-semibold text-destructive">
+                    Pozor: adresa alebo správa pre zariadenia v poli nie je uložená a zariadenia ju
+                    neuvidia. Zavrite toto okno a stlačte „Uložiť“.
+                  </p>
+                )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

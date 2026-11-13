@@ -127,7 +127,30 @@ Novú adresu (nepovinnú) uloží správca v karte prenosu po exporte (`org_tran
 
 **Access (zatiaľ len návrh rozhrania).** Tie isté razenia by sa dali vydať ako `.rzn` pre príjem v Accesse HR. Zariadenie na to nestačí: fronta má `user_id`, osobné číslo je len v kópii účtu `me-cache`, ktorá sa pri odhlásení maže. Mapovanie pozná nový server, preto je správna cesta: nahrať súbor na novom serveri a razenia odovzdať Accessu bežným exportom razení (bez zmeny kontraktu). Samostatný export `.rzn` zo súboru by bola nová funkcia na serveri (`user_id` → osobné číslo) a zmena dohodnutá s Accessom.
 
-**Čo to nerieši:** vypnutý celý starý server (oznam nemá kto vydať), organizáciu zrušenú ako testovaciu bez prenosu (oznam nevzniká) a zariadenie, ktoré sa už nikdy neotvorí.
+**Čo to nerieši:** vypnutý celý starý server (oznam nemá kto vydať) a zariadenie, ktoré sa už nikdy neotvorí. Organizáciu zrušenú ako testovaciu bez prenosu rieši od migrácie 0020 oznam „zrušená“ (ďalšia kapitola).
+
+## Vlastná správa, zrušenie bez presunu a rozpis po účtoch (migrácia 0020)
+
+Migrácia `0020_sprava_a_ukoncenie_organizacie.sql` (predpoklady 0019 a 0007, opakovateľná, návrat `0020_spat_zachranny.sql` **pred** `0019_spat_zachranny.sql`) pridáva tri veci. Tabuľky `punches` a `profiles`, export pre Access ani `contract/` sa nemenia (stĺpec `device` nie je súčasťou kontraktu).
+
+**1. Správa správcu.** K oznamu možno pridať vlastný text (1 až 300 znakov, jeden riadok, čistý text bez riadiacich a skrytých znakov; pravidlo `org_transfer.valid_message`, v aplikácii `safeMessage` v `server-move.ts`).
+* Pri prenose: pole „Správa pre zariadenia“ v karte prenosu spolu s adresou (`org_transfer_set_notice(adresa, správa)`; `org_transfer_set_destination` ostáva, mení len adresu a správu zachová). Správa sa pri potvrdení prenosu prenesie do stavu `moved`.
+* Pri zrušení bez presunu: pole v karte Testovacia organizácia (`delete_test_organization(názov, správa)`, druhý parameter je nepovinný, volanie len s názvom funguje ďalej).
+* Zariadenie ju ukáže ako „Správa od správcu: …“ v okne počas prenosu, po presťahovaní, po zrušení aj po upratení. Vždy ako text: nikdy ako HTML ani odkaz.
+* Oznam číta aj neprihlásený (kto pozná id účtu), preto správa **nesmie obsahovať osobné údaje**; pri poli je na to upozornenie. V oznamoch ostávajú len SHA-256 odtlačky id účtov, adresa a správa.
+* Ak v poli ostane nepotvrdený text, karta prenosu na to pred zrušením pôvodnej organizácie (aj v potvrdzovacom okne) upozorní: zariadenia ho neuvidia, kým sa neuloží.
+
+**2. Zrušenie bez presunu (stav `ended`).** Zrušenie testovacej organizácie (`delete_test_organization`) dosiaľ nenechalo žiadny oznam: zariadenie s neodoslaným razením nemalo ako zistiť, čo sa stalo. Teraz funkcia pred zrušením, v tej istej transakcii, zapíše oznam `ended` (so správou, ak je zadaná) a až potom volá `purge_organization` (ktorá sa nemení; zrušenie po prenose robí `moved` spúšťač z 0019). Zariadenie ukáže okno „Organizácia bola zrušená“:
+* Súbor je **nepovinný** (ak sa organizácia obnoví z exportu, správca ho nahrá cez Neskoré razenia). Po uložení súboru platí rovnaké zmazanie ako pri presťahovaní.
+* Ak razenia netreba, dajú sa **zahodiť bez súboru**: zaškrtnutie, druhé potvrdenie s počtom a poznámka, že nezostane žiadna kópia. Táto cesta je **len pri `ended`**, nikdy pri presťahovaní (tam sú razenia jediná kópia údajov, ktoré na novom serveri chýbajú). Zahodí sa presne to, čo okno ukázalo (čerstvé čítanie fronty sa porovná s počtom).
+* Presťahované razenia majú prednosť pred zrušenými (kým sa nevybavia, `ended` okno čaká).
+* Živý účet nikdy `ended` nedostane (rovnako ako `moved`).
+
+**3. Neskoré razenia na novom serveri.**
+* `late_punches_import` pridá k poľu `device` každého zapísaného razenia predponu `neskoré: ` (dá sa potom nájsť a odlíšiť; obsah po predpone volí autor súboru, predponu nie).
+* Odpoveď vracia `by_account`: osobné číslo, počet a rozsah času po účtoch (vo „Skontrolovať“ aj po zápise; ide o razenia, ktoré sa dali zapísať). Karta ich vypíše a pri viac než jednom účte upozorní: súbor zo zariadenia zvyčajne patrí jednému človeku. Zoznam je v rozsahu `max_report_items`.
+
+**Súčinnosť s verziami.** Aplikácia ide aj proti databáze len s 0019: `org_transfer_get_destination` bez poľa `message` = pole správy sa neukáže a ukladá sa len adresa starou funkciou; rozpis po účtoch chýba a karta sa správa ako predtým; zrušenie testovacej organizácie bez správy volá funkciu ako doteraz. So správou proti databáze bez 0020 aplikácia odmietne a napíše, že treba spustiť 0020. **Poradie nasadenia nie je kritické** (odporúčané: najprv migrácia 0020 na oboch serveroch, potom Publish aplikácie; pole správy sa ukáže, až keď ju databáza podporuje). Staršia aplikácia (bez tejto verzie) proti databáze s 0020 funguje, no stav `ended` nepozná a oznam „zrušená“ by ignorovala (razenia zostanú vo fronte bez vysvetlenia).
 
 ## Ručné vyskúšanie (SQL editor, ako správca)
 
@@ -148,9 +171,12 @@ Ak `uncovered_tables()` vráti nejakú tabuľku, niektorá novšia migrácia pri
 2. Spustiť `docs/migracie/0016_prenos_organizacie_export.sql` (opakovateľné). Predpoklad: migrácie 0001 až 0008.
 3. Na serveri, ktorý má organizácie **prijímať**, spustiť aj `docs/migracie/0017_prenos_organizacie_import.sql` (opakovateľné, predpoklad 0016). Kontrola: `SELECT org_transfer.import_version(), org_transfer.import_unclassified();` vráti verziu a `{}`.
 4. Na oboch serveroch spustiť `docs/migracie/0019_razenia_po_prestahovani.sql` (opakovateľné, predpoklad 0016): starý vydáva oznam, nový prijíma neskoré razenia. Kontrola: `SELECT org_transfer.move_version();`. Bez nej všetko beží ako predtým.
-5. Návrat: [`migracie/0019_spat_zachranny.sql`](migracie/0019_spat_zachranny.sql), potom [`migracie/0017_spat_zachranny.sql`](migracie/0017_spat_zachranny.sql) a až potom [`migracie/0016_spat_zachranny.sql`](migracie/0016_spat_zachranny.sql), pozri [`ZACHRANA-A-NAVRAT.md`](ZACHRANA-A-NAVRAT.md).
+5. Voliteľne `docs/migracie/0020_sprava_a_ukoncenie_organizacie.sql` (opakovateľné, predpoklady 0019 a 0007): vlastná správa, oznam o zrušení bez presunu, rozpis po účtoch. Kontrola: `SELECT org_transfer.move_version();` vráti `org_move 2 (migrácia 0020)`.
+6. Návrat: [`migracie/0020_spat_zachranny.sql`](migracie/0020_spat_zachranny.sql) (ak bola spustená), potom [`migracie/0019_spat_zachranny.sql`](migracie/0019_spat_zachranny.sql), potom [`migracie/0017_spat_zachranny.sql`](migracie/0017_spat_zachranny.sql) a až potom [`migracie/0016_spat_zachranny.sql`](migracie/0016_spat_zachranny.sql), pozri [`ZACHRANA-A-NAVRAT.md`](ZACHRANA-A-NAVRAT.md).
 
 **Migrácia 0019 nie je overená na ostrej databáze Lovable Cloud ani v prehliadači** (volanie `punch_move_notice` bez prihlásenia cez REST a firemný proxy, stiahnutie súboru, upratanie service workera). Overené v sandboxe PostgreSQL 16 nad skutočnou schémou aplikácie: oznam, útoky na nahrávaný súbor, práva, návrat, okruh s 0016/0017 a 29 zámerných pokazení.
+
+**Migrácia 0020 nie je overená na ostrej databáze Lovable Cloud ani v prehliadači.** Overené v sandboxe PostgreSQL 16 (114 kontrol: oznam `ended`, správa, atomickosť zrušenia, ochrana pôvodnej a ostrej organizácie, oprávnenia, predpona a rozpis po účtoch, návrat, opakovanie) so zámernými pokazeniami (13 z 14 zmysluplných zachytených, jedno je ekvivalentné: `purge_organization` kontrolu testovacej organizácie opakuje), a v aplikácii testami komponentov a fronty so skutočným IndexedDB v pamäti. Neoverené: živý prehliadač, volanie `punch_move_notice` bez prihlásenia cez REST a firemný proxy, skutočné časy.
 
 **Import (0017) nie je overený na ostrej databáze Lovable Cloud ani na lokálnom Supabase so skutočným prihlasovacím serverom:** práva vlastníka migrácie na vypnutie spúšťačov a na `auth.users` z funkcie volanej prihláseným správcom, prihlásenie preneseným účtom po importe tlačidlom a to, či server rešpektuje dlhší časový limit funkcie (bez neho platí 8 s, čo stačí približne do 100 000 razení).
 

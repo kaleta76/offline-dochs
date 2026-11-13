@@ -33,6 +33,8 @@ import {
 //   * počas prenosu: razenia sú uložené a odošlú sa samy,
 //   * po presťahovaní: razenia sa dajú uložiť do šifrovaného súboru pre správcu nového servera; zmazanie a upratanie zariadenia sa
 //     ponúkne až po uložení súboru a po potvrdení. Nič sa nemaže samo.
+//   * po zrušení organizácie bez presunu (migrácia 0020): súbor je nepovinný; razenia sa dajú aj zahodiť bez súboru, ale len po
+//     zaškrtnutí a druhom potvrdení a len pri zrušenej organizácii (nie pri presťahovaní). Správcova správa sa ukazuje ako čistý text.
 
 /** Záznam o poslednom uloženom súbore (len odtlačok a počet, žiadne razenia ani heslo). */
 export const LATE_EXPORT_KEY = "late-export:v1";
@@ -79,6 +81,16 @@ const button =
 const danger =
   "rounded-sm border-2 border-destructive px-3 py-1 text-xs font-semibold uppercase tracking-wider text-destructive hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50";
 
+/** Správa od správcu (migrácia 0020). Vždy čistý text: React ho neinterpretuje ako HTML a odkaz z neho nevznikne. */
+function Notice({ message }: { message: string | null | undefined }) {
+  if (!message) return null;
+  return (
+    <p className="border-l-4 border-primary pl-2">
+      Správa od správcu: <strong>{message}</strong>
+    </p>
+  );
+}
+
 function Destination({ url }: { url: string | null }) {
   if (!url) return null;
   return (
@@ -108,16 +120,28 @@ export interface ServerMoveViewProps {
   onDownloadAgain: (() => void) | null;
   onCleanup: () => Promise<void>;
   onRecheck: () => void;
+  /** Razenia účtov, ktorých organizácia bola zrušená bez presunu na iný server (migrácia 0020). Okno „presťahovaný“ má prednosť. */
+  ended?: QueuedPunch[];
+  /** Správa od správcu k zobrazenému oznamu. */
+  message?: string | null;
+  /** Zahodenie razení bez uloženia súboru; ponúka sa len pri zrušenej organizácii (nie pri presťahovaní). */
+  onDiscard?: () => Promise<void>;
 }
 
 export function ServerMoveView(props: ServerMoveViewProps) {
   const { moved, locked, url, exported, done } = props;
+  const ended = props.ended ?? [];
+  const message = props.message ?? null;
+  const isEnded = moved.length === 0 && ended.length > 0;
+  const punches = isEnded ? ended : moved;
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
-  const [busy, setBusy] = useState<"export" | "cleanup" | null>(null);
+  const [busy, setBusy] = useState<"export" | "cleanup" | "discard" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [understood, setUnderstood] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [understoodDiscard, setUnderstoodDiscard] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
   if (done) {
     return (
@@ -142,13 +166,14 @@ export function ServerMoveView(props: ServerMoveViewProps) {
               stránky v nastaveniach prehliadača.
             </p>
           )}
+          <Notice message={message} />
           <Destination url={url} />
         </div>
       </section>
     );
   }
 
-  if (moved.length === 0) {
+  if (punches.length === 0) {
     if (locked.length === 0) return null;
     return (
       <section
@@ -165,20 +190,21 @@ export function ServerMoveView(props: ServerMoveViewProps) {
             zruší. Razte ďalej ako zvyčajne, nič sa nestratilo. Ak sa prenos dokončí, zariadenie
             ponúkne uloženie razení do súboru pre nový server.
           </p>
+          <Notice message={message} />
           <Destination url={url} />
         </div>
       </section>
     );
   }
 
-  const count = moved.length;
-  const accounts = new Set(moved.map((p) => p.user_id)).size;
+  const count = punches.length;
+  const accounts = new Set(punches.map((p) => p.user_id)).size;
   const tooMany = count > MAX_LATE_PUNCHES;
   const problem = password ? passwordProblem(password) : null;
   const mismatch = password2 !== "" && password !== password2;
   const canExport = !busy && !tooMany && password !== "" && !problem && password === password2;
 
-  async function run(kind: "export" | "cleanup", action: () => Promise<void>) {
+  async function run(kind: "export" | "cleanup" | "discard", action: () => Promise<void>) {
     setBusy(kind);
     setError(null);
     try {
@@ -192,36 +218,56 @@ export function ServerMoveView(props: ServerMoveViewProps) {
     } finally {
       setBusy(null);
       setConfirming(false);
+      setConfirmingDiscard(false);
     }
   }
 
   return (
     <section
       role="alert"
-      aria-label="Server bol presťahovaný"
+      aria-label={isEnded ? "Organizácia bola zrušená" : "Server bol presťahovaný"}
       className="no-print border-b-2 border-destructive bg-card px-4 py-3 text-sm"
     >
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
         <div className="space-y-1">
-          <p className="font-bold text-destructive">Server bol presťahovaný</p>
+          <p className="font-bold text-destructive">
+            {isEnded ? "Organizácia bola zrušená" : "Server bol presťahovaný"}
+          </p>
           <p>
-            Organizácia bola presťahovaná na iný server. V tomto zariadení ostalo{" "}
-            <strong className="num">{count}</strong>{" "}
+            {isEnded
+              ? "Organizácia bola na tomto serveri zrušená a nikam sa nepresťahovala. "
+              : "Organizácia bola presťahovaná na iný server. "}
+            V tomto zariadení ostalo <strong className="num">{count}</strong>{" "}
             {count === 1 ? "razenie, ktoré" : "razení, ktoré"} sa na pôvodný server už nedajú
             odoslať
             {accounts > 1 ? ` (${accounts} účty alebo viac)` : ""}. Nič sa nezmazalo a nič sa
             nezmaže samo.
           </p>
+          <Notice message={message} />
           <Destination url={url} />
         </div>
 
         <div className="space-y-2 rounded-sm border-2 border-foreground p-3">
-          <p className="font-semibold">1. Uložte razenia do šifrovaného súboru</p>
+          <p className="font-semibold">
+            {isEnded
+              ? "1. Uložte razenia do šifrovaného súboru (nepovinné)"
+              : "1. Uložte razenia do šifrovaného súboru"}
+          </p>
           <p className="text-xs text-muted-foreground">
-            Súbor odovzdajte správcovi; ten ho nahrá na novom serveri (Správa → Servis → Neskoré
-            razenia). Heslo mu povedzte inou cestou než súbor. Razenia budú na novom serveri
-            označené ako neoverené a potvrdí ich vedúci. Priamo odoslať na novú adresu sa z tohto
-            zariadenia nedajú.
+            {isEnded ? (
+              <>
+                Ak razenia ešte potrebujete (napríklad ak sa organizácia obnoví z exportu), uložte
+                ich do súboru. Správca ho vtedy nahrá na serveri, kde organizácia znova existuje
+                (Správa → Servis → Neskoré razenia). Heslo mu povedzte inou cestou než súbor.
+              </>
+            ) : (
+              <>
+                Súbor odovzdajte správcovi; ten ho nahrá na novom serveri (Správa → Servis → Neskoré
+                razenia). Heslo mu povedzte inou cestou než súbor. Razenia budú na novom serveri
+                označené ako neoverené a potvrdí ich vedúci. Priamo odoslať na novú adresu sa z
+                tohto zariadenia nedajú.
+              </>
+            )}
           </p>
           {tooMany ? (
             <p role="alert" className="text-destructive">
@@ -284,10 +330,66 @@ export function ServerMoveView(props: ServerMoveViewProps) {
         <div className="space-y-2 rounded-sm border-2 border-destructive p-3">
           <p className="font-semibold">2. Zmazať razenia a upratať toto zariadenie</p>
           {!exported ? (
-            <p className="text-xs text-muted-foreground">
-              Zmazanie sa ponúkne až po uložení súboru. Ak razenia preniesť nechcete, súbor si aj
-              tak najprv uložte: je to jediná kópia a zmazanie sa nedá vrátiť.
-            </p>
+            <>
+              <p className="text-xs text-muted-foreground">
+                {isEnded
+                  ? "Zmazanie so súborom sa ponúkne až po uložení súboru (je to jediná kópia a zmazanie sa nedá vrátiť). Ak razenia nepotrebujete, môžete ich zahodiť bez uloženia."
+                  : "Zmazanie sa ponúkne až po uložení súboru. Ak razenia preniesť nechcete, súbor si aj tak najprv uložte: je to jediná kópia a zmazanie sa nedá vrátiť."}
+              </p>
+              {isEnded && props.onDiscard && !confirmingDiscard && (
+                <div className="space-y-2 border-t border-border pt-2">
+                  <p className="text-xs font-semibold">Alebo razenia zahodiť bez uloženia</p>
+                  <label className="flex items-start gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={understoodDiscard}
+                      onChange={(e) => setUnderstoodDiscard(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Razenia nepotrebujem. Rozumiem, že <strong className="num">{count}</strong>{" "}
+                      razení sa z tohto zariadenia zmaže, nezostane po nich žiadna kópia a nedá sa
+                      to vrátiť. Spolu s nimi sa zmaže kľúč zariadenia a uložené údaje účtu; ak v
+                      zariadení nič iné neostane, aj prihlásenie a offline kópia aplikácie.
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!understoodDiscard || !!busy}
+                    onClick={() => setConfirmingDiscard(true)}
+                    className={danger}
+                  >
+                    Zahodiť {count} razení a upratať
+                  </button>
+                </div>
+              )}
+              {isEnded && props.onDiscard && confirmingDiscard && (
+                <div className="space-y-2">
+                  <p className="font-semibold">Naozaj zahodiť {count} razení z tohto zariadenia?</p>
+                  <p className="text-xs text-muted-foreground">
+                    Nedá sa to vrátiť. Nie je uložená žiadna kópia.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={!!busy}
+                      onClick={() => void run("discard", props.onDiscard!)}
+                      className="rounded-sm bg-destructive px-3 py-1 text-xs font-semibold uppercase tracking-wider text-destructive-foreground disabled:opacity-50"
+                    >
+                      {busy === "discard" ? "Mažem…" : "Áno, zahodiť"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!busy}
+                      onClick={() => setConfirmingDiscard(false)}
+                      className={button}
+                    >
+                      Nie, ponechať
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : !confirming ? (
             <>
               <label className="flex items-start gap-2 text-xs">
@@ -375,18 +477,27 @@ export function ServerMoveNotice() {
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [done, setDone] = useState<CleanupResult | null>(null);
   const [doneUrl, setDoneUrl] = useState<string | null>(null);
+  const [doneMessage, setDoneMessage] = useState<string | null>(null);
   const lastBlob = useRef<{ blob: Blob; name: string; fingerprint: string } | null>(null);
 
   const moved = useMemo(
     () => items.filter((p) => move[p.user_id]?.state === "moved"),
     [items, move],
   );
+  // Organizácia zrušená bez presunu (migrácia 0020): okno „presťahovaný“ má prednosť, zrušená sa ukáže až po jeho vybavení.
+  const ended = useMemo(
+    () => items.filter((p) => move[p.user_id]?.state === "ended"),
+    [items, move],
+  );
   const locked = useMemo(
     () => items.filter((p) => move[p.user_id]?.state === "transferring"),
     [items, move],
   );
-  const url =
-    (moved[0] ?? locked[0]) ? (move[(moved[0] ?? locked[0])!.user_id]?.url ?? null) : null;
+  const kind: "moved" | "ended" = moved.length > 0 ? "moved" : "ended";
+  const active = kind === "moved" ? moved : ended;
+  const shown = active[0] ?? locked[0];
+  const url = shown ? (move[shown.user_id]?.url ?? null) : null;
+  const message = shown ? (move[shown.user_id]?.message ?? null) : null;
 
   // Udalosti fronty: zámok a prijatie bez dopytu; dopyt na oznam len keď server razenie neprijal alebo účet nie je prihlásený.
   useEffect(
@@ -415,21 +526,21 @@ export function ServerMoveNotice() {
 
   useEffect(() => {
     let cancelled = false;
-    if (moved.length === 0) setFingerprint(null);
+    if (active.length === 0) setFingerprint(null);
     else
-      void fingerprintPunches(moved.map(toLatePunch)).then((fp) => {
+      void fingerprintPunches(active.map(toLatePunch)).then((fp) => {
         if (!cancelled) setFingerprint(fp);
       });
     return () => {
       cancelled = true;
     };
-  }, [moved]);
+  }, [active]);
 
   const exported =
     exportRecord && fingerprint && exportRecord.fingerprint === fingerprint ? exportRecord : null;
 
   async function onExport(password: string) {
-    const current = moved;
+    const current = active;
     const { blob, file } = await encryptLateFile(current, password, {
       origin: window.location.origin,
     });
@@ -449,18 +560,16 @@ export function ServerMoveNotice() {
     setExportRecord(record);
   }
 
-  async function onCleanup() {
-    if (!exported) throw new Error("Najprv uložte razenia do súboru.");
-    // Čerstvé čítanie fronty: maže sa len vtedy, ak je v zariadení presne to, čo je v súbore.
-    const now = (await listAllQueued()).filter(
-      (p) => getMoveSnapshot()[p.user_id]?.state === "moved",
-    );
-    if ((await fingerprintPunches(now.map(toLatePunch))) !== exported.fingerprint)
-      throw new Error(
-        "V zariadení pribudli razenia, ktoré v uloženom súbore nie sú. Uložte súbor znova.",
-      );
+  /** Čerstvé čítanie fronty: berú sa len razenia účtov v rovnakom stave, v akom ich okno ukazuje. */
+  async function freshPunches(): Promise<QueuedPunch[]> {
+    return (await listAllQueued()).filter((p) => getMoveSnapshot()[p.user_id]?.state === kind);
+  }
+
+  async function cleanUp(now: QueuedPunch[]) {
     const userIds = [...new Set(now.map((p) => p.user_id))];
+    // Po upratanie sa stav oznamu zabudne, adresa a správa sa preto ukážu z kópie urobenej pred upratovaním.
     const address = url;
+    const note = message;
     const result = await cleanupAfterMove(
       { uuids: now.map((p) => p.client_uuid), userIds },
       {
@@ -493,14 +602,37 @@ export function ServerMoveNotice() {
     lastBlob.current = null;
     setExportRecord(null);
     setDoneUrl(address);
+    setDoneMessage(note);
     setDone(result);
+  }
+
+  async function onCleanup() {
+    if (!exported) throw new Error("Najprv uložte razenia do súboru.");
+    // Maže sa len vtedy, ak je v zariadení presne to, čo je v súbore.
+    const now = await freshPunches();
+    if ((await fingerprintPunches(now.map(toLatePunch))) !== exported.fingerprint)
+      throw new Error(
+        "V zariadení pribudli razenia, ktoré v uloženom súbore nie sú. Uložte súbor znova.",
+      );
+    await cleanUp(now);
+  }
+
+  // Zahodenie bez súboru: len pri zrušenej organizácii a len presne tých razení, ktoré okno ukázalo (počet sa porovná s čerstvým čítaním).
+  async function onDiscard() {
+    if (kind !== "ended") throw new Error("Razenia sa bez uloženia súboru zahodiť nedajú.");
+    const now = await freshPunches();
+    if (now.length !== active.length)
+      throw new Error("V zariadení sa počet razení zmenil. Skontrolujte ho a skúste znova.");
+    await cleanUp(now);
   }
 
   const again = lastBlob.current;
   return (
     <ServerMoveView
       moved={moved}
+      ended={ended}
       locked={locked}
+      message={done ? doneMessage : message}
       url={done ? doneUrl : url}
       exported={exported}
       done={done}
@@ -511,8 +643,9 @@ export function ServerMoveNotice() {
           : null
       }
       onCleanup={onCleanup}
+      onDiscard={onDiscard}
       onRecheck={() =>
-        void checkMoveNotice(client, [...new Set(moved.map((p) => p.user_id))], { force: true })
+        void checkMoveNotice(client, [...new Set(active.map((p) => p.user_id))], { force: true })
       }
     />
   );

@@ -67,6 +67,9 @@ interface Db {
   deleted: boolean;
   failPage: boolean;
   receipt: string;
+  /** Adresa a správa pre zariadenia k rozpracovanému prenosu (migrácia 0020). */
+  url: string | null;
+  message: string | null;
 }
 let db: Db;
 
@@ -151,6 +154,16 @@ function handle(fn: string, args: Record<string, unknown> | undefined): Rpc {
         changes_accepted: args?.["_accept_changes"] === true,
       });
     }
+    case "org_transfer_get_destination":
+      return ok({
+        transfer_id: db.state === "none" ? null : TID,
+        url: db.url,
+        message: db.message,
+      });
+    case "org_transfer_set_notice":
+      db.url = String(args?.["_url"] ?? "") || null;
+      db.message = String(args?.["_message"] ?? "") || null;
+      return ok({ transfer_id: TID, url: db.url, message: db.message });
     case "test_organization_summary":
       return ok({
         name: "Firma „Ľ“",
@@ -202,6 +215,8 @@ describe("OrganizationTransfer (prenos organizácie)", () => {
       deleted: false,
       failPage: false,
       receipt: "ABCD-1234",
+      url: null,
+      message: null,
     };
     mocks.rpc.mockImplementation(async (fn: string, args?: Record<string, unknown>) =>
       handle(fn, args),
@@ -379,6 +394,34 @@ describe("OrganizationTransfer (prenos organizácie)", () => {
       fireEvent.change(input, { target: { files: [other] } });
       fireEvent.click(checkButton());
       await waitFor(() => expect(screen.getByText(/súbor je z inej organizácie/)).toBeTruthy());
+    });
+
+    it("neuložený text v poli adresy alebo správy sa pred zrušením pripomenie, po uložení zmizne", async () => {
+      mount();
+      await screen.findByLabelText("Kód potvrdenia z cieľového servera");
+      await waitFor(() =>
+        expect((screen.getByLabelText(/Nová adresa aplikácie/) as HTMLInputElement).disabled).toBe(
+          false,
+        ),
+      );
+      expect(screen.queryByText(/neuložený text/)).toBeNull();
+      fireEvent.change(screen.getByLabelText(/Správa pre zariadenia/), {
+        target: { value: "Presťahovali sme sa." },
+      });
+      expect(screen.getByText(/V poli s adresou alebo správou je neuložený text/)).toBeTruthy();
+      // aj v potvrdzovacom okne tesne pred zrušením
+      fillForm();
+      fireEvent.click(openButton());
+      const dialog = await screen.findByRole("alertdialog");
+      expect(dialog.textContent).toContain("nie je uložená");
+      fireEvent.keyDown(dialog, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      fireEvent.click(screen.getByRole("button", { name: "Uložiť adresu a správu" }));
+      await screen.findByText("Adresa a správa sú uložené.");
+      expect(db.message).toBe("Presťahovali sme sa.");
+      expect(screen.queryByText(/neuložený text/)).toBeNull();
+      fireEvent.click(openButton());
+      expect((await screen.findByRole("alertdialog")).textContent).not.toContain("nie je uložená");
     });
 
     it("tlačidlo na zrušenie čaká na kód z cieľového servera aj na presný názov organizácie", async () => {

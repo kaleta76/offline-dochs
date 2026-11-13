@@ -138,7 +138,22 @@ export type Database = {
           manager_id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "correction_auto_approvals_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_auto_approvals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       corrections: {
         Row: {
@@ -866,9 +881,56 @@ export type Database = {
       }
       is_closed: { Args: { _t: string; _user: string }; Returns: boolean }
       is_manager_of: { Args: { _emp: string }; Returns: boolean }
+      late_punches_import: {
+        Args: { _dry_run?: boolean; _payload: Json }
+        Returns: Json
+      }
       my_organization: { Args: never; Returns: string }
       new_pairing_code: { Args: never; Returns: string }
       new_recovery_code: { Args: never; Returns: string }
+      org_export_begin: { Args: { _lock?: boolean }; Returns: Json }
+      org_export_finish: {
+        Args: { _received: Json; _transfer: string }
+        Returns: Json
+      }
+      org_export_page: {
+        Args: {
+          _limit?: number
+          _offset?: number
+          _rel: string
+          _transfer: string
+        }
+        Returns: Json
+      }
+      org_import_begin: { Args: { _meta: string }; Returns: Json }
+      org_import_cancel: { Args: never; Returns: Json }
+      org_import_check: { Args: { _import: string }; Returns: Json }
+      org_import_chunk: {
+        Args: { _import: string; _rel: string; _rows: string; _seq: number }
+        Returns: Json
+      }
+      org_import_commit: {
+        Args: { _confirm_name: string; _import: string }
+        Returns: Json
+      }
+      org_import_status: { Args: never; Returns: Json }
+      org_transfer_cancel: { Args: never; Returns: Json }
+      org_transfer_confirm_and_delete: {
+        Args: {
+          _accept_changes?: boolean
+          _confirm_name: string
+          _receipt: string
+        }
+        Returns: Json
+      }
+      org_transfer_get_destination: { Args: never; Returns: Json }
+      org_transfer_set_destination: { Args: { _url: string }; Returns: Json }
+      org_transfer_set_notice: {
+        Args: { _message: string; _url: string }
+        Returns: Json
+      }
+      org_transfer_status: { Args: never; Returns: Json }
+      punch_move_notice: { Args: { _users: string[] }; Returns: Json }
       purge_organization: { Args: { _org: string }; Returns: Json }
       recover_device: {
         Args: {

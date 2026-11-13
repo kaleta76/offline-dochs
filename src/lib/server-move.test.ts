@@ -9,8 +9,10 @@ import {
   noteAccepted,
   noteTransferLock,
   parseNotice,
+  MAX_MESSAGE_LENGTH,
   resetMoveStateForTests,
   safeDestination,
+  safeMessage,
   subscribeMove,
   type NoticeClient,
 } from "./server-move";
@@ -62,6 +64,35 @@ describe("safeDestination (adresa z oznamu sa ukazuje ľuďom)", () => {
   });
 });
 
+describe("safeMessage (správa od správcu sa ukazuje ľuďom)", () => {
+  it("prejde jednoriadkový čistý text vrátane diakritiky a emoji", () => {
+    expect(safeMessage("Testovanie sa po upozornení SOC ukončilo.")).toBe(
+      "Testovanie sa po upozornení SOC ukončilo.",
+    );
+    expect(safeMessage("Ďakujeme 🙂")).toBe("Ďakujeme 🙂");
+    expect(safeMessage("a".repeat(MAX_MESSAGE_LENGTH))).toHaveLength(MAX_MESSAGE_LENGTH);
+    // emoji je jeden znak, nie dva (dĺžka sa počíta v znakoch, rovnako ako v databáze)
+    expect(safeMessage("🙂".repeat(MAX_MESSAGE_LENGTH))).not.toBeNull();
+  });
+  it("odmietne prázdne, príliš dlhé, viacriadkové, riadiace a skryté znaky, okrajové medzery a iný typ", () => {
+    expect(safeMessage("")).toBeNull();
+    expect(safeMessage("a".repeat(MAX_MESSAGE_LENGTH + 1))).toBeNull();
+    expect(safeMessage("riadok 1\nriadok 2")).toBeNull();
+    expect(safeMessage("tab\tznak")).toBeNull();
+    expect(safeMessage("skrytý\u200bznak")).toBeNull();
+    expect(safeMessage("obrátené \u202epísmo")).toBeNull();
+    expect(safeMessage("\u0085začiatok")).toBeNull();
+    expect(safeMessage(" medzera")).toBeNull();
+    expect(safeMessage("medzera ")).toBeNull();
+    expect(safeMessage(null)).toBeNull();
+    expect(safeMessage(42)).toBeNull();
+    expect(safeMessage({ toString: () => "text" })).toBeNull();
+  });
+  it("HTML a odkaz prejdú ako obyčajný text (zobrazí sa doslova), nič sa nevykoná", () => {
+    expect(safeMessage("<script>alert(1)</script>")).toBe("<script>alert(1)</script>");
+  });
+});
+
 describe("parseNotice", () => {
   it("prečíta stavy a nebezpečnú adresu zahodí, stav ponechá", () => {
     expect(
@@ -73,9 +104,30 @@ describe("parseNotice", () => {
         },
       }),
     ).toEqual({
-      [A]: { state: "moved", url: "https://novy.example.test" },
-      [B]: { state: "transferring", url: null },
+      [A]: { state: "moved", url: "https://novy.example.test", message: null },
+      [B]: { state: "transferring", url: null, message: null },
     });
+  });
+  it("stav ended a správa (migrácia 0020); nebezpečná správa sa zahodí, stav ostane", () => {
+    expect(
+      parseNotice({
+        version: 1,
+        users: {
+          [A]: { state: "ended", url: null, message: "Testovanie sa ukončilo.", since: "x" },
+          [B]: { state: "ended", message: "dva\nriadky" },
+          [C]: { state: "moved", url: "https://novy.example.test", message: 42 },
+        },
+      }),
+    ).toEqual({
+      [A]: { state: "ended", url: null, message: "Testovanie sa ukončilo." },
+      [B]: { state: "ended", url: null, message: null },
+      [C]: { state: "moved", url: "https://novy.example.test", message: null },
+    });
+  });
+  it("odpoveď servera bez migrácie 0020 (bez poľa message) sa číta ako bez správy", () => {
+    expect(
+      parseNotice({ users: { [A]: { state: "transferring", url: "https://novy.example.test" } } }),
+    ).toEqual({ [A]: { state: "transferring", url: "https://novy.example.test", message: null } });
   });
   it("neznámy tvar je chyba, nie prázdny oznam", () => {
     expect(parseNotice(null)).toBeNull();
@@ -94,7 +146,9 @@ describe("stav prenosu podľa účtu", () => {
     const seen = vi.fn();
     subscribeMove(seen);
     noteTransferLock(A, store);
-    expect(getMoveSnapshot(store)).toEqual({ [A]: { state: "transferring", url: null } });
+    expect(getMoveSnapshot(store)).toEqual({
+      [A]: { state: "transferring", url: null, message: null },
+    });
     expect(seen).toHaveBeenCalledTimes(1);
     noteTransferLock(A, store);
     expect(seen).toHaveBeenCalledTimes(1);
@@ -112,7 +166,11 @@ describe("stav prenosu podľa účtu", () => {
       .mockResolvedValue(answer({ [A]: { state: "moved", url: "https://novy.example.test" } }));
     await checkMoveNotice({ rpc } as NoticeClient, [A], { store, online });
     noteTransferLock(A, store);
-    expect(getMoveSnapshot(store)[A]).toEqual({ state: "moved", url: "https://novy.example.test" });
+    expect(getMoveSnapshot(store)[A]).toEqual({
+      state: "moved",
+      url: "https://novy.example.test",
+      message: null,
+    });
   });
 
   it("dopyt pošle len id účtov (zoradené, bez duplicít a neplatných) a odpoveď nahradí stav práve týchto účtov", async () => {
@@ -124,8 +182,8 @@ describe("stav prenosu podľa účtu", () => {
     ).toBe("checked");
     expect(rpc).toHaveBeenCalledWith("punch_move_notice", { _users: [A, B] });
     expect(getMoveSnapshot(store)).toEqual({
-      [A]: { state: "moved", url: null },
-      [C]: { state: "transferring", url: null },
+      [A]: { state: "moved", url: null, message: null },
+      [C]: { state: "transferring", url: null, message: null },
     });
   });
 
@@ -224,11 +282,11 @@ describe("stav prenosu podľa účtu", () => {
     await checkMoveNotice({ rpc } as NoticeClient, [A], { store, online, now: () => t });
     expect(JSON.parse(store.data.get(MOVE_STORAGE_KEY)!)).toEqual({
       checkedAt: t,
-      users: { [A]: { state: "moved", url: "https://novy.example.test" } },
+      users: { [A]: { state: "moved", url: "https://novy.example.test", message: null } },
     });
     resetMoveStateForTests();
     expect(getMoveSnapshot(store)).toEqual({
-      [A]: { state: "moved", url: "https://novy.example.test" },
+      [A]: { state: "moved", url: "https://novy.example.test", message: null },
     });
     expect(
       await checkMoveNotice({ rpc } as NoticeClient, [A], { store, online, now: () => t + 1000 }),
@@ -246,7 +304,45 @@ describe("stav prenosu podľa účtu", () => {
           }),
         }),
       ),
-    ).toEqual({ [A]: { state: "moved", url: null } });
+    ).toEqual({ [A]: { state: "moved", url: null, message: null } });
+  });
+
+  it("stav ended a správa prežijú nové načítanie; kópia z verzie pred 0020 (bez správy) sa načíta a nebezpečná správa v úložisku sa neukáže", () => {
+    const store = memory({
+      [MOVE_STORAGE_KEY]: JSON.stringify({
+        checkedAt: 1,
+        users: {
+          [A]: { state: "ended", url: null, message: "Testovanie sa ukončilo." },
+          [B]: { state: "moved", url: "https://novy.example.test" },
+          [C]: { state: "ended", url: null, message: "zlé\u202e" },
+        },
+      }),
+    });
+    expect(getMoveSnapshot(store)).toEqual({
+      [A]: { state: "ended", url: null, message: "Testovanie sa ukončilo." },
+      [B]: { state: "moved", url: "https://novy.example.test", message: null },
+      [C]: { state: "ended", url: null, message: null },
+    });
+  });
+
+  it("odpoveď so zmenenou len správou sa zapíše (porovnanie berie do úvahy aj správu)", async () => {
+    const store = memory();
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce(answer({ [A]: { state: "ended", message: "prvá" } }))
+      .mockResolvedValueOnce(answer({ [A]: { state: "ended", message: "druhá" } }));
+    await checkMoveNotice({ rpc } as NoticeClient, [A], {
+      store,
+      online,
+      now: () => CHECK_INTERVAL_MS + 10,
+    });
+    expect(getMoveSnapshot(store)[A]?.message).toBe("prvá");
+    await checkMoveNotice({ rpc } as NoticeClient, [A], {
+      store,
+      online,
+      now: () => 2 * CHECK_INTERVAL_MS + 20,
+    });
+    expect(getMoveSnapshot(store)[A]?.message).toBe("druhá");
   });
 
   it("forgetMove zabudne len vymenované účty", () => {

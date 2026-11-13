@@ -9,15 +9,19 @@
 //   * funkcia punch_move_notice sa volá len vtedy, keď sú vo fronte razenia A ZÁROVEŇ server razenie neprijal, alebo razenia patria
 //     účtu, ktorý nie je prihlásený (po zrušení organizácie sa prihlásiť nedá), a najviac raz za CHECK_INTERVAL_MS,
 //   * pri prázdnej fronte sa neposiela nič.
-// Dopyt ide bez prihlásenia a posiela len id účtov z fronty; odpoveď je stav a voliteľná nová adresa, žiadne osobné údaje.
+// Dopyt ide bez prihlásenia a posiela len id účtov z fronty; odpoveď je stav, voliteľná nová adresa a voliteľná správa od správcu
+// (migrácia 0020), žiadne osobné údaje.
 import { z } from "zod";
 
-export type MoveState = "transferring" | "moved";
+/** transferring = organizácia sa práve prenáša; moved = presťahovaná na iný server; ended = zrušená bez presunu (migrácia 0020). */
+export type MoveState = "transferring" | "moved" | "ended";
 
 export interface MoveInfo {
   state: MoveState;
   /** Nová adresa aplikácie, ak ju správca pri prenose uložil (len http/https, bez mena a hesla). */
   url: string | null;
+  /** Správa od správcu (jeden riadok čistého textu), ak ju uložil. Ukazuje sa vždy ako text, nikdy ako HTML ani odkaz. */
+  message: string | null;
 }
 
 export type MoveMap = Readonly<Record<string, MoveInfo>>;
@@ -29,6 +33,23 @@ export const CHECK_INTERVAL_MS = 10 * 60 * 1000;
 export const MAX_NOTICE_USERS = 50;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** Rovnaký limit ako org_transfer.valid_message v migrácii 0020 (tá rozhoduje). */
+export const MAX_MESSAGE_LENGTH = 300;
+// Riadiace znaky, znaky skrývajúce text a znaky meniace smer písma (zero-width, bidi, oddeľovače riadkov).
+/* eslint-disable no-control-regex */
+const MESSAGE_FORBIDDEN =
+  /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/;
+/* eslint-enable no-control-regex */
+
+/** Správa z oznamu sa ukazuje ľuďom: prejde len čistý jednoriadkový text bez okrajových medzier. Inak null. */
+export function safeMessage(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const length = [...value].length;
+  if (length < 1 || length > MAX_MESSAGE_LENGTH) return null;
+  if (value !== value.trim() || MESSAGE_FORBIDDEN.test(value)) return null;
+  return value;
+}
 
 /** Adresa z oznamu sa ukazuje ľuďom ako odkaz: prejde len čisté http(s) bez mena, hesla, dopytu a kotvy. Inak null. */
 export function safeDestination(value: unknown): string | null {
@@ -59,7 +80,11 @@ const noticeSchema = z.object({
   users: z.record(
     z.string(),
     z
-      .object({ state: z.enum(["transferring", "moved"]), url: z.unknown().optional() })
+      .object({
+        state: z.enum(["transferring", "moved", "ended"]),
+        url: z.unknown().optional(),
+        message: z.unknown().optional(),
+      })
       .passthrough(),
   ),
 });
@@ -70,7 +95,12 @@ export function parseNotice(value: unknown): Record<string, MoveInfo> | null {
   if (!parsed.success) return null;
   const out: Record<string, MoveInfo> = {};
   for (const [id, info] of Object.entries(parsed.data.users)) {
-    if (UUID.test(id)) out[id] = { state: info.state, url: safeDestination(info.url) };
+    if (UUID.test(id))
+      out[id] = {
+        state: info.state,
+        url: safeDestination(info.url),
+        message: safeMessage(info.message),
+      };
   }
   return out;
 }
@@ -93,7 +123,12 @@ const storedSchema = z.object({
   checkedAt: z.number().nonnegative(),
   users: z.record(
     z.string(),
-    z.object({ state: z.enum(["transferring", "moved"]), url: z.string().nullable() }),
+    z.object({
+      state: z.enum(["transferring", "moved", "ended"]),
+      url: z.string().nullable(),
+      // kópia z verzie pred migráciou 0020 správu nemá
+      message: z.string().nullable().optional(),
+    }),
   ),
 });
 
@@ -112,7 +147,12 @@ function load(store: Store | null) {
     checkedAt = parsed.data.checkedAt;
     const next: Record<string, MoveInfo> = {};
     for (const [id, info] of Object.entries(parsed.data.users))
-      if (UUID.test(id)) next[id] = { state: info.state, url: safeDestination(info.url) };
+      if (UUID.test(id))
+        next[id] = {
+          state: info.state,
+          url: safeDestination(info.url),
+          message: safeMessage(info.message),
+        };
     users = next;
   } catch {
     // poškodená kópia: začína sa odznova
@@ -123,7 +163,10 @@ function commit(next: Record<string, MoveInfo>, store: Store | null) {
   const same =
     Object.keys(next).length === Object.keys(users).length &&
     Object.entries(next).every(
-      ([id, i]) => users[id]?.state === i.state && users[id]?.url === i.url,
+      ([id, i]) =>
+        users[id]?.state === i.state &&
+        users[id]?.url === i.url &&
+        users[id]?.message === i.message,
     );
   if (!same) users = next;
   try {
@@ -151,7 +194,7 @@ export function getMoveSnapshot(store: Store | null = browserStore()): MoveMap {
 export function noteTransferLock(userId: string, store: Store | null = browserStore()): void {
   load(store);
   if (!UUID.test(userId) || users[userId]) return;
-  commit({ ...users, [userId]: { state: "transferring", url: null } }, store);
+  commit({ ...users, [userId]: { state: "transferring", url: null, message: null } }, store);
 }
 
 /** Server razenie účtu prijal: organizácia sa neprenáša ani nepresťahovala. */

@@ -11,6 +11,8 @@ Správca môže skúšobnú firmu natrvalo zrušiť aj s jej razeniami, zamestna
 
 Pred zrušením, ak chcete údaje zachovať, urobte zálohu: [`ZALOHA-DATABAZY.md`](ZALOHA-DATABAZY.md). Po zrušení sa organizácia vráti len obnovou zálohy.
 
+**Správa pre zariadenia (od migrácie 0020, nepovinná).** Pod názvom je pole „Správa pre zariadenia“ (jeden riadok, najviac 300 znakov, napríklad „Testovanie sa po upozornení SOC ukončilo.“). Ak v niektorom zariadení ostali neodoslané razenia, po zrušení sa tam ukáže okno „Organizácia bola zrušená“ a táto správa; razenia možno uložiť do šifrovaného súboru alebo ich po dvojitom potvrdení zahodiť bez súboru. Bez správy sa okno ukáže tiež, len bez textu. Správu vidí každý, kto má také zariadenie, preto v nej nie sú osobné údaje. Funkcia `delete_test_organization(názov, správa)` oznam zapíše v tej istej transakcii pred zrušením; bez migrácie 0020 pole správy zrušenie odmietne s textom, že treba spustiť 0020 (zrušenie bez správy funguje ako predtým). Podrobnosti: [`PRENOS-ORGANIZACIE.md`](PRENOS-ORGANIZACIE.md), kapitola o migrácii 0020.
+
 ## Ochrany
 
 - Zrušiť sa dá **len organizácia, ktorú správca predtým označil ako testovaciu** (stĺpec `organizations.is_test`). Ostrú firmu databáza zrušiť odmietne (`Zrušiť sa dá len organizácia označená ako testovacia`), aj keby niekto obišiel obrazovku.

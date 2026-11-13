@@ -11,6 +11,7 @@ import {
   MAX_LATE_PUNCHES,
   parseLateFileText,
   parseLateReport,
+  razeniaText,
   readLateFile,
   toLatePunch,
   type QueuedLike,
@@ -279,5 +280,43 @@ describe("nahratie neskorých razení (správca na novom serveri)", () => {
     ).toEqual({ reason: "nieco_nove", text: "nieco_nove", count: 2 });
     expect(() => parseLateReport({ ok: true })).toThrow(/neočakávanú odpoveď/);
     expect(() => parseLateReport(null)).toThrow(/neočakávanú odpoveď/);
+  });
+
+  it("rozpis po účtoch (migrácia 0020): osobné čísla, počty, rozsah; bez neho null", () => {
+    expect(parseLateReport(report).byAccount).toBeNull();
+    const withAccounts = parseLateReport({
+      ...report,
+      by_account: [
+        {
+          sap_id: "1001",
+          count: 2,
+          from: "2026-11-12T06:00:00+00:00",
+          to: "2026-11-12T14:00:00+00:00",
+        },
+        { sap_id: null, count: 1 },
+      ],
+    });
+    expect(withAccounts.byAccount).toEqual([
+      {
+        sapId: "1001",
+        count: 2,
+        from: "2026-11-12T06:00:00+00:00",
+        to: "2026-11-12T14:00:00+00:00",
+      },
+      { sapId: null, count: 1, from: null, to: null },
+    ]);
+    // zlý tvar rozpisu je neočakávaná odpoveď, nie potichu prázdny zoznam
+    expect(() => parseLateReport({ ...report, by_account: [{ sap_id: "1", count: "x" }] })).toThrow(
+      /neočakávanú odpoveď/,
+    );
+  });
+
+  it("skloňovanie počtu razení", () => {
+    expect(razeniaText(0)).toBe("0 razení");
+    expect(razeniaText(1)).toBe("1 razenie");
+    expect(razeniaText(2)).toBe("2 razenia");
+    expect(razeniaText(4)).toBe("4 razenia");
+    expect(razeniaText(5)).toBe("5 razení");
+    expect(razeniaText(22)).toBe("22 razení");
   });
 });

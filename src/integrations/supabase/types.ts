@@ -846,7 +846,7 @@ export type Database = {
         Returns: undefined
       }
       delete_test_organization: {
-        Args: { _confirm_name: string }
+        Args: { _confirm_name: string; _message?: string }
         Returns: Json
       }
       device_manager_ok: { Args: { _user: string }; Returns: boolean }

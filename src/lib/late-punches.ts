@@ -286,7 +286,26 @@ const reportSchema = z.object({
     }),
   ),
   accounts: z.number().int().nonnegative(),
+  // Rozpis po účtoch pridala migrácia 0020; starší server ho nevracia.
+  by_account: z
+    .array(
+      z.object({
+        sap_id: z.string().nullable().optional(),
+        count: z.number().int().nonnegative(),
+        from: z.string().nullable().optional(),
+        to: z.string().nullable().optional(),
+      }),
+    )
+    .optional(),
 });
+
+/** Rozpis zapísateľných razení podľa účtu (osobné číslo SAP, nikdy meno ani e-mail). */
+export interface LateAccountLine {
+  sapId: string | null;
+  count: number;
+  from: string | null;
+  to: string | null;
+}
 
 export interface LateReport {
   dryRun: boolean;
@@ -306,6 +325,15 @@ export interface LateReport {
     message: string | null;
   }[];
   accounts: number;
+  /** null = server rozpis nevracia (databáza bez migrácie 0020). */
+  byAccount: LateAccountLine[] | null;
+}
+
+/** Slovenské skloňovanie „razenie“ podľa počtu (1 razenie, 2–4 razenia, 5 a viac razení). */
+export function razeniaText(n: number): string {
+  if (n === 1) return "1 razenie";
+  if (n >= 2 && n <= 4) return `${n} razenia`;
+  return `${n} razení`;
 }
 
 export function parseLateReport(value: unknown): LateReport {
@@ -332,6 +360,14 @@ export function parseLateReport(value: unknown): LateReport {
       message: i.message ?? null,
     })),
     accounts: r.accounts,
+    byAccount: r.by_account
+      ? r.by_account.map((a) => ({
+          sapId: a.sap_id ?? null,
+          count: a.count,
+          from: a.from ?? null,
+          to: a.to ?? null,
+        }))
+      : null,
   };
 }
 

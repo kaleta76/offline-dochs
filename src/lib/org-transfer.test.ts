@@ -351,6 +351,13 @@ describe("stav, zrušenie a potvrdenie", () => {
       transferId: TID,
     });
     expect(describeChanges(s?.changes ?? [])).toBe("razenia: 120 → 123, účty: 5 → 6");
+    // rovnaký počet, zmenil sa obsah: nepíše sa „8 → 8“
+    expect(
+      describeChanges([
+        { rel: "public.devices", then: 8, now: 8 },
+        { rel: "public.punches", then: 120, now: 121 },
+      ]),
+    ).toBe("zariadenia: zmenil sa obsah (počet 8), razenia: 120 → 121");
     expect(parseStatus({ ...statusData, state: "niečo" })).toBeNull();
     expect(parseStatus(null)).toBeNull();
     expect(parseStatus({ name: "x" })).toBeNull();

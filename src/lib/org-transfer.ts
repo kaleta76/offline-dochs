@@ -247,10 +247,18 @@ const TABLE_LABELS: Record<string, string> = {
   "public.month_closures": "uzávierky mesiaca",
 };
 
-/** Veta o zmenách od exportu, napr. „razenia: 120 → 123, účty: 5 → 6“. */
+/**
+ * Veta o zmenách od exportu, napr. „razenia: 120 → 123, účty: 5 → 6“. Pri rovnakom počte (zmenil sa obsah riadkov, nie ich počet) by
+ * „8 → 8“ vyzeralo ako chyba, preto sa píše „zmenil sa obsah (počet 8)“.
+ */
 export function describeChanges(changes: TransferChange[]): string {
   return changes
-    .map((c) => `${TABLE_LABELS[c.rel] ?? c.rel.replace(/^public\./, "")}: ${c.then} → ${c.now}`)
+    .map((c) => {
+      const label = TABLE_LABELS[c.rel] ?? c.rel.replace(/^public\./, "");
+      return c.then === c.now
+        ? `${label}: zmenil sa obsah (počet ${c.now})`
+        : `${label}: ${c.then} → ${c.now}`;
+    })
     .join(", ");
 }
 

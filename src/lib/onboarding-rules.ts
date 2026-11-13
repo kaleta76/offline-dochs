@@ -22,9 +22,7 @@ export const registerSchema = z.object({
   name: z.string().trim().min(2, "Zadajte názov organizácie.").max(160),
   number: personnelNumberSchema,
   password: strongPasswordSchema,
-  accepted: z.literal(true, {
-    errorMap: () => ({ message: "Je potrebný súhlas so zodpovednosťou." }),
-  }),
+  accepted: z.literal(true, { error: "Je potrebný súhlas so zodpovednosťou." }),
 });
 
 export const loginSchema = z.object({

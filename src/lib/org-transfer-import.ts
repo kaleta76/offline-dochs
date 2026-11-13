@@ -185,7 +185,8 @@ function invalid(what: string): never {
   );
 }
 
-const orgSchema = z.object({ id: z.string().uuid(), name: z.string(), code: z.string() });
+// zod 4: `.uuid()` je prísne na verziu a variant; `z.guid()` prijíma každý tvar 8-4-4-4-12 ako zod 3 (pozri org-transfer.ts).
+const orgSchema = z.object({ id: z.guid(), name: z.string(), code: z.string() });
 
 const statusSchema = z.object({
   eligible: z.boolean(),
@@ -194,7 +195,7 @@ const statusSchema = z.object({
   code: z.string().optional(),
   active: z
     .object({
-      import_id: z.string().uuid(),
+      import_id: z.guid(),
       state: z.enum(["uploading", "checked"]),
       organization: orgSchema,
       rows: z.number(),
@@ -262,7 +263,7 @@ export function parseImportStatus(value: unknown): ImportStatus {
 }
 
 const beginSchema = z.object({
-  import_id: z.string().uuid(),
+  import_id: z.guid(),
   organization: orgSchema,
   tables: z.array(z.object({ rel: z.string().min(1), n: z.number().int().nonnegative() })).min(1),
   rows: z.number().int().nonnegative(),
@@ -279,7 +280,7 @@ const chunkSchema = z.object({
 
 const checkSchema = z.object({
   state: z.literal("checked"),
-  import_id: z.string().uuid(),
+  import_id: z.guid(),
   organization: orgSchema,
   counts: z.record(z.string(), z.number()),
   rows: z.number(),

@@ -47,7 +47,7 @@ Microsoft Access (plná verzia, Runtime nestačí) a VBA. Inštalátor overuje S
   - **Prvá fáza klienta**: razenie, lokálny záznam vlastných razení, odoslanie `.rzn`, bez výpočtu.
   - **Druhá fáza klienta**: klient počíta vlastný mesiac **tým istým VBA** rovnakej verzie ako HR Access. Zhodu overuje SHA-256 modulov podľa `manifest.json` pri štarte; pri nezhode sa klient aktualizuje zo zdieľaného priečinka, inak mesiac neukáže. Parametre (spoločné, bez osobných údajov) a údaje zamestnanca (len jeho) prináša do **lokálnych tabuliek** klienta synchronizačná rutina vo VBA, nie pripojenie tabuliek z hlavnej databázy (Access nemá práva po riadkoch, kto pripojí tabuľku, otvorí celý súbor). Rutina nové zverejnenie prevezme v jednej transakcii a bez dostupného zdroja použije poslednú lokálnu kópiu s označením „neaktuálne“. Výsledok klienta je len orientačný, záväzný ostáva výpočet v HR Accesse.
   - **Overenie VBA**: klient sa píše spolu s jeho skúškami v skutočnom Accesse na počítači vlastníčky (prepojenie s počítačom cez aplikáciu Claude, funguje len pri spustenej aplikácii), vždy na kópii databázy s testovacími dátami, krok po kroku s jej súhlasom. Kým skúška neprebehne, klient ostáva v zozname neoverených častí (kapitola 7).
-- **Snímač SKE**: modul nie je vo verejnom repozitári.
+- **Snímač SKE** (sériový port): modul nie je vo verejnom repozitári (rozhodnutie vlastníčky). Napojenie Accessu cez VBA na snímač ide až na konci (kapitola 8).
 - Kód VBA sa mimo Accessu nedá spustiť. Kontroluje ho `tools/kontrola_vba.py` (CI) a správanie v skutočnom Accesse overuje vlastník (od klienta aj spolu s Claude na jej počítači, pozri vyššie); v `access/CHANGELOG.md` je pri každom balíku skúšobný postup.
 
 ### 2.3 Kontrakt (`contract/`): hotové, overuje ho CI
@@ -199,6 +199,8 @@ Veľké časti píše jeden agent v samostatnom chate podľa písomného zadania
 6. **Etapa 4 – plán zamestnanca**: generátor po mesiacoch, režimy výpočtu.
 7. **Etapa 5 – uzávierka z Accessu v termináli** (po kontrakte 1.6.0 a balíku Access): zosúladenie mesiaca, razenia mimo uzávierky do auditu s upozornením.
 8. **Access**: klient na počítači zamestnanca (najprv razenie bez výpočtu, potom výpočet mesiaca tým istým VBA s lokálnymi tabuľkami; skúška v skutočnom Accesse, kapitola 2.2), okno na nastavenie režimov výpočtu, okno práce podľa fondu a organizačnej jednotky, upozornenie na razenie mimo okna, zostávajúce body z `access/CHANGELOG.md`.
+9. **Režim kiosk pre terminál (PWA)**: rozsah a podrobnosti sa určia, až príde na rad. Ide až na konci.
+10. **Napojenie Accessu cez VBA na snímač SKE** (sériový port): snímač zbiera razenia v dochádzkovom systéme bez terminála; podrobnosti napojenia sa určia, až príde na rad. Modul ostáva mimo verejného repozitára. Ide až na konci.
 
 ## 9. Rozhodnutia
 
@@ -217,3 +219,4 @@ Veľké časti píše jeden agent v samostatnom chate podľa písomného zadania
 | 13. 11. 2026 | Uzávierka z Accessu: terminál zosúladí mesiac, razenia mimo uzávierky do auditu s upozornením; návrh kontraktu 1.6.0 povolený                                                                                          |
 | 13. 11. 2026 | Terminál osobné údaje nezbiera, mená sa dopisujú ručne na tlačený výkaz; export pre SAP je mimo rozsahu, kým nie je špecifikácia                                                                                       |
 | 13. 11. 2026 | Klient v Accesse: najprv razenie bez výpočtu, potom výpočet tým istým VBA s lokálnymi tabuľkami; VBA sa overuje v skutočnom Accesse na kópii s testovacími dátami                                                      |
+| 13. 11. 2026 | Režim kiosk pre terminál a napojenie Accessu cez VBA na snímač SKE sa zaradili na koniec poradia prác                                                                                                                  |

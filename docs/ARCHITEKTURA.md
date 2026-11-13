@@ -43,9 +43,12 @@ React a TanStack Start, PWA, backend Supabase (Postgres, RLS, funkcie `SECURITY 
 Microsoft Access (plná verzia, Runtime nestačí) a VBA. Inštalátor overuje SHA-256 modulov; balík v `main` je **2.17.0**. Výpočet dňa je v `mod_08_UdalostiDna`, automatické opravy v `mod_09`, pravidlá prerušení a fondy v `mod_16` a `mod_17`, uzávierka v `mod_18`, import z terminála v `mod_19`, export konfigurácie v `mod_20`, režimy výpočtu v `mod_21`, import zo starého systému (DBF) v `mod_02`.
 
 - **Dve nezávislé inštancie** (rozhodnutie 12. 11. 2026): každá inštancia je plný Access s vlastnými zamestnancami a nastaveniami. Medzi inštanciami sa neprenášajú razenia ani nastavenia a nastavenia sa neuzamykajú.
-- **Klient na razenie v Accesse** (návrh): zamestnanec razí z Accessu na svojom počítači, razenie je jeden súbor `.rzn` v zdieľanom priečinku, HR ho prijme a prevedie rovnakým kódom ako razenie z terminála. Strana HR (balík 2.18.0) je vo vetve `claude/access-klient-razenia`, nezlúčená. Samotný klient ešte nie je.
+- **Klient v Accesse, „Access terminál“** (návrh): náhrada terminála tam, kde ho nasadiť nemožno (smie sa len Access a Excel). Zamestnanec razí z Accessu na svojom počítači, razenie je jeden súbor `.rzn` v zdieľanom priečinku (zamestnanec súbory len vytvára), HR ho prijme a prevedie rovnakým kódom ako razenie z terminála. Strana HR (balík 2.18.0) je vo vetve `claude/access-klient-razenia`, nezlúčená. Samotný klient ešte nie je.
+  - **Prvá fáza klienta**: razenie, lokálny záznam vlastných razení, odoslanie `.rzn`, bez výpočtu.
+  - **Druhá fáza klienta**: klient počíta vlastný mesiac **tým istým VBA** rovnakej verzie ako HR Access. Zhodu overuje SHA-256 modulov podľa `manifest.json` pri štarte; pri nezhode sa klient aktualizuje zo zdieľaného priečinka, inak mesiac neukáže. Parametre (spoločné, bez osobných údajov) a údaje zamestnanca (len jeho) prináša do **lokálnych tabuliek** klienta synchronizačná rutina vo VBA, nie pripojenie tabuliek z hlavnej databázy (Access nemá práva po riadkoch, kto pripojí tabuľku, otvorí celý súbor). Rutina nové zverejnenie prevezme v jednej transakcii a bez dostupného zdroja použije poslednú lokálnu kópiu s označením „neaktuálne“. Výsledok klienta je len orientačný, záväzný ostáva výpočet v HR Accesse.
+  - **Overenie VBA**: klient sa píše spolu s jeho skúškami v skutočnom Accesse na počítači vlastníčky (prepojenie s počítačom cez aplikáciu Claude, funguje len pri spustenej aplikácii), vždy na kópii databázy s testovacími dátami, krok po kroku s jej súhlasom. Kým skúška neprebehne, klient ostáva v zozname neoverených častí (kapitola 7).
 - **Snímač SKE**: modul nie je vo verejnom repozitári.
-- Kód VBA sa mimo Accessu nedá spustiť. Kontroluje ho `tools/kontrola_vba.py` (CI) a správanie v skutočnom Accesse overuje vlastník; v `access/CHANGELOG.md` je pri každom balíku skúšobný postup.
+- Kód VBA sa mimo Accessu nedá spustiť. Kontroluje ho `tools/kontrola_vba.py` (CI) a správanie v skutočnom Accesse overuje vlastník (od klienta aj spolu s Claude na jej počítači, pozri vyššie); v `access/CHANGELOG.md` je pri každom balíku skúšobný postup.
 
 ### 2.3 Kontrakt (`contract/`): hotové, overuje ho CI
 
@@ -195,7 +198,7 @@ Veľké časti píše jeden agent v samostatnom chate podľa písomného zadania
 5. **Etapa 3 – editor prerušení** s príznakmi a tlačidlami.
 6. **Etapa 4 – plán zamestnanca**: generátor po mesiacoch, režimy výpočtu.
 7. **Etapa 5 – uzávierka z Accessu v termináli** (po kontrakte 1.6.0 a balíku Access): zosúladenie mesiaca, razenia mimo uzávierky do auditu s upozornením.
-8. **Access**: klient na počítači zamestnanca, okno na nastavenie režimov výpočtu, okno práce podľa fondu a organizačnej jednotky, upozornenie na razenie mimo okna, zostávajúce body z `access/CHANGELOG.md`.
+8. **Access**: klient na počítači zamestnanca (najprv razenie bez výpočtu, potom výpočet mesiaca tým istým VBA s lokálnymi tabuľkami; skúška v skutočnom Accesse, kapitola 2.2), okno na nastavenie režimov výpočtu, okno práce podľa fondu a organizačnej jednotky, upozornenie na razenie mimo okna, zostávajúce body z `access/CHANGELOG.md`.
 
 ## 9. Rozhodnutia
 
@@ -213,3 +216,4 @@ Veľké časti píše jeden agent v samostatnom chate podľa písomného zadania
 | 13. 11. 2026 | Úplné rozhranie nastavení v termináli po etapách (pre firmy bez Accessu); model úplný od začiatku                                                                                                                      |
 | 13. 11. 2026 | Uzávierka z Accessu: terminál zosúladí mesiac, razenia mimo uzávierky do auditu s upozornením; návrh kontraktu 1.6.0 povolený                                                                                          |
 | 13. 11. 2026 | Terminál osobné údaje nezbiera, mená sa dopisujú ručne na tlačený výkaz; export pre SAP je mimo rozsahu, kým nie je špecifikácia                                                                                       |
+| 13. 11. 2026 | Klient v Accesse: najprv razenie bez výpočtu, potom výpočet tým istým VBA s lokálnymi tabuľkami; VBA sa overuje v skutočnom Accesse na kópii s testovacími dátami                                                      |

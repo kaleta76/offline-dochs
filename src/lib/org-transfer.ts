@@ -107,14 +107,15 @@ export async function call(
 // Odpovede databázy
 // ---------------------------------------------------------------------------------------------
 
+// zod 4: `.uuid()` kontroluje verziu a variant (odmietne napr. 00000000-0000-0000-0000-000000000001); `z.guid()` prijíma každý tvar 8-4-4-4-12 ako zod 3 a Postgres uuid.
 const beginSchema = z.object({
-  transfer_id: z.string().uuid(),
+  transfer_id: z.guid(),
   locked: z.boolean(),
   meta: z
     .object({
       format: z.literal(2),
       organization: z
-        .object({ id: z.string().uuid(), name: z.string(), code: z.string() })
+        .object({ id: z.guid(), name: z.string(), code: z.string() })
         .passthrough(),
     })
     .passthrough(),
@@ -132,7 +133,7 @@ const pageSchema = z.object({
 
 const finishSchema = z.object({
   state: z.literal("exported"),
-  transfer_id: z.string().uuid(),
+  transfer_id: z.guid(),
   locked: z.boolean(),
   is_test: z.boolean(),
   protected: z.boolean(),

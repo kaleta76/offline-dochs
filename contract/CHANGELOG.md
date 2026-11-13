@@ -67,3 +67,14 @@
 * Zámerne mimo tejto verzie: najdlhšie trvanie s prevodom prekročenia, zaokrúhlenie po prerušeniach, prerušenie cez polnoc, priorita pred sviatkom, predvoľba a plánovanie neprítomností,
   mesačný limit súkromných odchodov, kódy pre mzdy, pridelenie režimu podľa roly, voľné čísla pre prácu a obed.
 * Schválenie vlastníkom repozitára je potrebné (zmena `contract/`).
+
+## 1.6.0 – 2026-11-13 (návrh, nový súbor; `punches_*.csv`, `voids_*.csv` ani `dochs_config.json` sa nemenia)
+* Nový súbor `dochs_closures.json` (smer Access → terminál, `schema_version` 1): stav uzávierok mesiacov zamestnancov (`CLOSED` alebo `REOPENED`), počítadlo zmien stavu `state_seq`,
+  pri `CLOSED` konečné čísla mesiaca (`totals`) a zoznam razení, ktoré Access zarátal (`counted_punches`, podľa `external_id`). Terminál podľa nej mesiac zosúladí a razenia mimo uzávierky uloží do auditu
+  a upozorní vedúceho; razenia sa nemažú ani nemenia, vzorec hash reťaze sa nemení.
+* Dôvod (rozhodnutie vlastníčky 13. 11. 2026, `docs/ARCHITEKTURA.md`, kapitola 5.7): pri organizácii spárovanej s Accessom uzavretie mesiaca rieši Access; razenie sa v termináli vždy prijme.
+* Schéma `closures-export.schema.json`, zlatý súbor `examples/closures_example.json` (vymyslené údaje, razenia a organizácia z `examples/punches_example.csv`, jedno razenie zámerne mimo uzávierky),
+  overovač `tools/verify_closures.py` a 39 testov `tools/test_verify_closures.py` (vrátane súhlasu s JSON schémou, ak je nainštalovaný `jsonschema`; CI ho nemá a tieto testy preskočí).
+* Zámerne mimo: čísla po dňoch, prenos salda, nadčas, dôvod otvorenia, osoba, ktorá mesiac uzavrela.
+* Nasadenie: terminál a Access zatiaľ súbor neprodukujú ani neprijímajú; je to samostatná práca po schválení (terminál etapa 5, Access samostatný balík). Žiadny existujúci súbor ani test sa nemení.
+* Schválenie vlastníkom repozitára je potrebné (zmena `contract/`).

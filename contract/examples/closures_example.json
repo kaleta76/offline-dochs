@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "closures_version": "2026.11.20.0830",
+  "generated_at": "2026-11-20T08:30:00",
+  "organization_id": "0b6f2f0e-5a7e-4b8e-9a43-2c1d5e7a9f01",
+  "closures": [
+    {
+      "personnel_number": "00123456",
+      "year": 2026,
+      "month": 11,
+      "state": "CLOSED",
+      "state_seq": 1,
+      "changed_at": "2026-11-20T08:12:40",
+      "report_code": "A1B2C3D4E5F6",
+      "totals": { "worked_min": 484, "expected_min": 450, "balance_min": 34 },
+      "counted_punches": [
+        "a0000000-0000-4000-8000-000000000101",
+        "a0000000-0000-4000-8000-000000000103",
+        "a0000000-0000-4000-8000-000000000104",
+        "a0000000-0000-4000-8000-000000000105"
+      ]
+    },
+    {
+      "personnel_number": "1234567",
+      "year": 2026,
+      "month": 11,
+      "state": "CLOSED",
+      "state_seq": 1,
+      "changed_at": "2026-11-20T08:14:05",
+      "totals": { "worked_min": 438, "expected_min": 450, "balance_min": -12 },
+      "counted_punches": [
+        "a0000000-0000-4000-8000-000000000102",
+        "a0000000-0000-4000-8000-000000000106",
+        "a0000000-0000-4000-8000-000000000107"
+      ]
+    },
+    {
+      "personnel_number": "00123456",
+      "year": 2026,
+      "month": 10,
+      "state": "REOPENED",
+      "state_seq": 2,
+      "changed_at": "2026-11-19T15:02:11"
+    }
+  ],
+  "counts": { "closures": 3, "counted_punches": 7 }
+}

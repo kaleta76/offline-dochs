@@ -947,6 +947,16 @@ export interface ImportResult {
   withoutAccountCount: number;
   /** Prvých najviac 50 osobných čísel, ktoré nemajú účet v termináli. */
   withoutAccount: string[];
+  /** Od ktorého mesiaca („RRRR-MM“) má verzia platiť (migrácia 0022); null = databáza bez verzií nastavení. */
+  validFrom: string | null;
+  /** Aktuálny mesiac podľa databázy. */
+  monthNow: string | null;
+  /** Komu mesiac platnosti patrí pred importom: terminálu alebo Accessu. */
+  ownerNow: "terminal" | "access" | null;
+  /** Najstarší mesiac, od ktorého smie verzia platiť (najstarší neuzavretý). */
+  oldestOpen: string | null;
+  /** Posledné mesiace: koľko zamestnancov s razeniami má mesiac neuzavretý (open) a uzavretý (closed). */
+  openMonths: { month: string; open: number; closed: number }[];
 }
 
 const nat = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
@@ -972,7 +982,26 @@ export function parseImportResult(value: unknown): ImportResult | null {
     removedMonths: nat(value["removed_months"]),
     withoutAccountCount: nat(value["without_account_count"]),
     withoutAccount: list,
+    validFrom: monthOrNull(value["valid_from"]),
+    monthNow: monthOrNull(value["month_now"]),
+    ownerNow: ownerOf(value["owner_now"]),
+    oldestOpen: monthOrNull(value["oldest_open"]),
+    openMonths: (Array.isArray(value["open_months"]) ? value["open_months"] : []).flatMap((m) =>
+      isObj(m) && monthOrNull(m["month"]) ? [{ month: m["month"] as string, open: nat(m["open"]), closed: nat(m["closed"]) }] : [],
+    ),
   };
+}
+
+const monthOrNull = (v: unknown) => (isStr(v) && RE_MONTH.test(v) ? v : null);
+function ownerOf(v: unknown): "terminal" | "access" | null {
+  const origin = isObj(v) ? v["origin"] : null;
+  return origin === "terminal" || origin === "access" ? origin : null;
+}
+
+/** Mesiace pred mesiacom platnosti, v ktorých sú neuzavretí zamestnanci (ostanú s pôvodnými nastaveniami, kým správca nezvolí skoršiu platnosť). */
+export function openMonthsBefore(r: ImportResult): { month: string; open: number }[] {
+  if (!r.validFrom) return [];
+  return r.openMonths.filter((m) => m.open > 0 && m.month < r.validFrom!).map((m) => ({ month: m.month, open: m.open }));
 }
 
 export interface CurrentConfig {
@@ -1031,5 +1060,5 @@ export function describeImportResult(r: ImportResult): string {
       : "";
   return r.status === "preview"
     ? `Nová verzia ${formatConfigVersion(r.configVersion)}: ${body}${removed}. Zatiaľ sa nič nezapísalo.`
-    : `Prijatá verzia ${formatConfigVersion(r.configVersion)}: ${body}${removed}.`;
+    : `Prijatá verzia ${formatConfigVersion(r.configVersion)}: ${body}${removed}${r.validFrom ? `; platí od ${formatMonth(r.validFrom)}` : ""}.`;
 }

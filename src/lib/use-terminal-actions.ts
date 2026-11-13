@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { loadSettingsForMonth } from "./settings-model";
 import { pollInterval, useRefetchOnResume, useUserActive } from "./activity-polling";
 import {
   newestTerminalConfig,
@@ -37,21 +37,15 @@ export function useTerminalConfig(
     refetchInterval: pollInterval(CONFIG_POLL_MS, online && active),
     queryFn: async () => {
       if (!key || !organizationId) return null;
-      const { data, error } = await supabase
-        .from("access_config")
-        .select("config_version, config")
-        .eq("organization_id", organizationId)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) {
-        try {
-          localStorage.removeItem(key);
-        } catch {
-          /* optional cache */
-        }
-        return null;
-      }
-      const parsed = parseTerminalConfig(data.config_version, data.config);
+      // Tlačidlá sa odvodzujú z verzie nastavení platnej pre aktuálny mesiac (terminálovej alebo z Accessu); číta sa jedinou
+      // cestou spoločnou s výpočtom. Z odpovede sa do zariadenia ukladá len overená projekcia tlačidiel, nikdy plán zamestnanca.
+      const settings = await loadSettingsForMonth();
+      const config_version = (settings.config as { config_version?: unknown }).config_version;
+      const parsed = parseTerminalConfig(
+        typeof config_version === "string" ? config_version : (settings.version.config_version ?? ""),
+        settings.config,
+        settings.version.ord,
+      );
       if (!parsed) throw new Error("Neplatná konfigurácia tlačidiel.");
       let previous: TerminalConfig | null = null;
       try {

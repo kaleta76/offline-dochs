@@ -121,3 +121,5 @@ Projekt vzniká bez dotácie a vo voľnom čase. Ak ho chcete podporiť, môžet
 Dar nezakladá nárok na funkcie, podporu ani záruku. Aplikácia je prototyp v testovacej prevádzke.
 
 Na sponzoring, spoluprácu, nápady alebo chyby napíšte cez [Issues](https://github.com/kaleta76/offline-dochs/issues). Zápis je verejný, preto v ňom neuvádzajte osobné údaje, skutočné osobné čísla ani prístupové údaje.
+
+<!-- test-zapisu: 2026-11-13 12:12 UTC – overenie zápisu a synchronizácie do vetvy lovable -->

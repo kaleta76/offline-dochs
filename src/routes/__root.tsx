@@ -15,6 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth";
 import { prepareOfflineApp } from "../lib/pwa";
 import { installNetworkLog } from "../lib/net-log";
+import { ServerMoveNotice } from "../components/ServerMoveNotice";
 
 // Záznam zlyhaných dopytov na server (diagnostika spojenia, pozri src/lib/net-log.ts). Spúšťa sa pri načítaní modulu, aby zachytil aj
 // prvé dopyty po otvorení stránky. Na serveri sa nič nerobí.
@@ -132,6 +133,8 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <AuthProvider>
+        {/* Oznam o presťahovaní organizácie patrí nad každú stránku vrátane prihlásenia (po zrušení organizácie sa prihlásiť nedá). */}
+        <ServerMoveNotice />
         <Outlet />
       </AuthProvider>
     </QueryClientProvider>

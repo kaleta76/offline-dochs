@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TransferDestination } from "@/components/TransferDestination";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { confirmationMatches, describeContents, parseSummary } from "@/lib/organization-delete";
@@ -498,6 +499,8 @@ export function OrganizationTransfer() {
           )}
 
           <FileCheck status={status} />
+
+          <TransferDestination transferId={status.transferId} />
 
           {status.hasChanges && (
             <div role="alert" className="space-y-2 border-2 border-destructive p-2 text-sm">

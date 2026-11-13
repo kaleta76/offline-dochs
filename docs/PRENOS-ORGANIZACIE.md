@@ -106,7 +106,28 @@ Podľa kódu aplikácie (`offline-queue.ts`, `device.ts`, `auth-guard.ts`, `pwa.
 * **Zariadenie bude nové.** Kľúč zariadenia sa neprenáša (je len v pôvodnom prehliadači), preto sa razenia z neho najprv označia „neoverené“, kým vedúci nové zariadenie nepotvrdí (Nahradiť pôvodné zariadenie, potom schválenie v Môj tím → Zariadenia). Razenia sa počítajú aj dovtedy. Pozri [`OVERENIE-ZARIADENI.md`](OVERENIE-ZARIADENI.md).
 * **Staré inštalácie odstráňte.** Ak starý server vypnete úplne, nainštalovaná aplikácia sa ešte otvorí z vyrovnávacej pamäte a razenia ukladá do fronty, ktorá sa už nikdy neodošle, a zamestnanec si to nemusí všimnúť. Všetkým oznámte novú adresu.
 * **Najplynulejší presun:** ak terminály používajú vlastnú doménu, ktorú pri presune len prepojíte na nový server, ostane pôvodná adresa (a teda kľúč zariadenia aj front razení); zamestnanci sa len znova prihlásia a razenia vo fronte sa odošlú na nový server (účty majú rovnaké id a razenie je podľa `client_uuid` idempotentné). Neoverené: závisí od hostingu a od zostavenia aplikácie s adresou novej databázy.
-* **Zatiaľ nie je** upozornenie na starom serveri typu „organizácia sa presťahovala na adresu …“ ani odoslanie fronty z terminálu na nový server. Je to vhodný ďalší krok, ktorý by odstránil riziko tichej straty razení na starých termináloch.
+* **Od migrácie 0019** terminál presťahovanie zistí sám a razenia, ktoré v ňom ostali, ponúkne uložiť do šifrovaného súboru pre nový server: pozri ďalšiu kapitolu. Overenie „čaká na odoslanie je 0“ pred zrušením ostáva najistejšia cesta; súbor je záchrana pre terminály, na ktoré sa zabudlo.
+
+## Razenia, ktoré ostali v zariadení (migrácia 0019)
+
+Fronta razení terminálu o prenose nevedela: počas zámku sa razenie ticho opakovalo a po zrušení organizácie ostalo navždy len v prehliadači. Migrácia `0019_razenia_po_prestahovani.sql` a aplikácia to riešia v troch častiach.
+
+**1. Oznam (starý server).** Funkcia `punch_move_notice(účty)` je jediná, ktorú smie volať neprihlásený (po zrušení organizácie účty neexistujú). Zariadenie pošle id účtov, ktorých razenia má vo fronte, a dostane `transferring` (organizácia sa prenáša, rovnaká podmienka ako zámok razení) alebo `moved` (prenos bol potvrdený kódom a organizácia tu zanikla), prípadne novú adresu. Oznam je **pre organizáciu, nie pre server** (na serveri je viac organizácií). Po zrušenej organizácii ostane v `org_transfer.move_notices` len jej id, id prenosu, čas, voliteľná adresa a SHA-256 odtlačky id jej účtov; žiadne osobné čísla ani samotné id účtov. Stav vedie spúšťač na tabuľke prenosov, funkcie z 0016 sa nemenia: potvrdenie kódom = `moved`, zrušenie prenosu alebo nový export = oznam sa zmaže. Ak sa organizácia vráti importom späť, živý účet má prednosť a `moved` sa prestane vydávať.
+Novú adresu (nepovinnú) uloží správca v karte prenosu po exporte (`org_transfer_set_destination`); prejde len `http(s)://meno[:port][/cesta]`.
+
+**2. Terminál** (`src/lib/server-move.ts`, `src/components/ServerMoveNotice.tsx`, nad každou stránkou vrátane prihlásenia).
+* Zámok prenosu sa pozná z odpovede na razenie (SQLSTATE 55000), bez ďalšieho dopytu: „Organizácia sa práve sťahuje… razenia sú uložené a odošlú sa samy“.
+* Na oznam sa zariadenie pýta len vtedy, keď má vo fronte razenia a zároveň server razenie neprijal alebo razenia patria neprihlásenému účtu, najviac raz za 10 minút. Pri prázdnej fronte neposiela nič.
+* Pri `moved` ukáže „Server bol presťahovaný“ s počtom razení: (1) uložiť do šifrovaného súboru (formát `DOCHSENC` ako prenos organizácie, heslo aspoň 12 znakov, ostáva v prehliadači), (2) súbor odovzdať správcovi nového servera, (3) zmazať razenia a upratať zariadenie. **Zmazanie sa ponúkne až po uložení súboru**, vyžaduje zaškrtnutie aj druhé potvrdenie s počtom a zmaže presne to, čo je v súbore. Nič sa nemaže samo.
+* Súbor obsahuje len `client_uuid`, `user_id`, `code`, `direction`, `client_time`, `device`, verziu a odtlačok. Kľúč zariadenia sa doň nikdy nedostane.
+* Upratanie (`src/lib/device-cleanup.ts`): razenia zo súboru, kľúč zariadenia a uložené údaje presťahovaných účtov; ak v zariadení neostali iné razenia ani iný prihlásený účet, aj prihlásenie, celé úložisko stránky, obe databázy IndexedDB, vyrovnávacia pamäť a service worker. Kým je stránka otvorená, prázdna databáza fronty môže vzniknúť znova.
+* Priame odoslanie na novú adresu nejde (iná adresa = iná fronta a prihlásenie), preto súbor.
+
+**3. Nový server** (Správa → Servis → *Neskoré razenia zo zariadenia*, `late_punches_import`). Súbor sa dešifruje v prehliadači, server ho najprv len skontroluje a po potvrdení zapíše, čo je v poriadku. Súboru sa neverí: len správca a len účty jeho organizácie, opakované nahratie nič nezdvojí (`client_uuid`), nie do uzavretého mesiaca, nie do budúcnosti, nie staršie než 120 dní, najviac 2 000 razení v súbore. Razenia idú **bežnou cestou** (zdroj `terminal`, bez kľúča zariadenia), takže hash reťaz doplní `punches_chain` ako vždy a razenie je **neoverené**, kým ho nepotvrdí vedúci. Vzorec reťaze, `punches`, `profiles` ani `contract/` sa nemenia. Každé nahratie má jeden záznam v audite (počty, bez razení).
+
+**Access (zatiaľ len návrh rozhrania).** Tie isté razenia by sa dali vydať ako `.rzn` pre príjem v Accesse HR. Zariadenie na to nestačí: fronta má `user_id`, osobné číslo je len v kópii účtu `me-cache`, ktorá sa pri odhlásení maže. Mapovanie pozná nový server, preto je správna cesta: nahrať súbor na novom serveri a razenia odovzdať Accessu bežným exportom razení (bez zmeny kontraktu). Samostatný export `.rzn` zo súboru by bola nová funkcia na serveri (`user_id` → osobné číslo) a zmena dohodnutá s Accessom.
+
+**Čo to nerieši:** vypnutý celý starý server (oznam nemá kto vydať), organizáciu zrušenú ako testovaciu bez prenosu (oznam nevzniká) a zariadenie, ktoré sa už nikdy neotvorí.
 
 ## Ručné vyskúšanie (SQL editor, ako správca)
 
@@ -126,7 +147,10 @@ Ak `uncovered_tables()` vráti nejakú tabuľku, niektorá novšia migrácia pri
 1. Záloha podľa [`ZALOHA-DATABAZY.md`](ZALOHA-DATABAZY.md).
 2. Spustiť `docs/migracie/0016_prenos_organizacie_export.sql` (opakovateľné). Predpoklad: migrácie 0001 až 0008.
 3. Na serveri, ktorý má organizácie **prijímať**, spustiť aj `docs/migracie/0017_prenos_organizacie_import.sql` (opakovateľné, predpoklad 0016). Kontrola: `SELECT org_transfer.import_version(), org_transfer.import_unclassified();` vráti verziu a `{}`.
-4. Návrat: [`migracie/0017_spat_zachranny.sql`](migracie/0017_spat_zachranny.sql) a až potom [`migracie/0016_spat_zachranny.sql`](migracie/0016_spat_zachranny.sql), pozri [`ZACHRANA-A-NAVRAT.md`](ZACHRANA-A-NAVRAT.md).
+4. Na oboch serveroch spustiť `docs/migracie/0019_razenia_po_prestahovani.sql` (opakovateľné, predpoklad 0016): starý vydáva oznam, nový prijíma neskoré razenia. Kontrola: `SELECT org_transfer.move_version();`. Bez nej všetko beží ako predtým.
+5. Návrat: [`migracie/0019_spat_zachranny.sql`](migracie/0019_spat_zachranny.sql), potom [`migracie/0017_spat_zachranny.sql`](migracie/0017_spat_zachranny.sql) a až potom [`migracie/0016_spat_zachranny.sql`](migracie/0016_spat_zachranny.sql), pozri [`ZACHRANA-A-NAVRAT.md`](ZACHRANA-A-NAVRAT.md).
+
+**Migrácia 0019 nie je overená na ostrej databáze Lovable Cloud ani v prehliadači** (volanie `punch_move_notice` bez prihlásenia cez REST a firemný proxy, stiahnutie súboru, upratanie service workera). Overené v sandboxe PostgreSQL 16 nad skutočnou schémou aplikácie: oznam, útoky na nahrávaný súbor, práva, návrat, okruh s 0016/0017 a 29 zámerných pokazení.
 
 **Import (0017) nie je overený na ostrej databáze Lovable Cloud ani na lokálnom Supabase so skutočným prihlasovacím serverom:** práva vlastníka migrácie na vypnutie spúšťačov a na `auth.users` z funkcie volanej prihláseným správcom, prihlásenie preneseným účtom po importe tlačidlom a to, či server rešpektuje dlhší časový limit funkcie (bez neho platí 8 s, čo stačí približne do 100 000 razení).
 

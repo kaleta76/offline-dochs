@@ -50,6 +50,10 @@ Kód od PR s touto migráciou volá funkcie len z obrazovky Správa → Testovac
 Skript [`migracie/0018_spat_zachranny.sql`](migracie/0018_spat_zachranny.sql) vráti funkciu `purge_organization` do znenia z migrácie 0007 (záznam o zrušení organizácie s účtom správcu v `actor`). Nič iné nemení, záznamy v audite ostávajú. Skript je opakovateľný.
 **Overené:** na lokálnom PostgreSQL 16 (spustený dvakrát, po ňom platí pôvodná ochrana posledného správcu). **Neoverené:** beh na ostrej databáze Lovable Cloud.
 
+### Migrácia 0021 späť
+
+Skript [`migracie/0021_spat_zachranny.sql`](migracie/0021_spat_zachranny.sql) vráti funkciu `org_transfer.drift_cols()` do znenia z migrácie 0016 (kontrola zmien od exportu znova sleduje aj `devices.pairing_code` a `pairing_expires_at`). Dôsledok je len zbytočné upozornenie „zariadenia: zmenil sa obsah“, keď čakajúce zariadenie vymení párovací kód; údaje sa nestratia. Opakovateľný; rozpracovaný prenos treba zrušiť a export zopakovať. **Neoverené** na ostrej databáze Lovable Cloud (sandbox PostgreSQL 16: stav funkcie ako po 0016).
+
 ### Migrácia 0016 späť
 
 Skript [`migracie/0016_spat_zachranny.sql`](migracie/0016_spat_zachranny.sql) zruší spúšťače `a_punches_transfer_lock` (zámok razení pri prenose) a `a_organizations_transfer_guard` (ochrana pred predčasným zrušením), funkcie `org_export_begin`, `org_export_page`, `org_export_finish`, `org_transfer_status`, `org_transfer_cancel`, `org_transfer_confirm_and_delete` a schému `org_transfer` s históriou prenosov (ak v nej nie je súkromný balík 0015, vtedy schéma ostane). Údaje organizácií ani razenia sa nemenia. Skript **nevracia** označenie „testovacia organizácia“, ktoré nastavil prenos (vráťte ho tlačidlom v karte Servis alebo `set_organization_test(false)`). Aplikácia na týchto funkciách zatiaľ nezávisí. Spustenie: SQL editor v Lovable Cloud. Skript je opakovateľný. Popis prenosu: [`PRENOS-ORGANIZACIE.md`](PRENOS-ORGANIZACIE.md).

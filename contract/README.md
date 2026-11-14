@@ -1,4 +1,4 @@
-# Kontrakt terminál ⇄ Access (verzia 1, doplnky 1.1 až 1.5)
+# Kontrakt terminál ⇄ Access (verzia 1, doplnky 1.1 až 1.6)
 
 Tento priečinok je **jediné miesto, na ktorom sa dohodne rozhranie** medzi terminálom (tento repozitár, vyvíja ho Lovable agent)
 a lokálnym dochádzkovým systémom v Accesse (vyvíja ho Claude). Zmena súborov tu = zmena dohody, preto ide **iba cez pull request**
@@ -227,3 +227,41 @@ overovač odmietne každý kľúč navyše.
 * import smie spraviť len správca organizácie; zapíše sa do auditu (verzia, počty, kto);
 * mesiac mimo `period` nemá plán: terminál saldo ukáže ako nepotvrdené (bez plánu z Accessu);
 * po vyradení zamestnanca, zmene fondu alebo úväzku Access vydá novú verziu; terminál nepoužije nič staršie, než čo už prijal.
+
+## Súbor `dochs_closures.json` (kontrakt 1.6.0, smer Access → terminál)
+Mesiac zamestnanca sa v Accesse uzavrie podpísanou zostavou (`mod_18_Uzavierka`) a dá sa znova otvoriť s uvedením dôvodu. Tento súbor oznamuje terminálu, **ktoré mesiace Access uzavrel
+alebo znova otvoril**, s konečnými číslami a so zoznamom razení, ktoré zarátal, aby terminál zosúladil mesiac s Accessom a našiel razenia, ktoré Access nezarátal.
+Zásada je rovnaká ako pri konfigurácii: „Access rozhoduje, terminál preberá“. Formát je JSON (UTF-8), schéma `closures-export.schema.json` (`schema_version` 1),
+zlatý súbor `examples/closures_example.json`, overovač `tools/verify_closures.py`. Je to **nový súbor**: žiadny existujúci súbor kontraktu (`punches_*.csv`, `voids_*.csv`, `dochs_config.json`) sa nemení.
+
+| časť | obsah |
+|---|---|
+| `closures_version`, `generated_at` | označenie súboru (`rrrr.mm.dd.hhmm`) a miestny čas zostavenia; terminál ich zapíše do auditu |
+| `organization_id` | organizácia v termináli, rovnaká ako v `punches_*.csv`; súbor inej organizácie terminál odmietne |
+| `closures[]` | jeden záznam na zamestnanca a mesiac (aktuálny stav): `personnel_number`, `year`, `month`, `state`, `state_seq`, `changed_at` |
+| `closures[].state` | `CLOSED` (mesiac je v Accesse uzavretý) alebo `REOPENED` (bol uzavretý a Access ho znova otvoril) |
+| `closures[].state_seq` | počítadlo zmien stavu tohto mesiaca zamestnanca v Accesse: uzavretie = 1, otvorenie = 2, uzavretie = 3 … Preto `CLOSED` má nepárne a `REOPENED` párne číslo |
+| `closures[].report_code` | voliteľne kontrolný kód zostavy z Accessu (pätička zostavy), aby sa dal vytlačený výkaz porovnať s terminálom |
+| `closures[].totals` | len `CLOSED`: `worked_min`, `expected_min`, `balance_min` tak, ako ich Access uložil (súčty `OdpracovaneMin`, `DennyFondMin`, `SaldoMin` za mesiac); terminál ich nepočíta, len zobrazí |
+| `closures[].counted_punches` | len `CLOSED`: `external_id` (`punches.client_uuid`) razení z terminálu, ktoré Access v tomto mesiaci zarátal (neplatné a zneplatnené nie sú v zozname) |
+| `counts` | počet záznamov a súčet dĺžok `counted_punches` (kontrola úplnosti) |
+
+**Poradie a idempotencia.** Terminál použije záznam, len ak je jeho `state_seq` **väčšie** než číslo, ktoré už má pre toho zamestnanca a mesiac. Rovnaký súbor sa dá preto prijať opakovane a starší súbor
+nič nepokazí. Prijíma sa **celý alebo vôbec**; import smie spraviť len správca organizácie a zapíše sa do auditu (verzia súboru, počty, kto), rovnako ako pri konfigurácii.
+
+**Razenia mimo uzávierky.** Razenie patrí do mesiaca podľa `client_time` v pásme `Europe/Bratislava` (polootvorený interval [začiatok mesiaca, začiatok nasledujúceho)), rovnako ako v `punches_YYYYMM.csv`.
+Pri `CLOSED` vezme terminál platné (nezneplatnené) razenia zamestnanca z tohto mesiaca; tie, ktorých `client_uuid` nie je v `counted_punches`, sú **razenia mimo uzávierky**
+(napríklad prišli do Accessu až po uzavretí a ostali v `TerminalInbox` so stavom `UZAVRETY`, alebo sa tam ešte nedostali). Terminál ich **nemaže ani nemení**: uloží ich do auditu a upozorní vedúceho zamestnanca.
+Razenia, ktoré vznikli priamo v Accesse (editor, import z DBF), nemajú `external_id` z terminálu, v zozname nie sú a terminál ich nepozná; to nie je chyba.
+
+**Razenie sa vždy prijme.** Uzávierka v Accesse nikdy nebráni terminálu prijať razenie. Razenie za uzavretý mesiac ostane v Accesse v `TerminalInbox` (pravidlo „Mesiac uzavretý v Accesse“ vyššie) a v termináli sa ukáže ako razenie mimo uzávierky.
+
+**`REOPENED`.** Terminál zruší označenie „uzavretý Accessom“ aj konečné čísla mesiaca; mesiac sa zase počíta podľa platných nastavení. Zoznam razení mimo uzávierky sa zostaví nanovo pri ďalšom `CLOSED`.
+
+**Čo súbor zámerne nenesie** (môže pribudnúť v ďalšej verzii po rozhodnutí vlastníka): čísla po dňoch, prenos salda do ďalšieho mesiaca, uznaný nadčas, dôvod otvorenia, kto mesiac uzavrel.
+Dôvod a osoba ostávajú v Accesse (`DochadzkaUzavierkaLog`).
+
+**Súkromie**: zamestnanec je len `personnel_number`. Meno, e-mail, oddelenie ani iný osobný údaj do súboru nepatrí; overovač odmietne každý kľúč navyše.
+
+**Nasadenie 1.6.0.** Návrh je na schválenie vlastníkom (zmena `contract/`). Zavedenie je samostatná práca: terminál súbor prijme a zosúladí až po etape 5 (`docs/ARCHITEKTURA.md`, kapitola 5.7),
+Access súbor vytvorí samostatným balíkom. Kým to neexistuje, platí dnešné správanie. Databázová časť (úložisko stavu uzávierok a auditu) je súkromný SQL balík mimo repozitára a treba ju spustiť pred prvým súborom.

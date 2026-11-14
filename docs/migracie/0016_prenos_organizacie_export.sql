@@ -309,7 +309,10 @@ BEGIN
 END $$;
 
 -- -----------------------------------------------------------------------------------------------------
--- 2. Jedna stránka tabuľky. _rel musí byť z org_transfer.spec(); vracia riadky ako jsonb v rovnakom tvare ako súbor.
+-- 2. Jedna stránka tabuľky. _rel musí byť z org_transfer.spec().
+-- Riadky (pole objektov, rovnaký tvar ako v súbore) sa vracajú ako TEXT (`rows` je reťazec s JSON), nie ako vnorený JSON: klient ich do súboru
+-- vloží bez spracovania. Inak by ich prehliadač pri čítaní odpovede prevádzal na čísla JavaScriptu a stratil by napr. 7.50 → 7.5 alebo 8.0 → 8
+-- vo vnorenom jsonb (odtlačok riadku na cieli by sa potom nezhodoval).
 -- -----------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.org_export_page(_transfer uuid, _rel text, _offset integer DEFAULT 0, _limit integer DEFAULT 2000) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public SET timezone = 'UTC' AS $$
@@ -328,7 +331,7 @@ BEGIN
   EXECUTE format('SELECT coalesce(jsonb_agg(to_jsonb(q)), ''[]''::jsonb) FROM (SELECT * FROM %s x WHERE %s%s ORDER BY %s OFFSET $2 LIMIT $3) q',
                  s.rel, replace(s.filter, '{M}', '$4'), CASE WHEN s.rel = 'public.audit_log' THEN ' AND x.id <= $5' ELSE '' END, s.order_by)
     INTO rws USING org, _offset, _limit, members, t.audit_max;
-  RETURN jsonb_build_object('rel', _rel, 'offset', _offset, 'count', jsonb_array_length(rws), 'rows', rws);
+  RETURN jsonb_build_object('rel', _rel, 'offset', _offset, 'count', jsonb_array_length(rws), 'rows', rws::text);
 END $$;
 
 -- -----------------------------------------------------------------------------------------------------

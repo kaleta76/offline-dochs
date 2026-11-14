@@ -11,6 +11,8 @@ Správca môže skúšobnú firmu natrvalo zrušiť aj s jej razeniami, zamestna
 
 Pred zrušením, ak chcete údaje zachovať, urobte zálohu: [`ZALOHA-DATABAZY.md`](ZALOHA-DATABAZY.md). Po zrušení sa organizácia vráti len obnovou zálohy.
 
+**Správa pre zariadenia (od migrácie 0020, nepovinná).** Pod názvom je pole „Správa pre zariadenia“ (jeden riadok, najviac 300 znakov, napríklad „Testovanie sa po upozornení SOC ukončilo.“). Ak v niektorom zariadení ostali neodoslané razenia, po zrušení sa tam ukáže okno „Organizácia bola zrušená“ a táto správa; razenia možno uložiť do šifrovaného súboru alebo ich po dvojitom potvrdení zahodiť bez súboru. Bez správy sa okno ukáže tiež, len bez textu. Správu vidí každý, kto má také zariadenie, preto v nej nie sú osobné údaje. Funkcia `delete_test_organization(názov, správa)` oznam zapíše v tej istej transakcii pred zrušením; bez migrácie 0020 pole správy zrušenie odmietne s textom, že treba spustiť 0020 (zrušenie bez správy funguje ako predtým). Podrobnosti: [`PRENOS-ORGANIZACIE.md`](PRENOS-ORGANIZACIE.md), kapitola o migrácii 0020.
+
 ## Ochrany
 
 - Zrušiť sa dá **len organizácia, ktorú správca predtým označil ako testovaciu** (stĺpec `organizations.is_test`). Ostrú firmu databáza zrušiť odmietne (`Zrušiť sa dá len organizácia označená ako testovacia`), aj keby niekto obišiel obrazovku.
@@ -53,6 +55,8 @@ SELECT public.purge_organization('00000000-0000-0000-0000-000000000000');
 ```
 
 Funkcia `purge_organization` nekontroluje oprávnenia a spustiť ju môže len správca databázy (nie používateľ aplikácie). Odmietne neoznačenú a „Pôvodnú organizáciu“. Pri ručnom spustení nie je prihlásený používateľ, preto v audite ostanú aj záznamy bez autora (úpravy rolí a profilov z tohto mazania).
+
+Záznam o zrušení (`organization.deleted`) má od migrácie [`0018`](migracie/0018_audit_zrusenia_organizacie.sql) `actor = NULL`, ak organizáciu zrušil jej vlastný správca (jeho účet zrušením zanikol); jeho id je v `details.by`. Predtým ostával v audite záznam s id neexistujúceho účtu, ktorý po opätovnom importe tej istej organizácie pokazil počet riadkov auditu pri overení prenosu. Staré záznamy sa nemenia (import ich odpojí sám). Návrat: [`migracie/0018_spat_zachranny.sql`](migracie/0018_spat_zachranny.sql).
 
 ## Čo je overené a čo nie
 

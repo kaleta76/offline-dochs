@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kaleta76/offline-dochs/contract/closures-export.schema.json",
+  "title": "dochs_closures.json – uzávierky mesiacov z Accessu pre terminál (kontrakt 1.6.0, schema_version 1)",
+  "description": "Smer Access -> terminál. Access oznamuje, ktoré mesiace zamestnancov uzavrel (alebo znova otvoril), s konečnými číslami a zoznamom razení, ktoré zarátal. Terminál podľa toho zosúladí mesiac a razenia, ktoré Access nezarátal, uloží do auditu a upozorní na ne vedúceho. Súbor NESMIE obsahovať osobné údaje: zamestnanec je len osobné číslo. Sémantiku a krížové kontroly (jedinečnosť, počty, platné mesiace) overuje contract/tools/verify_closures.py.",
+  "type": "object",
+  "required": ["schema_version", "closures_version", "organization_id", "closures", "counts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "closures_version": { "type": "string", "pattern": "^[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}\\.[0-9]{4}$", "description": "rrrr.mm.dd.hhmm čas zostavenia v Accesse; označenie súboru v audite terminálu" },
+    "generated_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$", "description": "miestny čas počítača s Accessom, informatívne" },
+    "organization_id": { "type": "string", "format": "uuid", "description": "organizácia v termináli, rovnaká ako v punches_*.csv; terminál súbor inej organizácie odmietne" },
+    "closures": {
+      "type": "array",
+      "description": "jeden záznam na zamestnanca a mesiac: aktuálny stav uzávierky v Accesse",
+      "items": {
+        "type": "object",
+        "required": ["personnel_number", "year", "month", "state", "state_seq", "changed_at"],
+        "additionalProperties": false,
+        "properties": {
+          "personnel_number": { "type": "string", "pattern": "^[0-9A-Za-z]{1,20}$", "description": "jediný identifikátor zamestnanca; žiadne meno, e-mail ani oddelenie" },
+          "year": { "type": "integer", "minimum": 2000, "maximum": 2100 },
+          "month": { "type": "integer", "minimum": 1, "maximum": 12 },
+          "state": { "enum": ["CLOSED", "REOPENED"], "description": "CLOSED = mesiac je v Accesse uzavretý; REOPENED = uzavretý bol a Access ho znova otvoril" },
+          "state_seq": { "type": "integer", "minimum": 1, "maximum": 1000000, "description": "počítadlo zmien stavu tohto mesiaca zamestnanca v Accesse (uzavretie, otvorenie, uzavretie … = 1, 2, 3 …); terminál použije záznam, len ak je číslo väčšie než to, ktoré už má" },
+          "changed_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$", "description": "miestny čas počítača s Accessom, kedy sa stav zmenil, informatívne" },
+          "report_code": { "type": "string", "minLength": 1, "maxLength": 25, "description": "voliteľne kontrolný kód zostavy z Accessu (v pätičke zostavy), aby sa dal vytlačený výkaz porovnať s terminálom" },
+          "totals": {
+            "type": "object",
+            "required": ["worked_min", "expected_min", "balance_min"],
+            "additionalProperties": false,
+            "description": "len pri CLOSED: súčty mesiaca tak, ako ich Access uložil (OdpracovaneMin, DennyFondMin, SaldoMin); terminál ich nepočíta, len zobrazí",
+            "properties": {
+              "worked_min": { "type": "integer", "minimum": 0, "maximum": 44640 },
+              "expected_min": { "type": "integer", "minimum": 0, "maximum": 44640 },
+              "balance_min": { "type": "integer", "minimum": -44640, "maximum": 44640 }
+            }
+          },
+          "counted_punches": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 5000,
+            "description": "len pri CLOSED: external_id (punches.client_uuid) razení, ktoré Access v tomto mesiaci zarátal. Razenie zamestnanca z tohto mesiaca, ktoré tu nie je, je razenie mimo uzávierky.",
+            "items": { "type": "string", "format": "uuid" }
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "state": { "const": "CLOSED" } } },
+            "then": { "required": ["totals", "counted_punches"] },
+            "else": { "not": { "anyOf": [ { "required": ["totals"] }, { "required": ["counted_punches"] }, { "required": ["report_code"] } ] } }
+          }
+        ]
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["closures", "counted_punches"],
+      "additionalProperties": false,
+      "description": "kontrola úplnosti: počet záznamov a súčet dĺžok counted_punches (zachytí orezaný alebo poškodený súbor)",
+      "properties": {
+        "closures": { "type": "integer", "minimum": 0 },
+        "counted_punches": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

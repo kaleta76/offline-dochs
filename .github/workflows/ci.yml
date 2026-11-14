@@ -46,6 +46,10 @@ jobs:
         run: python3 -I contract/tools/build_config_example.py --check
       - name: Testy overovača konfigurácie a výpočtu plánu
         run: python3 -I contract/tools/test_verify_config.py
+      - name: Overenie zlatého súboru uzávierok (kontrakt 1.6.0)
+        run: python3 -I contract/tools/verify_closures.py contract/examples/closures_example.json --strict
+      - name: Testy overovača uzávierok
+        run: python3 -I contract/tools/test_verify_closures.py
       - name: Kontrola balíka Access (kontrolné súčty modulov, verzie, zakázané súbory)
         run: python3 -I tools/over_access_balik.py
       - name: Testy kontroly balíka Access

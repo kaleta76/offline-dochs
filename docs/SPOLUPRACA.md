@@ -31,7 +31,7 @@ Silné stránky: idempotentné razenie (`client_uuid`), hash reťaz po používa
 | 2 | vysoká | Trigger `punches_chain` pri uzavretom mesiaci hodí `Mesiac je uzavretý` – **razenie sa odmietne**. Offline fronta by ho opakovane odosielala/zahodila | v integrovanom režime nepoužívať uzávierku v terminále; razenie je fakt a vždy sa prijme, o uzavretí rozhoduje Access (`TerminalInbox` stav `UZAVRETY`) |
 | 3 | vysoká | **Verejný repozitár + otvorená registrácia organizácie** (`handle_new_user`: ktokoľvek zadá názov firmy a vznikne organizácia s rolou admin) | registráciu organizácií v produkcii vypnúť/obmedziť (pozvánka od vlastníka); skontrolovať Supabase Auth nastavenia |
 | 4 | stredná | `.env` je v gite. Obsahuje len 6 kľúčov (`SUPABASE_URL`, `*_PUBLISHABLE_KEY`, `*_PROJECT_ID`) – to sú verejné hodnoty, **ale** súbor tam nepatrí a raz tam skončí niečo tajné | `.env` do `.gitignore`, `git rm --cached`; tajné hodnoty len v Lovable/Supabase secrets; v CI kontrola `service_role` v repozitári |
-| 5 | stredná | Žiadne CI; Lovable commituje priamo do `main` | CI (lint, test, build, kontraktový test) beží po každom pushi; ochranu `main` s povinným PR **nezapínať** (rozbila by obojsmernú synchronizáciu s Lovable) |
+| 5 | stredná | Žiadne CI; Lovable commituje priamo do `main` | CI (lint, test, build, kontraktový test) beží po každom pushi; od 13. 11. 2026 má Lovable vlastnú vetvu `lovable` a `main` je chránená (zmeny len cez PR), pozri [`LOVABLE-VETVY.md`](LOVABLE-VETVY.md) |
 | 6 | stredná | Migrácie aplikuje Lovable, nie CLI; schéma v `drizzle/schema.ts` je prázdna | zmeny schémy, ktoré sa týkajú `punches`/`profiles`, musia v PR explicitne opísať dopad na kontrakt |
 | 7 | nízka | Pri aktivácii účtu sa dá zadať voliteľný vlastný e-mail (`accounts.functions.ts`) – to je osobný údaj | v integrovanom režime políčko skryť, ostať pri syntetickom e-maile |
 | 8 | nízka | Čas: `client_time` je z hodinky zariadenia (zachytáva sa `drift_minutes`), mesiac sa určuje v `Europe/Bratislava` | kontrakt nesie UTC aj lokálny čas; Access ukladá lokálny čas a pri zhode vyhodnotí podľa UTC |
@@ -89,7 +89,7 @@ Postup pri zmene:
 3. CI skontroluje test a lint; Claude upraví importér a zlatý súbor použije ako vstup testu v Accesse.
 4. Tag `contract-v1.1.0`; Access importér zapíše do logu, ktorú verziu kontraktu videl.
 
-Pravidlá pre vetvy: `main` ostáva vetvou Lovable (priame commity bota sú v poriadku); Claude pracuje vo vetvách `claude/<téma>` a ide cez PR. **Nerobiť force-push ani prepisovať históriu** (AGENTS.md to už zakazuje). Branch protection s povinným PR nezapínať; hlavnú ochranu robí CI + `CODEOWNERS` pre `contract/**`.
+Pravidlá pre vetvy (od 13. 11. 2026, podrobne v [`LOVABLE-VETVY.md`](LOVABLE-VETVY.md)): Lovable píše do vlastnej vetvy `lovable`, `main` je chránená a ide do nej všetko cez PR (Claude pracuje vo vetvách z `main`, napr. `fix/<téma>`); do Lovable sa zmeny dostanú PR `main` → `lovable`. **Nerobiť force-push ani prepisovať históriu** (AGENTS.md to už zakazuje). K ochrane `main` pristupuje aj CI + `CODEOWNERS` pre `contract/**`.
 
 Definícia hotového (pre obe strany): lint a testy zelené, kontraktový test zelený, zmena kontraktu má verziu a záznam v `contract/CHANGELOG.md`, v PR je napísané, čo sa nevyskúšalo.
 

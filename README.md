@@ -87,6 +87,8 @@ CI na GitHube (`.github/workflows/ci.yml`) spúšťa po každom PR a pushi do `m
 | Dokument | O čom |
 |---|---|
 | [`contract/README.md`](contract/README.md) | formát `punches_*.csv` a `voids_*.csv`, hash reťaz, pravidlá importu |
+| [`docs/PRIRUCKA.md`](docs/PRIRUCKA.md) | používateľská príručka so snímkami obrazoviek: zamestnanec (razenie, Môj mesiac, opravy), vedúci (Môj tím), správca (Správa), časté otázky |
+| [`docs/ARCHITEKTURA.md`](docs/ARCHITEKTURA.md) | mapa celku: súčasti, hranica terminál / Access, kto vlastní nastavenia výpočtu (návrh), čo je overené, poradie prác |
 | [`docs/SPOLUPRACA.md`](docs/SPOLUPRACA.md) | rozdelenie rolí terminál / Access / vlastník, zistenia, rozhodnutia |
 | [`docs/ZNEPLATNENIE-RAZENI.md`](docs/ZNEPLATNENIE-RAZENI.md) | žiadosť o zneplatnenie duplicity, schválenie, prenos do Accessu, poradie nasadenia |
 | [`docs/TESTOVANIE-S-ACCESSOM.md`](docs/TESTOVANIE-S-ACCESSOM.md) | scenár na celý mesiac a porovnanie sald terminál / Access |
@@ -94,10 +96,11 @@ CI na GitHube (`.github/workflows/ci.yml`) spúšťa po každom PR a pushi do `m
 | [`docs/REGISTRACIA.md`](docs/REGISTRACIA.md) | registrácia firiem a zamestnancov bez e-mailu |
 | [`docs/OVERENIE-ZARIADENI.md`](docs/OVERENIE-ZARIADENI.md) | čo overenie zariadenia zaručuje a čo nie, neoverené razenia, záchranný kód, zmeny zariadení |
 | [`docs/LOVABLE-KREDITY.md`](docs/LOVABLE-KREDITY.md) | čo míňa kredity, synchronizácia s GitHubom |
-| [`docs/ZACHRANA-A-NAVRAT.md`](docs/ZACHRANA-A-NAVRAT.md) | návrat k bezpečnému stavu: kód, databáza, záchranné skripty k migráciám 0006, 0007 a 0016 |
+| [`docs/LOVABLE-VETVY.md`](docs/LOVABLE-VETVY.md) | vetvy `main` a `lovable`, tok zmien medzi nimi, pravidlá |
+| [`docs/ZACHRANA-A-NAVRAT.md`](docs/ZACHRANA-A-NAVRAT.md) | návrat k bezpečnému stavu: kód, databáza, záchranné skripty k migráciám 0006, 0007, 0016, 0020 a 0021 |
 | [`docs/ZALOHA-DATABAZY.md`](docs/ZALOHA-DATABAZY.md) | záloha a návrat databázy v Lovable Cloud: Export, overenie súboru, snapshot pred zásahom, výpis aktuálneho stavu |
 | [`docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md`](docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md) | označenie a zrušenie testovacej organizácie správcom, ručné zrušenie |
-| [`docs/PRENOS-ORGANIZACIE.md`](docs/PRENOS-ORGANIZACIE.md) | prenos celej organizácie na iný server: export po stránkach, zámok razení, kód potvrdenia, zrušenie pôvodnej organizácie (databázová časť, migrácia 0016) |
+| [`docs/PRENOS-ORGANIZACIE.md`](docs/PRENOS-ORGANIZACIE.md) | prenos celej organizácie na iný server: export po stránkach, zámok razení, kód potvrdenia, zrušenie pôvodnej organizácie (migrácia 0016), import tlačidlom na cieľovom serveri (migrácia 0017), razenia, ktoré ostali v zariadení po presťahovaní (migrácia 0019), vlastná správa a oznam o zrušení bez presunu (migrácia 0020), kontrola zmien od exportu bez párovacích kódov zariadení (migrácia 0021) |
 | [`access/README.md`](access/README.md), [`access/CHANGELOG.md`](access/CHANGELOG.md) | inštalácia a zmeny dochádzkového systému v Accesse |
 | [`roadmap.md`](roadmap.md) | hotové a otvorené úlohy |
 

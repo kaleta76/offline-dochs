@@ -87,6 +87,7 @@ CI na GitHube (`.github/workflows/ci.yml`) spúšťa po každom PR a pushi do `m
 | Dokument | O čom |
 |---|---|
 | [`contract/README.md`](contract/README.md) | formát `punches_*.csv` a `voids_*.csv`, hash reťaz, pravidlá importu |
+| [`docs/PRIRUCKA.md`](docs/PRIRUCKA.md) | používateľská príručka so snímkami obrazoviek: zamestnanec (razenie, Môj mesiac, opravy), vedúci (Môj tím), správca (Správa), časté otázky |
 | [`docs/ARCHITEKTURA.md`](docs/ARCHITEKTURA.md) | mapa celku: súčasti, hranica terminál / Access, kto vlastní nastavenia výpočtu (návrh), čo je overené, poradie prác |
 | [`docs/SPOLUPRACA.md`](docs/SPOLUPRACA.md) | rozdelenie rolí terminál / Access / vlastník, zistenia, rozhodnutia |
 | [`docs/ZNEPLATNENIE-RAZENI.md`](docs/ZNEPLATNENIE-RAZENI.md) | žiadosť o zneplatnenie duplicity, schválenie, prenos do Accessu, poradie nasadenia |

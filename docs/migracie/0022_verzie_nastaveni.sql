@@ -434,24 +434,92 @@ SELECT p.organization_id, c.user_id, c.year, c.month, public.settings_version_fo
  WHERE p.organization_id IS NOT NULL AND c.month BETWEEN 1 AND 12
    AND NOT EXISTS (SELECT 1 FROM public.month_closure_snapshots s WHERE s.user_id = c.user_id AND s.year = c.year AND s.month = c.month);
 
+-- Kontrola tvaru a rozumnosti výsledku mesiaca (čísla počíta prehliadač, databáza ich neprepočíta, ale nezmyselné nepustí).
+-- Vráti NULL, ak je výsledok v poriadku, inak krátky dôvod. Platí pre tvar výsledku `engine` = 1 (RESULT_ENGINE v settings-model.ts):
+-- pri zmene tvaru výsledku v etape 1b treba túto funkciu upraviť spolu s hodnotou `engine`, inak sa uzávierka s novým tvarom odmietne.
+-- Kontroluje: presne známe kľúče; denné hodnoty v rozsahu 0 až 2880 minút (zostatok −2880 až 2880); každý deň je ten istý deň
+-- mesiaca v poradí; v každom dni súčet = práca + kredit a zostatok = súčet − fond; súčty mesiaca = súčet dní.
+CREATE OR REPLACE FUNCTION public.month_result_problem(_year int, _month int, _result jsonb) RETURNS text
+LANGUAGE plpgsql STABLE SET search_path = '' AS $$
+DECLARE
+  n int := extract(day FROM (make_date(_year, _month, 1) + interval '1 month' - interval '1 day'))::int;
+  top_keys constant text[] := ARRAY['engine', 'punches', 'totals', 'byCode', 'days'];
+  tot_keys constant text[] := ARRAY['work', 'credit', 'total', 'expected', 'balance'];
+  day_keys constant text[] := ARRAY['d', 'workMin', 'creditMin', 'privMin', 'breakMin', 'totalMin', 'expectedMin', 'balanceMin', 'byCode', 'open'];
+  day_nums constant text[] := ARRAY['workMin', 'creditMin', 'privMin', 'breakMin', 'totalMin', 'expectedMin', 'balanceMin'];
+  lim constant numeric := 2880;
+  keys text[]; day jsonb; i int; k text; v numeric; lo numeric; w numeric; c numeric; t numeric; e numeric; b numeric;
+  s_work numeric := 0; s_credit numeric := 0; s_total numeric := 0; s_exp numeric := 0; s_bal numeric := 0;
+BEGIN
+  IF jsonb_typeof(_result) IS DISTINCT FROM 'object' OR octet_length(_result::text) > 200000 THEN RETURN 'nie je objekt alebo je príliš veľký'; END IF;
+  SELECT coalesce(array_agg(x), '{}') INTO keys FROM jsonb_object_keys(_result) x;
+  IF NOT (keys @> top_keys AND keys <@ top_keys) THEN RETURN 'neznáme alebo chýbajúce kľúče'; END IF;
+  IF jsonb_typeof(_result -> 'engine') IS DISTINCT FROM 'number' OR (_result ->> 'engine') <> '1' THEN RETURN 'neznáma verzia výsledku (engine)'; END IF;
+  IF jsonb_typeof(_result -> 'punches') IS DISTINCT FROM 'number' OR (_result ->> 'punches') !~ '^[0-9]{1,6}$' THEN RETURN 'počet razení'; END IF;
+
+  IF jsonb_typeof(_result -> 'totals') IS DISTINCT FROM 'object' THEN RETURN 'súčty mesiaca'; END IF;
+  SELECT coalesce(array_agg(x), '{}') INTO keys FROM jsonb_object_keys(_result -> 'totals') x;
+  IF NOT (keys @> tot_keys AND keys <@ tot_keys) THEN RETURN 'súčty mesiaca: neznáme alebo chýbajúce kľúče'; END IF;
+  FOREACH k IN ARRAY tot_keys LOOP
+    IF jsonb_typeof(_result -> 'totals' -> k) IS DISTINCT FROM 'number' THEN RETURN 'súčty mesiaca: ' || k || ' nie je číslo'; END IF;
+    v := (_result -> 'totals' ->> k)::numeric;
+    IF abs(v) > lim * n OR (k <> 'balance' AND v < 0) THEN RETURN 'súčty mesiaca: ' || k || ' mimo rozsahu'; END IF;
+  END LOOP;
+
+  IF jsonb_typeof(_result -> 'byCode') IS DISTINCT FROM 'object' OR (SELECT count(*) FROM jsonb_object_keys(_result -> 'byCode')) > 100 THEN RETURN 'byCode mesiaca'; END IF;
+  FOR k, v IN SELECT x.key, CASE WHEN jsonb_typeof(x.value) = 'number' THEN (x.value #>> '{}')::numeric END FROM jsonb_each(_result -> 'byCode') x LOOP
+    IF length(k) NOT BETWEEN 1 AND 64 OR v IS NULL OR v NOT BETWEEN 0 AND lim * n THEN RETURN 'byCode mesiaca: ' || left(k, 20); END IF;
+  END LOOP;
+
+  IF jsonb_typeof(_result -> 'days') IS DISTINCT FROM 'array' OR jsonb_array_length(_result -> 'days') <> n THEN RETURN 'počet dní'; END IF;
+  FOR i IN 1..n LOOP
+    day := _result -> 'days' -> (i - 1);
+    IF jsonb_typeof(day) IS DISTINCT FROM 'object' THEN RETURN 'deň ' || i || ' nie je objekt'; END IF;
+    SELECT coalesce(array_agg(x), '{}') INTO keys FROM jsonb_object_keys(day) x;
+    IF NOT (keys @> day_keys AND keys <@ day_keys) THEN RETURN 'deň ' || i || ': neznáme alebo chýbajúce kľúče'; END IF;
+    IF jsonb_typeof(day -> 'd') IS DISTINCT FROM 'string' OR (day ->> 'd') <> to_char(make_date(_year, _month, i), 'YYYY-MM-DD') THEN RETURN 'deň ' || i || ': dátum'; END IF;
+    IF jsonb_typeof(day -> 'open') IS DISTINCT FROM 'boolean' THEN RETURN 'deň ' || i || ': open'; END IF;
+    FOREACH k IN ARRAY day_nums LOOP
+      IF jsonb_typeof(day -> k) IS DISTINCT FROM 'number' THEN RETURN 'deň ' || i || ': ' || k || ' nie je číslo'; END IF;
+      v := (day ->> k)::numeric;
+      lo := CASE WHEN k = 'balanceMin' THEN -lim ELSE 0 END;
+      IF v > lim OR v < lo THEN RETURN 'deň ' || i || ': ' || k || ' mimo rozsahu'; END IF;
+    END LOOP;
+    IF jsonb_typeof(day -> 'byCode') IS DISTINCT FROM 'object' OR (SELECT count(*) FROM jsonb_object_keys(day -> 'byCode')) > 100 THEN RETURN 'deň ' || i || ': byCode'; END IF;
+    FOR k, v IN SELECT x.key, CASE WHEN jsonb_typeof(x.value) = 'number' THEN (x.value #>> '{}')::numeric END FROM jsonb_each(day -> 'byCode') x LOOP
+      IF length(k) NOT BETWEEN 1 AND 64 OR v IS NULL OR v NOT BETWEEN 0 AND lim THEN RETURN 'deň ' || i || ': byCode ' || left(k, 20); END IF;
+    END LOOP;
+    w := (day ->> 'workMin')::numeric; c := (day ->> 'creditMin')::numeric; t := (day ->> 'totalMin')::numeric;
+    e := (day ->> 'expectedMin')::numeric; b := (day ->> 'balanceMin')::numeric;
+    IF abs(t - (w + c)) > 0.01 THEN RETURN 'deň ' || i || ': súčet nie je práca + kredit'; END IF;
+    IF abs(b - (t - e)) > 0.01 THEN RETURN 'deň ' || i || ': zostatok nie je súčet − fond'; END IF;
+    s_work := s_work + w; s_credit := s_credit + c; s_total := s_total + t; s_exp := s_exp + e; s_bal := s_bal + b;
+  END LOOP;
+
+  IF abs((_result -> 'totals' ->> 'work')::numeric - s_work) > 0.01 OR abs((_result -> 'totals' ->> 'credit')::numeric - s_credit) > 0.01
+     OR abs((_result -> 'totals' ->> 'total')::numeric - s_total) > 0.01 OR abs((_result -> 'totals' ->> 'expected')::numeric - s_exp) > 0.01
+     OR abs((_result -> 'totals' ->> 'balance')::numeric - s_bal) > 0.01 THEN
+    RETURN 'súčty mesiaca nesedia so súčtom dní';
+  END IF;
+  RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION public.month_result_problem(int, int, jsonb) FROM PUBLIC, anon, authenticated;
+
 -- Zápis výsledku: len ten, kto mesiac práve uzavrel (closed_by), len raz, len rozumný tvar. Čísla počíta engine.ts v prehliadači
--- uzatvárajúceho; databáza ich neprepočítava (výpočet je v TypeScripte), preto ukladá aj vlastný odtlačok razení a fond na kontrolu.
+-- uzatvárajúceho; databáza ich neprepočítava (výpočet je v TypeScripte), preto ukladá aj vlastný odtlačok razení a fond na kontrolu
+-- a stráži ich rozumnosť (month_result_problem).
 CREATE OR REPLACE FUNCTION public.month_closure_store_result(_user uuid, _year int, _month int, _result jsonb) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE days int; n_db int;
+DECLARE problem text; n_db int;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Prihlásenie je potrebné'; END IF;
   IF _result IS NULL THEN RETURN; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.month_closures c WHERE c.user_id = _user AND c.year = _year AND c.month = _month AND c.closed_by = auth.uid()) THEN
     RAISE EXCEPTION 'Výsledok smie uložiť len ten, kto mesiac uzavrel';
   END IF;
-  days := extract(day FROM (make_date(_year, _month, 1) + interval '1 month' - interval '1 day'))::int;
-  IF jsonb_typeof(_result) IS DISTINCT FROM 'object' OR octet_length(_result::text) > 200000
-     OR jsonb_typeof(_result -> 'totals') IS DISTINCT FROM 'object' OR jsonb_typeof(_result -> 'days') IS DISTINCT FROM 'array'
-     OR jsonb_array_length(_result -> 'days') <> days
-     OR jsonb_typeof(_result -> 'punches') IS DISTINCT FROM 'number' OR (_result ->> 'punches') !~ '^[0-9]{1,6}$'
-     OR EXISTS (SELECT 1 FROM unnest(ARRAY['work', 'credit', 'total', 'expected', 'balance']) k WHERE jsonb_typeof(_result -> 'totals' -> k) IS DISTINCT FROM 'number') THEN
-    RAISE EXCEPTION 'Výsledok mesiaca má neplatný tvar';
+  problem := public.month_result_problem(_year, _month, _result);
+  IF problem IS NOT NULL THEN
+    RAISE EXCEPTION 'Výsledok mesiaca má neplatný tvar (%)', problem;
   END IF;
   -- výsledok musí byť spočítaný z tých istých razení, aké databáza vidí pri uzávierke (inak sa uzávierka nevykoná)
   SELECT s.punches_count INTO n_db FROM public.month_closure_snapshots s WHERE s.user_id = _user AND s.year = _year AND s.month = _month;

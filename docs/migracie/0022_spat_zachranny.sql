@@ -145,6 +145,7 @@ DROP TRIGGER IF EXISTS month_closure_only_last ON public.month_closures;
 
 DROP FUNCTION IF EXISTS public.close_month(uuid, int, int, jsonb);
 DROP FUNCTION IF EXISTS public.month_closure_store_result(uuid, int, int, jsonb);
+DROP FUNCTION IF EXISTS public.month_result_problem(int, int, jsonb);
 DROP FUNCTION IF EXISTS public.settings_unpair(date, text, boolean);
 DROP FUNCTION IF EXISTS public.settings_import_access(jsonb, boolean, date, boolean);
 DROP FUNCTION IF EXISTS public.settings_terminal_save(jsonb, date);

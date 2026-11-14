@@ -181,7 +181,7 @@ const monthResultSchema = z.object({
 });
 export type MonthResult = z.infer<typeof monthResultSchema>;
 
-/** Verzia tvaru uloženého výsledku (nie verzia nastavení). Zmena výpočtu v etape 1b ju zvýši. */
+/** Verzia tvaru uloženého výsledku (nie verzia nastavení). Zmena výpočtu v etape 1b ju zvýši; v tej istej zmene treba upraviť aj databázovú kontrolu `month_result_problem` (0022), ktorá dnes prijíma len `engine` = 1. */
 export const RESULT_ENGINE = 1;
 
 /** Uložený výsledok z databázy; neznámy tvar = null (mesiac sa potom dopočíta z pripnutej verzie, nič sa nevymýšľa). */

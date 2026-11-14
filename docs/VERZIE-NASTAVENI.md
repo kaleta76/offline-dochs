@@ -7,7 +7,7 @@ Záväzný návrh je v `docs/ARCHITEKTURA.md`, kapitola 5. Tento dokument opisuj
 - **`settings_versions`**: jedna verzia nastavení = jeden **nemenný** riadok (organizácia, poradie `ord`, pôvod `terminal` alebo `access`, „platí od mesiaca“ `valid_from`, dôvod vzniku, model `config`). Model má tvar kontraktu 1.5.0 bez zamestnancov (`contract/config-export.schema.json`). Úprava je vždy nový riadok; UPDATE a DELETE odmietne spúšťač aj pre funkcie.
 - **Platná verzia pre mesiac**: najvyššie `ord` spomedzi verzií, ktorých `valid_from` nie je neskôr než mesiac. Jej pôvod určuje, komu mesiac patrí. Verzia s prázdnym `valid_from` je uložená a na časovej osi nie je.
 - **Plán z Accessu** (`employee_month_plan`) patrí verzii, s ktorou prišiel (`version_id`). Nový import starší plán neprepíše ani nezmaže; plán za mesiace pred platnosťou verzie je uložený a nepoužije sa.
-- **`access_config`** je od migrácie pohľad s pôvodnými stĺpcami (verzia z Accessu platná pre aktuálny mesiac). Číta ho automatické schvaľovanie opráv a staršia aplikácia v zariadeniach; pôvodná tabuľka je odložená v schéme `settings_archive` kvôli návratu.
+- **`access_config`** je od migrácie pohľad s pôvodnými stĺpcami (verzia z Accessu platná pre aktuálny mesiac). Číta ho staršia aplikácia v zariadeniach (automatické schvaľovanie opráv ho čítalo do súkromnej migrácie 0023, pozri nižšie); pôvodná tabuľka je odložená v schéme `settings_archive` kvôli návratu.
 - **`organization_settings`, `organization_codes`, `organization_holidays`** ostali s údajmi. Výpočtové kľúče a sviatky sa z nich nečítajú; ich zmenu zo staršej aplikácie databáza odmietne s výzvou obnoviť aplikáciu. `organization_settings` ďalej drží nastavenia mimo výpočtu, `organization_codes` SAP kódy.
 
 Klient do tabuliek verzií a snímok nezapisuje ani z nich nečíta priamo. Všetko ide cez funkcie, ktoré overia prihlásenie, rolu správcu a vlastnú organizáciu.
@@ -41,6 +41,18 @@ Rozhodnutie vlastníčky (13. 11. 2026): po uzavretí sa nemenia parametre, výp
 ## Prenos organizácie
 
 `settings_versions` a `month_closure_snapshots` sú v `org_transfer.spec()`, ich odkazy v `org_transfer.import_refs()`. Súbor exportovaný pred migráciou 0022 sa na serveri po migrácii neimportuje (nesie tabuľku `access_config`); oba servery musia byť na rovnakej migrácii. Súkromný balík 0015 má vlastnú kópiu zoznamu tabuliek: po 0022 ho neinštalujte znova v staršej verzii.
+
+## Automatické schvaľovanie opráv a model nastavení (súkromná migrácia 0023)
+
+Oprava `request_correction` (súkromný balík, v repozitári nie je; funkcia je z 0013 a 0014) po 0022 posudzovala typ opravy podľa pohľadu `access_config`, ktorý ukazuje len verziu z Accessu platnú pre **aktuálny** mesiac. Pre mesiac, ktorý patrí terminálu (každá nová organizácia, aj po odpárovaní), bol pohľad prázdny, a preto sa sama schvaľovala už len oprava `WORK`; prerušenia išli vždy na ručné schválenie. Migrácia 0023 to opravuje:
+
+- Typ opravy (odchod s iným kódom než `WORK`) sa posudzuje podľa **verzie nastavení platnej pre mesiac, do ktorého oprava patrí** (`settings_version_for(organizácia, mesiac času opravy v Europe/Bratislava)`), nie podľa aktuálneho mesiaca. Oprava z minulého mesiaca sa teda posudzuje podľa verzie, ktorá platila vtedy.
+- Pravidlo ostáva z 0013: kód má v `terminal_code_map` práve jedno priradenie a príslušné prerušenie v `interruptions` je práve jedno a nemá `needs_approval = true`. Čo model nenesie (chýba verzia, priradenie alebo prerušenie), ostáva na ručné schválenie.
+- Mesiace z Accessu: správanie je rovnaké ako pred 0022 (príznak `needs_approval` z Accessu).
+- **Mesiace patriace terminálu:** terminálový model z 0022 príznak `needs_approval` nenesie a v Správe sa nedá nastaviť (prichádza len zo súboru z Accessu). Vedúcemu, ktorý zapol voľbu, sa teda v takom mesiaci sama schváli aj oprava namapovaného prerušenia (odchod), ak zamestnanec posiela zo svojho overeného zariadenia a oprava spĺňa limity a poradie. Zodpovedá to textu súhlasu vedúceho („prerušenia bez príznaku vyžaduje schválenie“). Kto chce, aby sa niektorý typ nikdy neschvaľoval sám, musí mať mesiac z Accessu s príznakom.
+- Nemení sa nič iné: overenie zariadenia, limity (14 dní, 5 za deň, 5 minút do budúcnosti), poradie razení dňa, dôvody `manual_reason`, audit, hash reťaz razení ani podpis funkcie. Klient sa nemení: tlačidlá a „Môj mesiac“ čítali model pre mesiac už cez `loadSettingsForMonth`.
+
+Nasadenie: súkromný balík `0023_balik` (migrácia, kontrola, návrat) v novej karte SQL editora, kontrola má mať všetky riadky `OK`. Poradie voči aplikácii je ľubovoľné, klient sa nemení. Vyžaduje 0014 a 0022. Návrat: `0023_spat_zachranny.sql` vráti znenie z 0014 (nič sa nestratí).
 
 ## Nasadenie a návrat
 

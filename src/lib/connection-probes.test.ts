@@ -12,7 +12,7 @@ describe("buildProbes", () => {
     for (const list of [ids(), ids(true)]) {
       expect(list).toContain("rpc-admin-overview");
       expect(list).toContain("get-invites");
-      expect(list).toHaveLength(9);
+      expect(list).toHaveLength(8);
     }
   });
 
@@ -23,10 +23,9 @@ describe("buildProbes", () => {
     expect(list).toEqual([
       "auth-user",
       "rpc-my-profile",
-      "rpc-calc-settings",
+      "rpc-settings-for-month",
       "get-user-roles",
       "get-profiles",
-      "get-holidays",
       "get-punches",
     ]);
   });

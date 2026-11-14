@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { loadMonth, labelOf, hm } from "@/lib/month";
+import { closeMonth, monthResult } from "@/lib/settings-model";
 import { unverifiedSummary } from "@/lib/device-trace";
 import { fmtMin } from "@/lib/engine";
 import { presenceOf, summarizePresence, type Presence } from "@/lib/presence";
@@ -140,7 +141,19 @@ function Team() {
   const close = useMutation({
     mutationFn: async (userId: string) => {
       if (!uid) throw new Error("Prihlásenie je potrebné.");
-      const { error } = await supabase.from("month_closures").insert({ user_id: userId, year: ym.y, month: ym.m, closed_by: uid });
+      // Výsledok mesiaca sa uloží spolu s uzávierkou (jedna transakcia) a uzavretý mesiac sa už neprepočítava. Počíta sa z čerstvo
+      // načítaných razení; databáza porovná ich počet s vlastným a pri nezhode uzávierku nevykoná.
+      const fresh = await loadMonth(userId, ym.y, ym.m);
+      if (fresh.closedAt) throw new Error("Mesiac je už uzavretý.");
+      await closeMonth(userId, ym.y, ym.m, monthResult(fresh));
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["team"] }),
+    onError: (e: Error) => alert(e.message),
+  });
+  // Vrátiť sa dá len posledná uzávierka zamestnanca (stráži databáza); po vrátení sa mesiac znova počíta a dá sa uzavrieť nanovo.
+  const reopen = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.from("month_closures").delete().eq("user_id", userId).eq("year", ym.y).eq("month", ym.m);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["team"] }),
@@ -230,7 +243,12 @@ function Team() {
                     <div className="flex justify-end gap-2">
                       <Link to="/vykaz/$userId/$ym" params={{ userId: p.id, ym: `${ym.y}-${ym.m}` }} className="rounded-sm border-2 border-foreground px-2 py-1 text-xs font-bold">Výkaz A4</Link>
                       {m.closedAt ? (
-                        <span className="rounded-sm bg-muted px-2 py-1 text-xs font-bold">Uzavretý</span>
+                        <>
+                          <span className="rounded-sm bg-muted px-2 py-1 text-xs font-bold" title={m.snapshot?.matches === false ? "Kontrolný prepočet sa líši od uloženého výsledku; platí uložený." : undefined}>Uzavretý{m.snapshot?.matches === false ? " *" : ""}</span>
+                          {isAdmin && (
+                            <Button size="sm" variant="outline" onClick={() => confirm(`Vrátiť uzávierku ${ym.m}/${ym.y} pre ${personnelLabel(p)}?\n\nUložený výsledok mesiaca sa zahodí a mesiac sa bude znova počítať podľa nastavení platných teraz. Vrátiť sa dá len posledná uzávierka zamestnanca.`) && reopen.mutate(p.id)}>Vrátiť</Button>
+                          )}
+                        </>
                       ) : (
                         <Button size="sm" onClick={() => confirm(`Uzavrieť ${ym.m}/${ym.y} pre ${personnelLabel(p)}?${m.unverifiedCount ? `\n\nPozor: ${unverifiedSummary(m.unverifiedCount)}` : ""}`) && close.mutate(p.id)}>Uzavrieť</Button>
                       )}

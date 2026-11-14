@@ -20,7 +20,12 @@ function chain() {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => chain(),
-    rpc: () => Promise.resolve({ data: null, error: { message: "mock" } }),
+    rpc: async (fn: string) => {
+      const f = await import("@/lib/__fixtures__/settings-fixtures");
+      if (fn === "settings_for_month") return { data: f.forMonthResponse("terminal"), error: null };
+      if (fn === "settings_timeline") return { data: f.timelineResponse("terminal"), error: null };
+      return { data: null, error: { message: "mock" } };
+    },
     auth: { signOut: () => Promise.resolve({ error: null }) },
   },
 }));
@@ -95,6 +100,8 @@ describe("Správa: karty Prevádzka a Servis a testovanie", () => {
   it("?servis=1: záložky sú dve, Servis sa otvorí a má všetky servisné voľby aj diagnostiku", async () => {
     mount("?servis=1");
     await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
+    // Pravidlá výpočtu a sviatky sú karta verzií nastavení; sviatky sa ukážu po načítaní platnej verzie.
+    await waitFor(() => expect(has("Sviatky")).toBe(true));
     for (const heading of [...SERVICE_TOOLS, DIAGNOSTICS]) expect(has(heading), heading).toBe(true);
     // Bežné voľby ostávajú v druhej karte, v Servise sa neukazujú.
     expect(

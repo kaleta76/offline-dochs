@@ -7,6 +7,7 @@ import { terminalCacheKey } from "@/lib/terminal-actions";
 
 const mocks = vi.hoisted(() => ({
   from: vi.fn(),
+  rpc: vi.fn(),
   enqueue: vi.fn(),
   online: true,
   userId: "owner",
@@ -20,7 +21,9 @@ const mocks = vi.hoisted(() => ({
     voided_at: null;
   }[],
 }));
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: mocks.from } }));
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { from: mocks.from, rpc: mocks.rpc },
+}));
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
     session: { user: { id: mocks.userId } },
@@ -60,14 +63,37 @@ describe("terminal configured punching", () => {
         eq: () => query,
         gte: () => query,
         order: () => Promise.resolve({ data: mocks.today, error: null }),
-        maybeSingle: () =>
-          Promise.resolve({
-            data: table === "access_config" ? { config_version: "2026.11.04.1200", config } : null,
-            error: null,
-          }),
+        maybeSingle: () => Promise.resolve({ data: null, error: null }),
       };
+      void table;
       return query;
     });
+    // Tlačidlá prídu z verzie nastavení platnej pre aktuálny mesiac (RPC settings_for_month), nie z tabuľky access_config.
+    const { employees: _employees, ...model } = config;
+    mocks.rpc.mockImplementation((fn: string) =>
+      Promise.resolve(
+        fn === "settings_for_month"
+          ? {
+              data: {
+                month: "2026-11",
+                version: {
+                  id: "22222222-2222-4222-8222-222222222222",
+                  ord: 2,
+                  origin: "access",
+                  valid_from: "2026-11",
+                  reason: "import",
+                  config_version: "2026.11.04.1200",
+                  created_at: "2026-11-13T09:00:00Z",
+                },
+                config: model,
+                max_drift_min: 10,
+                closure: null,
+              },
+              error: null,
+            }
+          : { data: null, error: { message: "mock" } },
+      ),
+    );
     mocks.enqueue.mockResolvedValue({ client_time: "2026-11-05T10:00:00Z" });
   });
 
@@ -119,6 +145,7 @@ describe("terminal configured punching", () => {
     );
     mounted.unmount();
     mocks.from.mockClear();
+    mocks.rpc.mockClear();
     mocks.online = false;
     mount();
     await waitFor(() => expect(screen.queryByRole("button", { name: "Súkromne" })).toBeNull());
@@ -131,6 +158,7 @@ describe("terminal configured punching", () => {
       }),
     );
     expect(mocks.from).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it("falls back without blocking punching when configuration cannot be read", async () => {
@@ -145,6 +173,7 @@ describe("terminal configured punching", () => {
       };
       return query;
     });
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: "Network unavailable" } });
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Príchod" }));
     await waitFor(() =>

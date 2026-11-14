@@ -6,7 +6,7 @@
 // Ostatné v tomto súbore sú čisté funkcie (odvodenie vstupov výpočtu z modelu, snímka uzavretého mesiaca, rozdiel verzií).
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import type { DayResult, EngineSettings } from "./engine";
+import type { DayResult, EngineSettings, InterruptionProps, RegimeDef } from "./engine";
 import { isMissingFunction } from "./rpc-helpers";
 
 type LooseRpc = {
@@ -134,19 +134,96 @@ export interface EngineInputs extends EngineSettings {
   /** Predvolený denný fond v hodinách (použije sa, keď zamestnanec nemá vlastný). */
   fundHours: number;
   holidays: Map<string, string>;
+  /** Režimy výpočtu z modelu podľa čísla (etapa 1b); režim pre deň určuje plán, ktorý klient zatiaľ nečíta. */
+  regimes: Map<number, RegimeDef>;
 }
 
-/** Zaokrúhlenia, obed, predvolený fond a sviatky z modelu v tvare kontraktu. */
+const optNum = z.number().optional().catch(undefined);
+const optBool = z.boolean().optional().catch(undefined);
+/** Čo výpočet číta z pravidiel a prerušení nad rámec povinných kľúčov; nepovinné kľúče s nesprávnym typom sa berú ako chýbajúce. */
+const rulesExtra = z.looseObject({
+  work_window_start_min: optNum,
+  work_window_end_min: optNum,
+  full_day_obstacle_min: optNum,
+  lunch_recorded_mode: optNum,
+  lunch_min_min: optNum,
+  unlabeled_out_is_lunch: optBool,
+  duplicate_punch_window_min: optNum,
+  rounding_mode: optNum,
+  auto_repair_mode: optNum,
+});
+const interruptionExtra = z.looseObject({
+  code: z.number(),
+  calc: z.string(),
+  full_day_min: optNum,
+  counts_to_lunch_base: optBool,
+  auto_end_of_shift: optBool,
+  full_day_only: optBool,
+});
+const codeMapSchema = z.array(z.looseObject({ code: z.string(), interruption: z.number() }));
+const regimesSchema = z.array(
+  z.looseObject({
+    id: z.number(),
+    rules: z.record(z.string(), z.unknown()).optional().catch(undefined),
+    interruptions: z
+      .array(z.looseObject({ code: z.number(), calc: z.string().optional(), full_day_min: z.number().optional(), counts_to_lunch_base: z.boolean().optional() }))
+      .optional()
+      .catch(undefined),
+  }),
+);
+
+/**
+ * Vstupy výpočtu z modelu v tvare kontraktu: pravidlá (obed, zaokrúhlenie so smerom, okno práce, razený obed, duplicita, automatická oprava),
+ * prerušenia s vlastnosťami podľa kódu terminála (`terminal_code_map`), režimy, predvolený fond a sviatky. Bez mapy kódov platia vstavané
+ * kódy predvolenej terminálovej verzie; kód, ktorý model nepozná, výpočet neodhaduje (deň je nepotvrdený).
+ */
 export function engineInputs(config: SettingsModel): EngineInputs {
   const r = config.rules;
+  const x = rulesExtra.parse(r);
+  const byNumber = new Map<number, z.infer<typeof interruptionExtra>>();
+  for (const i of config.interruptions) {
+    const p = interruptionExtra.safeParse(i);
+    if (p.success) byNumber.set(p.data.code, p.data);
+  }
+  const map = codeMapSchema.catch([]).parse((config as Record<string, unknown>)["terminal_code_map"]);
+  const interruptions = new Map<string, InterruptionProps>();
+  for (const m of map) {
+    const i = byNumber.get(m.interruption);
+    if (!i) continue;
+    interruptions.set(m.code.toUpperCase(), {
+      number: i.code,
+      calc: i.calc,
+      fullDayMin: i.full_day_min ?? null,
+      countsToLunchBase: i.counts_to_lunch_base ?? false,
+      autoEndOfShift: i.auto_end_of_shift ?? false,
+      fullDayOnly: i.full_day_only ?? false,
+    });
+  }
+  if (!interruptions.has("WORK")) interruptions.set("WORK", { number: 1, calc: "WORK" });
+  const regimes = new Map<number, RegimeDef>();
+  for (const g of regimesSchema.catch([]).parse((config as Record<string, unknown>)["regimes"])) {
+    regimes.set(g.id, { rules: g.rules, interruptions: g.interruptions });
+  }
   return {
     roundInMin: r.rounding_in_min ?? 0,
     roundOutMin: r.rounding_out_min ?? 0,
     // vypnutý automatický obed = odpočet 0 (engine pri 0 nič neodpočíta)
     breakMin: r.auto_lunch_enabled ? r.auto_lunch_deduct_min : 0,
     breakAfterHours: r.auto_lunch_trigger_min / 60,
+    roundingMode: x.rounding_mode ?? 0,
+    windowStartMin: x.work_window_start_min ?? 0,
+    windowEndMin: x.work_window_end_min ?? 1440,
+    fullDayObstacleMin: x.full_day_obstacle_min ?? 1440,
+    lunchRecordedMode: x.lunch_recorded_mode ?? 0,
+    lunchMinMin: x.lunch_min_min ?? 30,
+    unlabeledOutIsLunch: x.unlabeled_out_is_lunch ?? true,
+    duplicateWindowMin: x.duplicate_punch_window_min ?? 0,
+    autoRepairMode: x.auto_repair_mode ?? 0,
+    // bez mapy kódov (model bez terminal_code_map) platia vstavané kódy; WORK je v mape vždy
+    interruptions: map.length > 0 ? interruptions : undefined,
     fundHours: r.default_daily_fund_min / 60,
     holidays: new Map(config.holidays.map((h) => [h.date, h.name])),
+    regimes,
   };
 }
 

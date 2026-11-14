@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_UI_Tab_Export"
-'@Verzia 2.11.1
+'@Verzia 2.12.0
 Option Compare Database
 Option Explicit
 
@@ -14,6 +14,8 @@ Option Explicit
 ' - InitDefaults(frm)                 : Inicializuje predvolené parametre exportu.
 ' - VyberExportFolder_Click()         : Otvára dialóg pre výber cieľového adresára.
 ' - SpustiExportLovableUI()           : Spúšťa export konfigurácie a testovacích dát.
+' - SpustiNastavenieKlientaUI()        : Nastaví priečinok klienta na razenie v Accesse a zapíše konfiguráciu tlačidiel.
+' - SpustiPrijemKlientovUI()           : Prevezme razenia zo súborov klientov (nanečisto alebo naozaj).
 '===============================================================================
 
 '-------------------------------------------------------------------------------
@@ -106,6 +108,17 @@ Public Sub BuildUI(ByVal strFrmName As String, ByVal strPageName As String)
     btn.Name = "btnSamoTestTerminal"
     btn.Caption = "Samočinný test terminála (zapíše terminal_test_report.txt)"
     btn.OnClick = "=SpustiSamoTestTerminaluUI()"
+
+    ' --- KLIENT NA RAZENIE V ACCESSE (zamestnanci razia z Accessu na svojom počítači, docs/KLIENT-ACCESS.md) ---
+    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 500, 7200, 9500, 500)
+    btn.Name = "btnNastavKlienta"
+    btn.Caption = "Klient na razenie v Accesse: nastaviť priečinok a konfiguráciu tlačidiel..."
+    btn.OnClick = "=SpustiNastavenieKlientaUI()"
+
+    Set btn = CreateControl(strFrmName, acCommandButton, acDetail, strPageName, "", 500, 7850, 9500, 500)
+    btn.Name = "btnPrijemKlientov"
+    btn.Caption = "Prijať razenia z klientov v Accesse (súbory z priečinka prijem)"
+    btn.OnClick = "=SpustiPrijemKlientovUI()"
 
     Exit Sub
 ChybaHandler:
@@ -275,4 +288,49 @@ Public Function SpustiSamoTestTerminaluUI() As Boolean
     Exit Function
 ChybaHandler:
     MsgBox "Chyba samočinného testu: " & Err.Description, vbCritical
+End Function
+
+'-------------------------------------------------------------------------------
+' Klient na razenie v Accesse: nastaví zdieľaný priečinok (KlientPriecinok), vytvorí podpriečinky a zapíše konfiguráciu tlačidiel.
+'-------------------------------------------------------------------------------
+Public Function SpustiNastavenieKlientaUI() As Boolean
+    On Error GoTo ChybaHandler
+    Dim strStary As String, strNovy As String, strRep As String
+    strStary = Trim$(mod_00_Common.GetNastavenie("KlientPriecinok", ""))
+    strNovy = Trim$(InputBox("Zdieľaný priečinok pre klientov na razenie (napríklad \\server\dochadzka)." & vbCrLf & vbCrLf & _
+                             "Správca siete v ňom nastaví práva: zamestnanci môžu v podpriečinku prijem len vytvárať súbory.", "Klient na razenie", strStary))
+    If Len(strNovy) = 0 Then Exit Function
+    Call mod_00_Common.SetNastavenie("KlientPriecinok", strNovy, "Zdieľaný priečinok klientov na razenie v Accesse (docs/KLIENT-ACCESS.md)")
+    Call mod_22_KlientRazenia.NastavPredvolby
+    strRep = mod_22_KlientRazenia.PripravPriecinky() & vbCrLf & vbCrLf & mod_22_KlientRazenia.GenerujKonfiguraciuKlienta()
+    MsgBox Left$(strRep, 1800), vbInformation, "Klient na razenie"
+    Call mod_UI_Pomocnik.OznacCinnost("EXPORT")
+    SpustiNastavenieKlientaUI = True
+    Exit Function
+ChybaHandler:
+    MsgBox "Chyba pri nastavení klienta: " & Err.Description, vbCritical
+End Function
+
+'-------------------------------------------------------------------------------
+' Príjem razení z klientov: skontroluje súbory z priečinka prijem a prevezme ich do fronty. Najprv sa ponúkne beh nanečisto.
+'-------------------------------------------------------------------------------
+Public Function SpustiPrijemKlientovUI() As Boolean
+    On Error GoTo ChybaHandler
+    Dim odp As VbMsgBoxResult, strRep As String, strSub As String
+    If Len(Trim$(mod_00_Common.GetNastavenie("KlientPriecinok", ""))) = 0 Then
+        MsgBox "Najprv nastavte priečinok klienta (tlačidlo Klient na razenie v Accesse: nastaviť priečinok).", vbExclamation, "Príjem razení z klientov"
+        Exit Function
+    End If
+    odp = MsgBox("Ako spustiť príjem?" & vbCrLf & vbCrLf & "Áno = naozaj (zapíše razenia do fronty, spracuje ich a presunie súbory)" & vbCrLf & _
+                 "Nie = nanečisto (iba skontroluje súbory a ukáže, ako sa razenia previedu)", vbQuestion + vbYesNoCancel, "Príjem razení z klientov")
+    If odp = vbCancel Then Exit Function
+    strRep = mod_22_KlientRazenia.PrijmiKlientskeRazenia(odp = vbNo)
+    strSub = CurrentProject.Path & "\klient_prijem_report.txt"
+    Call mod_00_Common.UlozUTF8Sustor(strSub, strRep)
+    MsgBox Left$(strRep, 1800) & vbCrLf & vbCrLf & "Celý report: " & strSub, vbInformation, "Príjem razení z klientov"
+    Call mod_UI_Pomocnik.OznacCinnost("EXPORT")
+    SpustiPrijemKlientovUI = True
+    Exit Function
+ChybaHandler:
+    MsgBox "Chyba pri príjme razení z klientov: " & Err.Description, vbCritical
 End Function

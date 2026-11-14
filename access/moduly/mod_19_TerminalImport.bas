@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_19_TerminalImport"
-'@Verzia 1.3.0
+'@Verzia 1.4.0
 Option Compare Database
 Option Explicit
 
@@ -41,6 +41,7 @@ Option Explicit
 ' - ZabezpecTabulky(db)                      : Vytvorí TerminalMapaKodov (s predvoľbou) a TerminalMapaOsob.
 ' - NastavPredvolbuMapovania(db)             : Zapíše predvolené mapovanie siedmich kódov terminála na prerušenia.
 ' - ImportujSubor(cesta, nanecisto, prisne)  : Overí a importuje súbor; vráti textový report.
+' - PrevedRazeniaKlienta(...)                : Párovanie razení z klienta v Accesse (mod_22_KlientRazenia) rovnako ako pri termináli.
 ' - SamoTestTerminalu(cestaCSV)              : Test s reportom (súbory v priečinku databázy).
 ' - OdstranTestoveData()                     : Zmaže testovacie údaje zamestnancov 9000001 až 9000099.
 ' - JeSuborZneplatneni(cesta)                : Je súbor zoznam zneplatnených razení (voids_*.csv, kontrakt v1.1)?
@@ -579,6 +580,58 @@ Private Sub SparujRazenia(ByRef r() As TRazenie, ByRef ix() As Long, ByVal n As 
         g0 = g1 + 1
     Loop
 End Sub
+
+'-------------------------------------------------------------------------------
+' Prevod razení z klienta v Accesse (mod_22_KlientRazenia, 1.4.0): z kódu (WORK, DOCTOR, ...), smeru (IN / OUT) a poradia razení
+' zamestnanca za deň urči kód razenia Accessu TÝM ISTÝM párovaním ako pri súbore z terminála (SparujRazenia), takže výpočet dňa,
+' editor, výkazy a uzávierka sa správajú rovnako bez ohľadu na zdroj. Nič nezapisuje.
+' Všetky polia majú rovnaký rozsah 0 až n - 1 (poradie v poliach je jedno, zoradí sa tu). strOsc je osobné číslo Accessu.
+' strCasUtc má tvar RRRR-MM-DDTHH:MM:SS (rozhoduje pri rovnakom lokálnom čase pri zmene času). Vráti počet razení bez chyby;
+' pri chybe je v strChyba dôvod a lKodRazenia = 0.
+'-------------------------------------------------------------------------------
+Public Function PrevedRazeniaKlienta(ByRef strOsc() As String, ByRef strKod() As String, ByRef strSmer() As String, _
+                                     ByRef dtLokalny() As Date, ByRef strCasUtc() As String, ByVal n As Long, _
+                                     ByRef lKodRazenia() As Long, ByRef strChyba() As String) As Long
+    On Error GoTo Chyba
+    Dim r() As TRazenie, kl() As String, ix() As Long, db As DAO.Database, mapa As Object, kodDic As Object
+    Dim i As Long, bObed As Boolean, nOk As Long
+    If n <= 0 Then Exit Function
+    Set db = CurrentDb
+    Call ZabezpecTabulky(db)
+    ReDim r(0 To n - 1)
+    ReDim kl(0 To n - 1)
+    ReDim ix(0 To n - 1)
+    For i = 0 To n - 1
+        r(i).PunchID = i + 1
+        r(i).Osc = Trim$(strOsc(i))
+        r(i).Kod = UCase$(Trim$(strKod(i)))
+        r(i).Smer = UCase$(Trim$(strSmer(i)))
+        r(i).Lokalny = dtLokalny(i)
+        r(i).Den = Format$(dtLokalny(i), "yyyy\-mm\-dd")
+        r(i).CasUtc = strCasUtc(i)
+        ix(i) = i
+        kl(i) = r(i).Osc & "|" & r(i).Den & "|" & r(i).CasUtc & "|" & Format$(i, "0000000000")
+    Next i
+    Call ZoradKluce(kl, ix, 0, n - 1)
+    Set mapa = NacitajMapuKodov(db)
+    Set kodDic = CreateObject("Scripting.Dictionary")
+    bObed = (UCase$(mod_00_Common.GetNastavenie("TerminalOdchodBezDovodu", "OBED")) <> "ODCHOD")
+    Call SparujRazenia(r, ix, n, bObed, mapa, kodDic)
+    For i = 0 To n - 1
+        lKodRazenia(i) = r(i).KodRazenia
+        strChyba(i) = r(i).Chyba
+        If Len(r(i).Chyba) = 0 Then nOk = nOk + 1
+    Next i
+    PrevedRazeniaKlienta = nOk
+    Exit Function
+Chyba:
+    Call mod_00_Common.ZapisLog("mod_19_TerminalImport.PrevedRazeniaKlienta", "ERROR", Err.Description)
+    For i = 0 To n - 1
+        lKodRazenia(i) = 0
+        strChyba(i) = "Prevod razení zlyhal: " & Err.Description
+    Next i
+    PrevedRazeniaKlienta = 0
+End Function
 
 '===============================================================================
 ' Import súboru

@@ -73,7 +73,14 @@ export interface DayPlan {
 /** Regime of a day (contract 1.5.0 `regimes[]`): a set of overridden rules and interruption properties. */
 export interface RegimeDef {
   rules?: Record<string, unknown> | undefined;
-  interruptions?: { code: number; calc?: string | undefined; full_day_min?: number | undefined; counts_to_lunch_base?: boolean | undefined }[] | undefined;
+  interruptions?:
+    | {
+        code: number;
+        calc?: string | undefined;
+        full_day_min?: number | undefined;
+        counts_to_lunch_base?: boolean | undefined;
+      }[]
+    | undefined;
 }
 
 export interface DayInput {
@@ -113,7 +120,10 @@ const WORK_NO = 1;
 const LUNCH_NO = 7;
 
 /** Default terminal version (docs/migracie/0022_verzie_nastaveni.sql `settings_default_config`), used when the settings carry no interruptions. */
-export const DEFAULT_INTERRUPTIONS: ReadonlyMap<string, InterruptionProps> = new Map<string, InterruptionProps>([
+export const DEFAULT_INTERRUPTIONS: ReadonlyMap<string, InterruptionProps> = new Map<
+  string,
+  InterruptionProps
+>([
   ["WORK", { number: WORK_NO, calc: "WORK" }],
   ["DOCTOR", { number: 2, calc: "COUNTED", autoEndOfShift: true }],
   ["ERRAND", { number: 4, calc: "COUNTED", autoEndOfShift: true }],
@@ -146,7 +156,10 @@ interface Resolved {
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 /** Regime values override the rules, regime interruption changes override the properties (contract 1.5.0, order of values for a day). */
-export function applyRegime(s: EngineSettings, regime: RegimeDef | null | undefined): EngineSettings {
+export function applyRegime(
+  s: EngineSettings,
+  regime: RegimeDef | null | undefined,
+): EngineSettings {
   if (!regime) return s;
   const r = regime.rules ?? {};
   const out: EngineSettings = { ...s };
@@ -157,18 +170,21 @@ export function applyRegime(s: EngineSettings, regime: RegimeDef | null | undefi
   setNum("work_window_start_min", "windowStartMin");
   setNum("work_window_end_min", "windowEndMin");
   setNum("full_day_obstacle_min", "fullDayObstacleMin");
-  if (num(r["auto_lunch_trigger_min"]) !== null) out.breakAfterHours = (r["auto_lunch_trigger_min"] as number) / 60;
+  if (num(r["auto_lunch_trigger_min"]) !== null)
+    out.breakAfterHours = (r["auto_lunch_trigger_min"] as number) / 60;
   setNum("lunch_recorded_mode", "lunchRecordedMode");
   setNum("lunch_min_min", "lunchMinMin");
   setNum("rounding_in_min", "roundInMin");
   setNum("rounding_out_min", "roundOutMin");
   setNum("rounding_mode", "roundingMode");
   setNum("auto_repair_mode", "autoRepairMode");
-  if (typeof r["unlabeled_out_is_lunch"] === "boolean") out.unlabeledOutIsLunch = r["unlabeled_out_is_lunch"];
+  if (typeof r["unlabeled_out_is_lunch"] === "boolean")
+    out.unlabeledOutIsLunch = r["unlabeled_out_is_lunch"];
   if (typeof r["auto_lunch_enabled"] === "boolean") {
     const deduct = num(r["auto_lunch_deduct_min"]) ?? out.breakMin;
     out.breakMin = r["auto_lunch_enabled"] ? deduct : 0;
-  } else if (num(r["auto_lunch_deduct_min"]) !== null) out.breakMin = r["auto_lunch_deduct_min"] as number;
+  } else if (num(r["auto_lunch_deduct_min"]) !== null)
+    out.breakMin = r["auto_lunch_deduct_min"] as number;
   if (regime.interruptions?.length) {
     const map = new Map(out.interruptions ?? DEFAULT_INTERRUPTIONS);
     for (const change of regime.interruptions) {
@@ -190,7 +206,8 @@ export function applyRegime(s: EngineSettings, regime: RegimeDef | null | undefi
 function resolve(s: EngineSettings, plan?: DayPlan): Resolved {
   const byCode = new Map(s.interruptions ?? DEFAULT_INTERRUPTIONS);
   const byNumber = new Map<number, { code: string; props: InterruptionProps }>();
-  for (const [code, props] of byCode) if (!byNumber.has(props.number)) byNumber.set(props.number, { code, props });
+  for (const [code, props] of byCode)
+    if (!byNumber.has(props.number)) byNumber.set(props.number, { code, props });
   return {
     roundIn: s.roundInMin,
     roundOut: s.roundOutMin,
@@ -281,8 +298,13 @@ interface DayState {
 function runDay(evs: Ev[], R: Resolved, anomalies: string[]): DayState {
   const ivs: Iv[] = [];
   const last = new Map<number, { dir: "Z" | "K"; at: number }>();
-  let working = false, wFrom = 0, wReturned = false, wResumed = false;
-  let inter = false, iNo = 0, iFrom = 0;
+  let working = false,
+    wFrom = 0,
+    wReturned = false,
+    wResumed = false;
+  let inter = false,
+    iNo = 0,
+    iFrom = 0;
   const parallel: number[] = [];
 
   for (const e of evs) {
@@ -296,7 +318,9 @@ function runDay(evs: Ev[], R: Resolved, anomalies: string[]): DayState {
 
     if (e.c === WORK_NO && e.dir === "Z") {
       if (working && wReturned) {
-        wFrom = e.at; wReturned = false; wResumed = false; // a punched arrival replaces the restored work
+        wFrom = e.at;
+        wReturned = false;
+        wResumed = false; // a punched arrival replaces the restored work
       } else if (working) {
         anomalies.push("DOUBLE_ARRIVAL");
       } else {
@@ -305,12 +329,17 @@ function runDay(evs: Ev[], R: Resolved, anomalies: string[]): DayState {
           ivs.push({ c: iNo, from: iFrom, to: e.at, fromResumed: false, toDeparture: false });
           inter = false;
         }
-        working = true; wFrom = e.at; wReturned = false; wResumed = false;
+        working = true;
+        wFrom = e.at;
+        wReturned = false;
+        wResumed = false;
       }
     } else if (e.c === WORK_NO && e.dir === "K") {
       if (working) {
-        if (!(inter && iFrom === wFrom)) ivs.push({ c: WORK_NO, from: wFrom, to: e.at, fromResumed: wResumed, toDeparture: true });
-        working = false; wReturned = false;
+        if (!(inter && iFrom === wFrom))
+          ivs.push({ c: WORK_NO, from: wFrom, to: e.at, fromResumed: wResumed, toDeparture: true });
+        working = false;
+        wReturned = false;
       } else if (inter) {
         if (e.at > iFrom) anomalies.push("DEPARTURE_DURING_INTERRUPTION");
         ivs.push({ c: iNo, from: iFrom, to: e.at, fromResumed: false, toDeparture: false });
@@ -329,17 +358,30 @@ function runDay(evs: Ev[], R: Resolved, anomalies: string[]): DayState {
       }
       if (!inter) {
         if (working && e.at > wFrom) {
-          ivs.push({ c: WORK_NO, from: wFrom, to: e.at, fromResumed: wResumed, toDeparture: false });
+          ivs.push({
+            c: WORK_NO,
+            from: wFrom,
+            to: e.at,
+            fromResumed: wResumed,
+            toDeparture: false,
+          });
           working = false;
         }
-        inter = true; iNo = e.c; iFrom = e.at;
+        inter = true;
+        iNo = e.c;
+        iFrom = e.at;
       }
     } else if (inter && iNo === e.c) {
       ivs.push({ c: e.c, from: iFrom, to: e.at, fromResumed: false, toDeparture: false });
       if (!working) {
-        working = true; wFrom = e.at; wReturned = true; wResumed = true;
+        working = true;
+        wFrom = e.at;
+        wReturned = true;
+        wResumed = true;
       } else if (iFrom === wFrom) {
-        wFrom = e.at; wReturned = true; wResumed = true;
+        wFrom = e.at;
+        wReturned = true;
+        wResumed = true;
       }
       inter = false;
     } else {
@@ -370,32 +412,56 @@ export function roundMinutes(at: number, step: number, direction: number): numbe
 function applyRounding(ivs: Iv[], R: Resolved) {
   if (R.roundIn <= 1 && R.roundOut <= 1) return;
   const [dirIn, dirOut]: [number, number] =
-    R.roundingMode === 1 ? [1, 1] : R.roundingMode === 2 ? [-1, -1] : R.roundingMode === 3 ? [0, 0] : [1, -1];
-  let first = -1, lastEnd = -1;
+    R.roundingMode === 1
+      ? [1, 1]
+      : R.roundingMode === 2
+        ? [-1, -1]
+        : R.roundingMode === 3
+          ? [0, 0]
+          : [1, -1];
+  let first = -1,
+    lastEnd = -1;
   ivs.forEach((v, i) => {
     if (v.c !== WORK_NO) return;
     if (first < 0 || v.from < ivs[first]!.from) first = i;
     if (lastEnd < 0 || v.to > ivs[lastEnd]!.to) lastEnd = i;
   });
   if (first < 0) return;
-  if (R.roundIn > 1 && !ivs[first]!.fromResumed) ivs[first]!.from = roundMinutes(ivs[first]!.from, R.roundIn, dirIn);
+  if (R.roundIn > 1 && !ivs[first]!.fromResumed)
+    ivs[first]!.from = roundMinutes(ivs[first]!.from, R.roundIn, dirIn);
   if (R.roundOut > 1) {
     const v = ivs[lastEnd]!;
     // only a real last departure of the day: nothing but work may start at or after its end
-    if (v.toDeparture && !ivs.some((o) => o.c !== WORK_NO && o.from >= v.to)) v.to = roundMinutes(v.to, R.roundOut, dirOut);
+    if (v.toDeparture && !ivs.some((o) => o.c !== WORK_NO && o.from >= v.to))
+      v.to = roundMinutes(v.to, R.roundOut, dirOut);
   }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 
 const ZERO_DAY = (expectedMin: number): DayResult => ({
-  workMin: 0, creditMin: 0, privMin: 0, breakMin: 0, totalMin: 0, expectedMin, balanceMin: -expectedMin, byCode: {}, open: false, anomalies: [], unconfirmed: null, repaired: false,
+  workMin: 0,
+  creditMin: 0,
+  privMin: 0,
+  breakMin: 0,
+  totalMin: 0,
+  expectedMin,
+  balanceMin: -expectedMin,
+  byCode: {},
+  open: false,
+  anomalies: [],
+  unconfirmed: null,
+  repaired: false,
 });
 
 export function computeDay(input: DayInput, settings: EngineSettings): DayResult {
   const s = applyRegime(settings, input.regime);
   const R = resolve(s, input.plan);
-  const expectedMin = input.plan ? input.plan.expectedMin : input.isWorkday ? Math.round(input.fundHours * 60) : 0;
+  const expectedMin = input.plan
+    ? input.plan.expectedMin
+    : input.isWorkday
+      ? Math.round(input.fundHours * 60)
+      : 0;
   const fundMin = expectedMin;
   const ps = input.punches
     .map((p, i) => ({ p, i }))
@@ -406,7 +472,14 @@ export function computeDay(input: DayInput, settings: EngineSettings): DayResult
   // Whole-day codes (leave, sickness): the day counts as the daily fund, the balance is zero.
   const wholeDay = ps.find((p) => R.byCode.get(p.code)?.fullDayOnly);
   if (wholeDay) {
-    return { ...ZERO_DAY(expectedMin), creditMin: expectedMin, totalMin: expectedMin, balanceMin: 0, byCode: expectedMin > 0 ? { [wholeDay.code]: expectedMin } : {}, unconfirmed };
+    return {
+      ...ZERO_DAY(expectedMin),
+      creditMin: expectedMin,
+      totalMin: expectedMin,
+      balanceMin: 0,
+      byCode: expectedMin > 0 ? { [wholeDay.code]: expectedMin } : {},
+      unconfirmed,
+    };
   }
 
   const anomalies: string[] = [];
@@ -418,7 +491,12 @@ export function computeDay(input: DayInput, settings: EngineSettings): DayResult
   const threshold = (c: number) => props(c)?.fullDayMin ?? R.fullDayObstacle;
 
   // Sums of the day (SumarDna): work (clipped by the window), counted interruptions, lunch, unpaid time, lunch base.
-  let work = 0, credit = 0, priv = 0, lunchReal = 0, base = 0, hasLunch = false;
+  let work = 0,
+    credit = 0,
+    priv = 0,
+    lunchReal = 0,
+    base = 0,
+    hasLunch = false;
   const byCode: Record<string, number> = {};
   const add = (code: string, m: number) => {
     if (m > 0) byCode[code] = (byCode[code] ?? 0) + m;
@@ -426,7 +504,8 @@ export function computeDay(input: DayInput, settings: EngineSettings): DayResult
   for (const v of state.ivs) {
     if (v.to <= v.from) continue;
     if (v.c === WORK_NO) {
-      const a = Math.max(v.from, R.windowStart), b = Math.min(v.to, R.windowEnd);
+      const a = Math.max(v.from, R.windowStart),
+        b = Math.min(v.to, R.windowEnd);
       if (b > a) work += b - a;
     } else if (v.c === LUNCH_NO) {
       hasLunch = true;
@@ -466,12 +545,18 @@ export function computeDay(input: DayInput, settings: EngineSettings): DayResult
       if (lunchReal < R.lunchMinRecorded) work -= R.lunchMinRecorded - lunchReal;
     } else work += lunchReal - R.lunchMinRecorded;
     work = Math.max(0, work);
-    if (byCode["WORK"] !== undefined) byCode["WORK"] = Math.max(0, byCode["WORK"] + (work - before));
+    if (byCode["WORK"] !== undefined)
+      byCode["WORK"] = Math.max(0, byCode["WORK"] + (work - before));
   }
 
   // An interruption without a return that ends with the shift: topped up to the fund only when the rules say so.
   let repaired = false;
-  if (state.openInterruption !== null && R.autoRepairMode >= 2 && expectedMin > 0 && props(state.openInterruption)?.autoEndOfShift) {
+  if (
+    state.openInterruption !== null &&
+    R.autoRepairMode >= 2 &&
+    expectedMin > 0 &&
+    props(state.openInterruption)?.autoEndOfShift
+  ) {
     const top = Math.max(0, fundMin - work - credit);
     credit += top;
     add(codeOf(state.openInterruption), top);
@@ -480,13 +565,26 @@ export function computeDay(input: DayInput, settings: EngineSettings): DayResult
 
   const totalMin = work + credit;
   return {
-    workMin: work, creditMin: credit, privMin: priv, breakMin, totalMin, expectedMin, balanceMin: totalMin - expectedMin, byCode,
-    open: state.openWork || (state.openInterruption !== null && !repaired), anomalies, unconfirmed: unconfirmed ?? (anomalies.some((a) => a.startsWith("UNKNOWN_CODE")) ? "unknown_code" : null), repaired,
+    workMin: work,
+    creditMin: credit,
+    privMin: priv,
+    breakMin,
+    totalMin,
+    expectedMin,
+    balanceMin: totalMin - expectedMin,
+    byCode,
+    open: state.openWork || (state.openInterruption !== null && !repaired),
+    anomalies,
+    unconfirmed:
+      unconfirmed ?? (anomalies.some((a) => a.startsWith("UNKNOWN_CODE")) ? "unknown_code" : null),
+    repaired,
   };
 }
 
 /** @deprecated Reads the old key/value rows; kept because contract/scenare/referencne_saldo.ts (the contract is not changed here) still calls it. The app reads the model (settings-model.ts `engineInputs`). */
-export function settingsFromRows(rows: { key: string; value: string }[]): EngineSettings & { fund: number; maxDrift: number } {
+export function settingsFromRows(
+  rows: { key: string; value: string }[],
+): EngineSettings & { fund: number; maxDrift: number } {
   const m = new Map(rows.map((r) => [r.key, r.value]));
   const n = (k: string, d: number) => {
     const v = parseFloat((m.get(k) ?? "").replace(",", "."));

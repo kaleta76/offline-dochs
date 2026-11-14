@@ -118,7 +118,9 @@ export function MonthTable({
                   ))}
                   {d.open && !d.future && (
                     <span className="text-xs font-bold text-destructive">
-                      {d.anomalies?.includes("UNFINISHED_INTERRUPTION") ? "chýba návrat" : "chýba odchod"}
+                      {d.anomalies?.includes("UNFINISHED_INTERRUPTION")
+                        ? "chýba návrat"
+                        : "chýba odchod"}
                     </span>
                   )}
                   {d.unconfirmed && !d.future && (

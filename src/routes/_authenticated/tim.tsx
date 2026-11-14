@@ -235,7 +235,7 @@ function Team() {
                   <td className="py-2"><div className="font-semibold">{personnelLabel(p)}</div><div className="text-xs text-muted-foreground">{p.department}</div></td>
                   <td className="py-2"><PresenceBadge presence={presence.data?.get(p.id)} /></td>
                   <td className="num py-2 text-right">{fmtMin(m.totals.total)}</td>
-                  <td className={`num py-2 text-right ${m.totals.balance < 0 ? "text-destructive" : "text-success"}`}>{fmtMin(m.totals.balance)}</td>
+                  <td className={`num py-2 text-right ${m.totals.balance < 0 ? "text-destructive" : "text-success"}`}>{fmtMin(m.totals.balance)}{m.unconfirmedDays > 0 && <span className="ml-1 rounded-sm border border-warning px-1 text-[10px] font-semibold uppercase text-warning-foreground" title={`Dni s nepotvrdeným saldom: ${m.unconfirmedDays}. Podrobnosti sú vo výkaze.`}>nepotvrdené</span>}</td>
                   <td className={`py-2 text-center font-bold ${m.openDays ? "text-destructive" : ""}`}>{m.openDays}</td>
                   <td className={`py-2 text-center font-bold ${m.driftCount ? "text-warning-foreground" : ""}`}>{m.driftCount}</td>
                   <td className={`py-2 text-center font-bold ${m.unverifiedCount ? "text-warning-foreground" : ""}`}>{m.unverifiedCount}</td>

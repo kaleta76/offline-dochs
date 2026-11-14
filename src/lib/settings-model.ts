@@ -166,7 +166,14 @@ const regimesSchema = z.array(
     id: z.number(),
     rules: z.record(z.string(), z.unknown()).optional().catch(undefined),
     interruptions: z
-      .array(z.looseObject({ code: z.number(), calc: z.string().optional(), full_day_min: z.number().optional(), counts_to_lunch_base: z.boolean().optional() }))
+      .array(
+        z.looseObject({
+          code: z.number(),
+          calc: z.string().optional(),
+          full_day_min: z.number().optional(),
+          counts_to_lunch_base: z.boolean().optional(),
+        }),
+      )
       .optional()
       .catch(undefined),
   }),
@@ -185,7 +192,9 @@ export function engineInputs(config: SettingsModel): EngineInputs {
     const p = interruptionExtra.safeParse(i);
     if (p.success) byNumber.set(p.data.code, p.data);
   }
-  const map = codeMapSchema.catch([]).parse((config as Record<string, unknown>)["terminal_code_map"]);
+  const map = codeMapSchema
+    .catch([])
+    .parse((config as Record<string, unknown>)["terminal_code_map"]);
   const interruptions = new Map<string, InterruptionProps>();
   for (const m of map) {
     const i = byNumber.get(m.interruption);

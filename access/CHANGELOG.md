@@ -1,5 +1,12 @@
 # Dochádzka – zmeny
 
+## Balík 2.18.1
+Oprava reportu príjmu razení z klientov po skúške balíka 2.18.0 v skutočnom Accesse (14. 11. 2026). Výpočet, párovanie ani zápis razení sa nemenia.
+- **`mod_22_KlientRazenia` 1.0.1**: upozornenie „vlastníka sa nepodarilo zistiť“ sa už nepočíta pre súbory odmietnuté skôr, než sa vlastník vôbec zisťuje (zlý tvar, duplicita, účet). Pri behu nanečisto zoznam odmietnutých už netvrdí, že súbory ostali v `chybne`, ale že ostali v `prijem` a naostro pôjdu do `chybne`.
+- **Overené v skutočnom Accesse (2.18.0, kroky 1 až 9 skúšky nižšie)**: šesť platných súborov sa prevzalo v správnom poradí a kódoch, osem neplatných sa odmietlo s dôvodom v `.dovod.txt`, kontrola účtu (PRISNE odmietne, UPOZORNIT vloží ako neoverené), dnešné razenia čakajú a s `KlientAjDnesne` = 1 sa prevezmú, vlastník súboru sa zapisuje do `KlientRazenia`. Súbor bez `#END` sa odmietne hneď, ak má starý čas zmeny (Prieskumník ho pri kopírovaní zachová); skutočný klient súbor zapisuje práve teraz, preto počká 5 minút.
+- **K skúške 2.18.0**: krok 4 s `KlientKontrolaVlastnika` = `UPOZORNIT` (predvolené) dá pri ručne skopírovaných súboroch všetkých 6 razení ako neoverené; to je správne. Na kontrolu tabuliek exportujte `DoCmd.TransferSpreadsheet acExport, acSpreadsheetTypeExcel12Xml, …` do `.xlsx`, export `DoCmd.TransferText` do CSV hlási pri slovenských regionálnych nastaveniach chybu 3441.
+- **Neoverené v skutočnom Accesse**: samotná oprava reportu (kód prešiel `tools/kontrola_vba.py`, nespúšťal sa). Skúška: skopírujte `prijem\zle` do `prijem` a spustite príjem nanečisto. Report nesmie hlásiť „vlastníka sa nepodarilo zistiť“ a zoznam odmietnutých má hovoriť o priečinku `prijem`.
+
 ## Balík 2.18.0
 Strana HR klienta na razenie v Accesse: zamestnanci razia z Accessu na svojom pracovnom počítači, razenia prídu ako malé súbory do zdieľaného priečinka a HR ich prevezme jedným tlačidlom. Terminál (Lovable) pri tom nie je potrebný. Balík obsahuje aj všetko z 2.17.0. **Samotný klient (okno s tlačidlami na počítači zamestnanca) ešte nie je**, v tomto balíku je len príjem.
 - **Súvislosť**: v práci sa smie používať len Access a Excel (odpoveď SOC z 12. 11. 2026), preto razenie nejde cez webový terminál. Návrh, protokol, práva na priečinky a hranice riešenia sú v `docs/KLIENT-ACCESS.md`.

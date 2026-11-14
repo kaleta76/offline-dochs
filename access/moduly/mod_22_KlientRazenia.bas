@@ -1,5 +1,5 @@
 Attribute VB_Name = "mod_22_KlientRazenia"
-'@Verzia 1.0.0
+'@Verzia 1.0.1
 Option Compare Database
 Option Explicit
 
@@ -58,6 +58,7 @@ Private Type TKlient
     Odlozene As Boolean
     Obsah As String           ' text súboru (do Payload)
     Vlastnik As String        ' vlastník súboru podľa Windows
+    VlastnikZistovany As Boolean ' súbor prešiel skoršími kontrolami a vlastník sa zisťoval (inak sa neráta do upozornenia)
     Overenie As String        ' verified / unverified
     Poznamka As String
     Stav As String            ' PRIJATE / ODMIETNUTE / CAKA / NEDOKONCENE / DUPLICITA / CHYBA
@@ -618,6 +619,7 @@ Private Sub PripravSubor(ByRef r As TKlient, ByVal strPrijem As String, ByVal st
 
     If mVlastnik <> "VYPNUTE" Then
         r.Vlastnik = VlastnikSuboru(strNazov)
+        r.VlastnikZistovany = True
         strChyba = KontrolaVlastnika(r.Vlastnik, r.LoginWin)
         If Len(strChyba) > 0 Then
             If mVlastnik = "PRISNE" Then
@@ -816,7 +818,7 @@ Public Function PrijmiKlientskeRazenia(Optional ByVal bNanecisto As Boolean = Fa
             Case "NEDOKONCENE"
                 nNedok = nNedok + 1
         End Select
-        If Len(r(i).Vlastnik) = 0 And mVlastnik <> "VYPNUTE" And (r(i).Stav = "PRIJATE" Or r(i).Stav = "ODMIETNUTE") Then nVlastnikNezist = nVlastnikNezist + 1
+        If r(i).VlastnikZistovany And Len(r(i).Vlastnik) = 0 And mVlastnik <> "VYPNUTE" And (r(i).Stav = "PRIJATE" Or r(i).Stav = "ODMIETNUTE") Then nVlastnikNezist = nVlastnikNezist + 1
     Next i
 
     Pis rep, "Výsledok: prijatých " & nPrijato & " (z toho neoverených " & nNeov & "), odmietnutých " & nOdm & ", čakajú na ďalší deň " & nCaka & _
@@ -835,7 +837,11 @@ Public Function PrijmiKlientskeRazenia(Optional ByVal bNanecisto As Boolean = Fa
         If kolko > 20 Then Pis rep, "  ... ďalších " & (kolko - 20) & " (všetky sú v tabuľke KlientRazenia, Overenie = unverified)"
     End If
     If nOdm > 0 Then
-        Pis rep, "ODMIETNUTÉ súbory (ostali v priečinku chybne s dôvodom; po oprave ich vráťte do prijem):"
+        If bNanecisto Then
+            Pis rep, "ODMIETNUTÉ súbory (nanečisto ostali v priečinku prijem; naostro pôjdu do priečinka chybne s dôvodom, po oprave ich vráťte do prijem):"
+        Else
+            Pis rep, "ODMIETNUTÉ súbory (ostali v priečinku chybne s dôvodom; po oprave ich vráťte do prijem):"
+        End If
         kolko = 0
         For i = 0 To nSub - 1
             If r(i).Stav = "ODMIETNUTE" Then

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import { computeDay, settingsFromRows, type DayResult, type PunchLike } from "./engine";
+import { computeDay, type DayResult, type PunchLike } from "./engine";
+import { applyStoredResult, engineInputs, loadSettingsForMonth } from "./settings-model";
 import { asVerification, countUnverified, type DeviceVerification } from "./device-trace";
 
 export interface DayRow extends DayResult {
@@ -18,17 +19,18 @@ export const dayKey = (d: Date) =>
 export async function loadMonth(userId: string, year: number, month: number) {
   const from = new Date(year, month - 1, 1);
   const to = new Date(year, month, 1);
-  const [punches, holidays, settings, profile, closure] = await Promise.all([
+  // Nastavenia výpočtu prídu jedinou cestou (settings-model.ts): verzia platná pre mesiac, pri uzavretom mesiaci zamestnanca verzia
+  // pripnutá pri uzávierke a jej snímka. Sviatky, pravidlá aj uzávierka sú v tej istej odpovedi.
+  const [punches, settings, profile] = await Promise.all([
     supabase.from("punches").select("id, code, direction, client_time, drift_minutes, source, voided_at, device_verification")
       .eq("user_id", userId).gte("client_time", from.toISOString()).lt("client_time", to.toISOString()).order("client_time"),
-    supabase.from("organization_holidays").select("day, name").gte("day", dayKey(from)).lt("day", dayKey(to)),
-    supabase.rpc("calc_settings"),
+    loadSettingsForMonth({ y: year, m: month }, userId),
     supabase.from("profiles").select("id, department, sap_id, daily_fund").eq("id", userId).maybeSingle(),
-    supabase.from("month_closures").select("closed_at").eq("user_id", userId).eq("year", year).eq("month", month).maybeSingle(),
   ]);
-  const err = punches.error ?? holidays.error ?? settings.error ?? profile.error;
+  const err = punches.error ?? profile.error;
   if (err) throw err;
-  const s = settingsFromRows(settings.data ?? []);
+  const s = engineInputs(settings.config);
+  const closure = settings.closure;
   // čakajúce žiadosti o zneplatnenie (razenie sa ešte počíta, ale v zozname je označené)
   const pendingVoid = new Set<number>();
   const punchIds = (punches.data ?? []).filter((p) => !p.voided_at).map((p) => p.id);
@@ -38,8 +40,9 @@ export async function loadMonth(userId: string, year: number, month: number) {
     if (pendError) throw pendError;
     for (const r of pend ?? []) pendingVoid.add(r.punch_id);
   }
-  const fund = Number(profile.data?.daily_fund ?? s.fund);
-  const hol = new Map((holidays.data ?? []).map((h) => [h.day, h.name]));
+  // Uzavretý mesiac drží denný fond z uzávierky; neskoršia zmena fondu zamestnanca ho nezmení.
+  const fund = Number(closure?.dailyFund ?? profile.data?.daily_fund ?? s.fundHours);
+  const hol = s.holidays;
   const now = new Date();
   const days: DayRow[] = [];
   for (let d = new Date(from); d < to; d.setDate(d.getDate() + 1)) {
@@ -57,17 +60,27 @@ export async function loadMonth(userId: string, year: number, month: number) {
   const sum = (k: keyof DayResult) => days.reduce((a, d) => a + (d[k] as number), 0);
   const byCode: Record<string, number> = {};
   days.forEach((d) => Object.entries(d.byCode).forEach(([c, m]) => (byCode[c] = (byCode[c] ?? 0) + m)));
+  // Uzavretý mesiac sa neprepočítava: čísla dní a súčty sú z uloženého výsledku (snímky). Prepočet slúži len na kontrolu zhody.
+  const month_ = applyStoredResult(
+    { days, totals: { work: sum("workMin"), credit: sum("creditMin"), total: sum("totalMin"), expected: sum("expectedMin"), balance: sum("balanceMin") }, byCode },
+    closure?.result ?? null,
+  );
+  const maxDrift = settings.maxDriftMin;
   return {
     profile: profile.data,
-    closedAt: closure.data?.closed_at ?? null,
-    maxDrift: s.maxDrift,
-    days,
-    totals: { work: sum("workMin"), credit: sum("creditMin"), total: sum("totalMin"), expected: sum("expectedMin"), balance: sum("balanceMin") },
-    byCode,
-    openDays: days.filter((d) => d.open && !d.future && d.key !== dayKey(now)).length,
+    closedAt: closure?.closedAt ?? null,
+    maxDrift,
+    days: month_.days,
+    totals: month_.totals,
+    byCode: month_.byCode,
+    /** Verzia nastavení, podľa ktorej sa mesiac počíta, a komu mesiac patrí (Access alebo terminál). */
+    settings: { version: settings.version, ownedByAccess: settings.ownedByAccess },
+    /** Uzavretý mesiac: čísla sú z uloženého výsledku (fromSnapshot) a či s ním sedí kontrolný prepočet (matches; null = nedá sa porovnať). */
+    snapshot: closure ? { fromSnapshot: month_.fromSnapshot, matches: month_.matches, punchesCount: closure.punchesCount } : null,
+    openDays: month_.days.filter((d) => d.open && !d.future && d.key !== dayKey(now)).length,
     /** razenia z neschválených zariadení (započítavajú sa, kým ich vedúci nepotvrdí) */
     unverifiedCount: days.reduce((a, d) => a + countUnverified(d.punches), 0),
-    driftCount: days.reduce((a, d) => a + d.punches.filter((p) => !p.voided && p.source === "terminal" && Math.abs(p.drift) > s.maxDrift).length, 0),
+    driftCount: days.reduce((a, d) => a + d.punches.filter((p) => !p.voided && p.source === "terminal" && Math.abs(p.drift) > maxDrift).length, 0),
   };
 }
 export type MonthData = Awaited<ReturnType<typeof loadMonth>>;

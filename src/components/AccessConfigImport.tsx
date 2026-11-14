@@ -10,15 +10,18 @@ import {
   formatConfigVersion,
   formatMonth,
   MAX_FILE_BYTES,
+  openMonthsBefore,
   parseConfigText,
   parseImportResult,
   type ConfigCheck,
   type ImportResult,
 } from "@/lib/access-config";
 
-// Import konfigurácie a výpočtového plánu z Accessu (kontrakt 1.2.0, docs/KONFIGURACIA-Z-ACCESSU.md).
+// Import konfigurácie a výpočtového plánu z Accessu (kontrakt 1.2.0 až 1.5.0, docs/KONFIGURACIA-Z-ACCESSU.md).
 // Správca nahrá súbor dochs_config.json; aplikácia ho skontroluje, databáza ho skontroluje znova a zapíše ho celý alebo vôbec.
 // Všetko beží pod prihlásením správcu, bez service role: o oprávnení rozhoduje databáza.
+// Od migrácie 0022 je každý prijatý súbor NOVÁ VERZIA nastavení z Accessu platná od zvoleného mesiaca (spárovanie, docs/VERZIE-NASTAVENI.md):
+// náhľad ukáže upozornenie a neuzavreté predchádzajúce mesiace, prijatie vyžaduje výslovné potvrdenie (kontroluje ho aj databáza).
 
 type LooseRpc = {
   rpc(
@@ -35,7 +38,7 @@ type Loaded = { name: string; doc: unknown; check: ConfigCheck };
 
 function friendly(message: string): string {
   if (/schema cache|Could not find the function|does not exist/i.test(message)) {
-    return "Databáza ešte nemá import konfigurácie. Najprv treba spustiť migráciu 0008 (súkromný SQL balík).";
+    return "Databáza ešte nemá import konfigurácie s verziami nastavení. Najprv treba spustiť migráciu 0022 (docs/migracie).";
   }
   if (/statement timeout|canceling statement/i.test(message)) {
     return "Spracovanie trvalo príliš dlho a databáza ho prerušila. Nič sa nezapísalo; súbor je pravdepodobne príliš veľký, napíšte nám.";
@@ -53,12 +56,17 @@ export function AccessConfigImport() {
   const [done, setDone] = useState<ImportResult | null>(null);
   const [busy, setBusy] = useState<"read" | "preview" | "import" | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  // Od ktorého mesiaca má verzia platiť (null = aktuálny mesiac, určí databáza) a výslovné potvrdenie spárovania.
+  const [validFrom, setValidFrom] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
 
   function reset(keepDone = false) {
     setLoaded(null);
     setLoadError(null);
     setPreview(null);
     setMessage(null);
+    setValidFrom(null);
+    setConfirmed(false);
     if (!keepDone) setDone(null);
   }
 
@@ -88,14 +96,17 @@ export function AccessConfigImport() {
     }
   }
 
-  async function run(dryRun: boolean) {
+  async function run(dryRun: boolean, from: string | null = validFrom) {
     if (!loaded || loaded.check.errors.length > 0) return;
+    if (!dryRun && !confirmed) return;
     setBusy(dryRun ? "preview" : "import");
     setMessage(null);
     try {
-      const { data, error } = await db.rpc("import_access_config", {
+      const { data, error } = await db.rpc("settings_import_access", {
         _payload: loaded.doc,
         _dry_run: dryRun,
+        _valid_from: from ? `${from}-01` : null,
+        _confirm: !dryRun && confirmed,
       });
       if (error) {
         setMessage({ ok: false, text: friendly(error.message) });
@@ -111,10 +122,13 @@ export function AccessConfigImport() {
       }
       if (dryRun) {
         setPreview(result);
+        setValidFrom(from);
+        setConfirmed(false);
         return;
       }
       setDone(result);
       void queryClient.invalidateQueries({ queryKey: ["terminal-buttons"] });
+      void queryClient.invalidateQueries({ queryKey: ["settings-versions"] });
       reset(true);
       if (fileRef.current) fileRef.current.value = "";
     } catch (error) {
@@ -129,7 +143,8 @@ export function AccessConfigImport() {
 
   const check = loaded?.check;
   const canPreview = !!loaded && !!check && check.errors.length === 0 && busy === null;
-  const canImport = canPreview && preview !== null && preview.status === "preview";
+  const canImport = canPreview && preview !== null && preview.status === "preview" && confirmed;
+  const earlier = preview ? openMonthsBefore(preview) : [];
 
   return (
     <section className="rounded-sm border-2 border-foreground bg-card p-4">
@@ -139,7 +154,8 @@ export function AccessConfigImport() {
         Exporty, tlačidlo „Vytvoriť verziu konfigurácie prerušení pre terminál“). Najprv sa ukáže
         náhľad a nič sa nezapíše. Súbor sa zapíše celý alebo vôbec; staršia verzia, než je prijatá,
         sa neprijme. Súbor nesmie obsahovať mená ani iné osobné údaje, zamestnanec je v ňom len
-        osobné číslo.
+        osobné číslo. Prijatý súbor je nová verzia nastavení z Accessu platná od zvoleného mesiaca;
+        staršie verzie ostávajú uložené.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -219,6 +235,58 @@ export function AccessConfigImport() {
           <WithoutAccount result={preview} />
           {preview.status === "unchanged" && (
             <p className="text-xs text-muted-foreground">Nie je čo prijímať.</p>
+          )}
+          {preview.status === "preview" && preview.validFrom && (
+            <div className="space-y-2 rounded-sm border-2 border-foreground p-3">
+              <p className="font-bold">
+                {preview.ownerNow === "access"
+                  ? `Od ${formatMonth(preview.validFrom)} bude platiť táto nová verzia z Accessu namiesto doterajšej.`
+                  : `Od ${formatMonth(preview.validFrom)} platia nastavenia z Accessu a nastavenia výpočtu v termináli sa zamknú.`}
+              </p>
+              <p className="text-xs">
+                Vaše terminálové nastavenia ostanú uložené a dajú sa k nim vrátiť odpárovaním (Správa, karta
+                Servis). Razenia sa nemenia. Mesiac, ktorý má zamestnanec uzavretý, sa nezmení nikdy.
+              </p>
+              {earlier.map((m) => (
+                <p key={m.month} className="text-xs">
+                  {formatMonth(m.month)} nie je uzavretý u {countEmployees(m.open)}, ostane s pôvodnými
+                  nastaveniami.{" "}
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs"
+                    disabled={busy !== null}
+                    onClick={() => void run(true, m.month)}
+                  >
+                    Použiť Access aj pre {formatMonth(m.month)}
+                  </Button>
+                </p>
+              ))}
+              {preview.monthNow && preview.validFrom < preview.monthNow && (
+                <p className="text-xs">
+                  Zvolená platnosť od {formatMonth(preview.validFrom)}: prepočítajú sa len neuzavreté mesiace
+                  zamestnancov.{" "}
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs"
+                    disabled={busy !== null}
+                    onClick={() => void run(true, null)}
+                  >
+                    Vrátiť na {formatMonth(preview.monthNow)}
+                  </Button>
+                </p>
+              )}
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={confirmed}
+                  onChange={(e) => setConfirmed(e.target.checked)}
+                />
+                <span>
+                  Rozumiem: od {formatMonth(preview.validFrom)} sa výpočet riadi nastaveniami z Accessu.
+                </span>
+              </label>
+            </div>
           )}
         </div>
       )}

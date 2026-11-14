@@ -90,7 +90,7 @@ Vetvy a synchronizácia s Lovable: `main` je chránená a ide do nej všetko cez
 
 ## 5. Nastavenia výpočtu: kto ich vlastní
 
-**Rozhodnuté 13. 11. 2026 (vlastníčka systému).** V kóde zatiaľ nič z toho nie je: je to schválený návrh, podľa ktorého sa píše etapa 1 (kapitola 8).
+**Rozhodnuté 13. 11. 2026 (vlastníčka systému).** Úložisko verzií, párovanie, platné nastavenia pre mesiac a snímka uzavretého mesiaca sú napísané v etape 1a (migrácia 0022, `docs/VERZIE-NASTAVENI.md`, neoverené v prevádzke); výpočet nad celým modelom je etapa 1b. Kapitola 5.1 opisuje stav pred etapou 1a.
 
 ### 5.1 Stav dnes
 

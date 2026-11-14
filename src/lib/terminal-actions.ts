@@ -40,6 +40,8 @@ const requestSchema = z.object({
 const snapshotSchema = z
   .object({
     version: z.string().regex(/^\d{4}\.\d{2}\.\d{2}\.\d{4}$/),
+    /** Poradie verzie nastavení v organizácii (migrácia 0022); 0 = staršia cache, ktorá poradie nepozná. */
+    ord: z.number().int().min(0).default(0),
     buttons: z
       .array(
         z.object({
@@ -89,7 +91,7 @@ const docSchema = z.object({
 });
 
 /** Read only the button projection of an already accepted document; never cache employee plans. */
-export function parseTerminalConfig(version: string, doc: unknown): TerminalConfig | null {
+export function parseTerminalConfig(version: string, doc: unknown, ord = 0): TerminalConfig | null {
   const parsed = docSchema.safeParse(doc);
   if (!parsed.success) return null;
   const buttons = [];
@@ -126,6 +128,7 @@ export function parseTerminalConfig(version: string, doc: unknown): TerminalConf
   }
   const result = snapshotSchema.safeParse({
     version,
+    ord,
     buttons,
     requests,
     correctionDeadlineDay: parsed.data.rules?.correction_deadline_day ?? 0,
@@ -223,9 +226,16 @@ export function readTerminalCache(
     return null;
   }
 }
+/**
+ * Novšia z dvoch projekcií. Od migrácie 0022 rozhoduje poradie verzie nastavení (`ord`): verzia platná pre aktuálny mesiac má
+ * v čase vždy rovnaké alebo vyššie poradie, takže staršia odpoveď nikdy neprepíše novšiu. Odpoveď servera s poradím má prednosť
+ * pred staršou cache bez poradia; dve projekcie bez poradia sa porovnajú podľa verzie ako doteraz.
+ */
 export function newestTerminalConfig(
   current: TerminalConfig | null,
   next: TerminalConfig,
 ): TerminalConfig {
-  return current && current.version > next.version ? current : next;
+  if (!current) return next;
+  if (next.ord > 0) return current.ord > next.ord ? current : next;
+  return current.version > next.version ? current : next;
 }

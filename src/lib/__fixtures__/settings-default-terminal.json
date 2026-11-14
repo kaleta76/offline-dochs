@@ -1,0 +1,253 @@
+{
+    "rok": 2026,
+    "funds": [
+        {
+            "id": 1,
+            "name": "Denný fond zamestnanca",
+            "type": 1
+        }
+    ],
+    "rules": {
+        "rounding_mode": 0,
+        "rounding_in_min": 0,
+        "auto_repair_mode": 0,
+        "rounding_out_min": 0,
+        "auto_lunch_enabled": true,
+        "work_window_end_min": 1440,
+        "auto_lunch_deduct_min": 30,
+        "full_day_obstacle_min": 1440,
+        "work_window_start_min": 0,
+        "auto_lunch_trigger_min": 360,
+        "default_daily_fund_min": 450,
+        "unlabeled_out_is_lunch": true,
+        "duplicate_punch_window_min": 0
+    },
+    "period": {
+        "to_month": "2026-11",
+        "from_month": "2026-11"
+    },
+    "holidays": [
+        {
+            "date": "2026-01-01",
+            "name": "Deň vzniku SR"
+        },
+        {
+            "date": "2026-01-06",
+            "name": "Zjavenie Pána"
+        },
+        {
+            "date": "2026-04-03",
+            "name": "Veľký piatok"
+        },
+        {
+            "date": "2026-04-06",
+            "name": "Veľkonočný pondelok"
+        },
+        {
+            "date": "2026-05-01",
+            "name": "Sviatok práce"
+        },
+        {
+            "date": "2026-05-08",
+            "name": "Deň víťazstva nad fašizmom"
+        },
+        {
+            "date": "2026-07-05",
+            "name": "Sv. Cyril a Metod"
+        },
+        {
+            "date": "2026-08-29",
+            "name": "Výročie SNP"
+        },
+        {
+            "date": "2026-09-15",
+            "name": "Sedembolestná Panna Mária"
+        },
+        {
+            "date": "2026-11-01",
+            "name": "Sviatok Všetkých svätých"
+        },
+        {
+            "date": "2026-11-17",
+            "name": "Deň boja za slobodu a demokraciu"
+        },
+        {
+            "date": "2026-12-24",
+            "name": "Štedrý deň"
+        },
+        {
+            "date": "2026-12-25",
+            "name": "Prvý sviatok vianočný"
+        },
+        {
+            "date": "2026-12-26",
+            "name": "Druhý sviatok vianočný"
+        }
+    ],
+    "templates": [
+    ],
+    "punch_codes": [
+    ],
+    "interruptions": [
+        {
+            "calc": "WORK",
+            "code": 1,
+            "name": "Práca na pracovisku",
+            "is_work": true,
+            "is_lunch": false,
+            "short_name": "WORK",
+            "end_punch_code": 101,
+            "start_punch_code": 100,
+            "auto_end_of_shift": false
+        },
+        {
+            "calc": "COUNTED",
+            "code": 2,
+            "name": "Lekár / ošetrenie",
+            "is_work": false,
+            "is_lunch": false,
+            "short_name": "DOCTOR",
+            "terminal_icon": "doctor",
+            "end_punch_code": 103,
+            "terminal_label": "Lekár",
+            "terminal_order": 1,
+            "terminal_button": true,
+            "start_punch_code": 102,
+            "auto_end_of_shift": true
+        },
+        {
+            "calc": "COUNTED",
+            "code": 4,
+            "name": "Služobné vzdialenie",
+            "is_work": false,
+            "is_lunch": false,
+            "short_name": "ERRAND",
+            "terminal_icon": "errand",
+            "end_punch_code": 107,
+            "terminal_label": "Služobné vzdialenie",
+            "terminal_order": 4,
+            "terminal_button": true,
+            "start_punch_code": 106,
+            "auto_end_of_shift": true
+        },
+        {
+            "calc": "LUNCH",
+            "code": 7,
+            "name": "Obed",
+            "is_work": false,
+            "is_lunch": true,
+            "short_name": "OBED",
+            "end_punch_code": 111,
+            "start_punch_code": 110,
+            "auto_end_of_shift": false
+        },
+        {
+            "calc": "COUNTED",
+            "code": 8,
+            "name": "Dovolenka",
+            "is_work": false,
+            "is_lunch": false,
+            "short_name": "LEAVE",
+            "full_day_only": true,
+            "end_punch_code": 117,
+            "start_punch_code": 116,
+            "terminal_request": true,
+            "auto_end_of_shift": true
+        },
+        {
+            "calc": "COUNTED",
+            "code": 11,
+            "name": "PN / práceneschopnosť",
+            "is_work": false,
+            "is_lunch": false,
+            "short_name": "SICK",
+            "full_day_only": true,
+            "end_punch_code": 121,
+            "start_punch_code": 120,
+            "terminal_request": true,
+            "auto_end_of_shift": true
+        },
+        {
+            "calc": "COUNTED",
+            "code": 12,
+            "name": "Služobná cesta",
+            "is_work": false,
+            "is_lunch": false,
+            "short_name": "TRIP",
+            "terminal_icon": "trip",
+            "end_punch_code": 123,
+            "terminal_label": "Služobná cesta",
+            "terminal_order": 3,
+            "terminal_button": true,
+            "start_punch_code": 122,
+            "auto_end_of_shift": true,
+            "counts_to_lunch_base": true
+        },
+        {
+            "calc": "UNPAID",
+            "code": 13,
+            "name": "Súkromné prerušenie",
+            "is_work": false,
+            "is_lunch": false,
+            "short_name": "PRIV",
+            "terminal_icon": "private",
+            "end_punch_code": 125,
+            "terminal_label": "Súkromne",
+            "terminal_order": 5,
+            "terminal_button": true,
+            "start_punch_code": 124,
+            "auto_end_of_shift": false
+        },
+        {
+            "calc": "COUNTED",
+            "code": 16,
+            "name": "Sprievod rodinného príslušníka",
+            "is_work": false,
+            "is_lunch": false,
+            "short_name": "FAMILY",
+            "terminal_icon": "family",
+            "end_punch_code": 131,
+            "terminal_label": "Sprievod",
+            "terminal_order": 2,
+            "terminal_button": true,
+            "start_punch_code": 130,
+            "auto_end_of_shift": true
+        }
+    ],
+    "config_version": "2026.11.01.0000",
+    "schema_version": 2,
+    "terminal_code_map": [
+        {
+            "code": "WORK",
+            "interruption": 1
+        },
+        {
+            "code": "DOCTOR",
+            "interruption": 2
+        },
+        {
+            "code": "ERRAND",
+            "interruption": 4
+        },
+        {
+            "code": "LEAVE",
+            "interruption": 8
+        },
+        {
+            "code": "SICK",
+            "interruption": 11
+        },
+        {
+            "code": "TRIP",
+            "interruption": 12
+        },
+        {
+            "code": "PRIV",
+            "interruption": 13
+        },
+        {
+            "code": "FAMILY",
+            "interruption": 16
+        }
+    ]
+}

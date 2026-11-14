@@ -69,11 +69,12 @@ export function buildProbes(userId: string, today: Date, opts: { admin?: boolean
       run: async () => fromPostgrest(await supabase.rpc("get_admin_overview")),
     },
     {
-      id: "rpc-calc-settings",
-      label: "Pravidlá výpočtu (RPC)",
+      id: "rpc-settings-for-month",
+      label: "Nastavenia výpočtu pre mesiac (RPC)",
       method: "POST",
-      request: "/rest/v1/rpc/calc_settings",
-      run: async () => fromPostgrest(await supabase.rpc("calc_settings")),
+      request: "/rest/v1/rpc/settings_for_month",
+      // funkcia z migrácie 0022 (typy klienta ju ešte nepoznajú); obsah odpovede sa nikde nezobrazuje
+      run: async () => fromPostgrest(await (supabase.rpc as unknown as (fn: string) => Promise<Parameters<typeof fromPostgrest>[0]>)("settings_for_month")),
     },
     {
       id: "get-user-roles",
@@ -100,14 +101,6 @@ export function buildProbes(userId: string, today: Date, opts: { admin?: boolean
       request: "/rest/v1/organization_invites?select=code",
       // obsah (kód) sa nikde nezobrazuje ani neukladá
       run: async () => fromPostgrest(await supabase.from("organization_invites").select("code").maybeSingle()),
-    },
-    {
-      id: "get-holidays",
-      label: "Sviatky mesiaca",
-      method: "GET",
-      request: "/rest/v1/organization_holidays?select=day,name&day=gte.*&day=lt.*",
-      run: async () =>
-        fromPostgrest(await supabase.from("organization_holidays").select("day, name").gte("day", ymd(from)).lt("day", ymd(to))),
     },
     {
       id: "get-punches",

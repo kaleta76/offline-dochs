@@ -13,6 +13,7 @@ import {
   formatMonth,
   parseConfigText,
   parseCurrentConfig,
+  openMonthsBefore,
   parseImportResult,
 } from "./access-config";
 
@@ -979,7 +980,37 @@ describe("odpovede databázy", () => {
       removedMonths: 0,
       withoutAccountCount: 3,
       withoutAccount: ["9000001", "9000002"],
+      validFrom: null,
+      monthNow: null,
+      ownerNow: null,
+      oldestOpen: null,
+      openMonths: [],
     });
+  });
+  it("náhľad z databázy s verziami nastavení nesie platnosť, vlastníka mesiaca a otvorené mesiace", () => {
+    const r = parseImportResult({
+      ...raw,
+      valid_from: "2026-11",
+      month_now: "2026-11",
+      owner_now: { origin: "terminal" },
+      oldest_open: "2026-09",
+      open_months: [
+        { month: "2026-09", open: 0, closed: 4 },
+        { month: "2026-10", open: 3, closed: 1 },
+        { month: "2026-11", open: 4, closed: 0 },
+        { month: "zle", open: 1, closed: 0 },
+        "x",
+      ],
+    });
+    expect(r?.validFrom).toBe("2026-11");
+    expect(r?.ownerNow).toBe("terminal");
+    expect(r?.oldestOpen).toBe("2026-09");
+    expect(r?.openMonths).toHaveLength(3);
+    // pred mesiacom platnosti je otvorený len október (september je celý uzavretý, november je mesiac platnosti)
+    expect(openMonthsBefore(r!)).toEqual([{ month: "2026-10", open: 3 }]);
+    expect(openMonthsBefore({ ...r!, validFrom: "2026-10" })).toEqual([]);
+    expect(openMonthsBefore({ ...r!, validFrom: null })).toEqual([]);
+    expect(parseImportResult({ ...raw, owner_now: { origin: "sap" } })?.ownerNow).toBeNull();
   });
   it("neznámy tvar je null, nikdy vymyslené čísla", () => {
     for (const v of [

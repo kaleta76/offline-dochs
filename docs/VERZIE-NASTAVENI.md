@@ -1,6 +1,6 @@
 # Verzie nastavení výpočtu (etapa 1a, migrácia 0022)
 
-Záväzný návrh je v `docs/ARCHITEKTURA.md`, kapitola 5. Tento dokument opisuje, ako je urobený: úložisko, pravidlá platnosti, spárovanie s Accessom, snímka uzavretého mesiaca a nasadenie. Výpočet nad celým modelom je etapa 1b; v 1a `src/lib/engine.ts` ostáva bez zmeny a z modelu číta len to, čo čítal doteraz (zaokrúhlenia, obed, predvolený fond, sviatky).
+Záväzný návrh je v `docs/ARCHITEKTURA.md`, kapitola 5. Tento dokument opisuje, ako je urobený: úložisko, pravidlá platnosti, spárovanie s Accessom, snímka uzavretého mesiaca a nasadenie. V etape 1a `src/lib/engine.ts` ostal bez zmeny; výpočet nad celým modelom je etapa 1b (kapitola „Výpočet nad modelom“ nižšie).
 
 ## Úložisko
 
@@ -67,3 +67,32 @@ Migrácia nemení `punches`, `profiles`, `punches_chain`, vzorec hash reťaze an
 ## Terminálový model a kódy razení Accessu (`punch_codes`)
 
 Terminálový model nenesie kódy razení Accessu: pole `punch_codes` je prázdne a čísla `start_punch_code` a `end_punch_code` pri prerušeniach (100, 101, …) sú pozostatok číslovania z Accessu. Terminál razí slovnými kódmi (`WORK`, `DOCTOR`, …), prekladá ich cez `terminal_code_map` a výpočet tieto čísla nečíta (používa ich len kontrola súboru z Accessu v `src/lib/access-config.ts`). Prísny režim `contract/tools/verify_config.py --strict` preto na terminálovom modeli hlási upozornenia o chýbajúcich kódoch razení. Je to zámer, nie chyba: model sa nedopĺňa a upozornenia sa neriešia. Rozhodnutie majiteľky 14. 11. 2026.
+
+## Výpočet nad modelom (etapa 1b)
+
+`computeDay` v `src/lib/engine.ts` ostáva čistá funkcia bez I/O. Vstupy mu z modelu pripraví `engineInputs` v `src/lib/settings-model.ts`: pravidlá (obed, zaokrúhlenie so smerom, okno práce, razený obed, duplicita, automatická oprava), prerušenia s vlastnosťami podľa kódu terminála (`terminal_code_map` spojená s `interruptions[]`) a režimy (`regimes[]`). Deň, plán a režim dňa môže volajúci doplniť (`DayInput.plan`, `DayInput.regime`); bez nich platí denný fond zamestnanca a pravidlá verzie. Pôvodný tvar volania (štyri polia `EngineSettings`) funguje ďalej a počíta ako terminál pred 1b; `settingsFromRows` ostáva len pre `contract/scenare/referencne_saldo.ts`.
+
+Čo sa počíta (prepis Accessu: `SparujRazenia`, `SpracujDen`, `TrvanieIntervalu`, `SumarDna`, `ZaokruhliCas`):
+
+- Razenia sa párujú ako v Accesse: príchod pri otvorenom prerušení je jeho koniec, odchod za posledným príchodom je odchod, odchod pred ním je obed (ak `unlabeled_out_is_lunch`), ostatné kódy cez `terminal_code_map`. Čas je minúta od polnoci, vteriny sa zahadzujú.
+- Práca sa orezáva oknom práce (okno z plánu zamestnanca má prednosť pred oknom z pravidiel). Obed je skutočný čas, `UNPAID` sa nepočíta, `COUNTED` je skutočný čas alebo celý denný fond, ak interval dosiahne `full_day_min` (inak `full_day_obstacle_min`).
+- Automatický obed sa odpočíta z práce, keď základ (práca + započítaný čas prerušení s `counts_to_lunch_base`) dosiahne prah (vrátane), deň má fond a nebol razený obed; odpočet nikdy nezníži prácu pod nulu. Razený obed upravuje `lunch_recorded_mode` (0 skutočný, 1 aspoň minimum, 2 vždy presne minimum).
+- Zaokrúhlenie má smer podľa `rounding_mode` (0 príchod nahor a odchod nadol, 1 oboje nahor, 2 oboje nadol, 3 najbližšie). Zaokrúhľuje sa len prvý príchod dňa a posledný odchod dňa; návrat z prerušenia nie.
+- Celodenné kódy (`full_day_only`, dovolenka a PN) dajú celý denný fond a nulové saldo; v dni bez fondu nič.
+- Prerušenie bez návratu: pri `auto_repair_mode` 2 a vlastnosti `auto_end_of_shift` sa deň doplní do fondu, pri 0 a 1 ostane otvorený s anomáliou `UNFINISHED_INTERRUPTION` (v tabuľke „chýba návrat“) a nič sa nedoplní.
+- Duplicita (rovnaký kód a smer v rámci `duplicate_punch_window_min`), paralelné prerušenia v tej istej minúte, anomálie (`DOUBLE_ARRIVAL`, `END_WITHOUT_START`, …) sa hlásia vo výsledku (`anomalies`).
+
+**Nepotvrdený deň.** Výsledok nesie `unconfirmed`, keď sa saldo nedá potvrdiť, a nikdy sa nehádže: `no_plan` (mesiac patrí Accessu, plán z Accessu terminál zatiaľ nenačítal), `unknown_calc` (prerušenie s hodnotou `calc`, ktorú výpočet nepozná, sa nepočíta), `unknown_code` (razenie s kódom, ktorý model nepozná, sa vynechá). V tabuľke je to štítok „nepotvrdené“, v prehľade tímu pri saldo. `no_plan` dostanú teraz všetky dni mesiaca, ktorý patrí Accessu, kým nepribudne čítanie plánu (samostatná migrácia, súkromné tabuľky).
+
+**Rozdiely oproti terminálu pred 1b** (rozhodnutie majiteľky 13. 11.: dnešný výpočet je len otestovaný, nemusí sa zachovať):
+
+1. Predvolená terminálová verzia má `auto_repair_mode` 0, preto sa odchod k lekárovi, na služobnú cestu a pod. bez návratu už **nedopĺňa do fondu**; deň ostane otvorený. Zmena predvolenej hodnoty je nová migrácia a editor pravidiel (etapy 2 až 4).
+2. Služobná cesta je započítané prerušenie (nie práca) s príznakom základu obeda; súčet dňa sa nemení, mení sa rozdelenie práca a kredit. Služobné vzdialenie sa počíta (dnes sa nepočítalo), súkromné prerušenie je `UNPAID`.
+3. Dovolenka a PN sú rovnaké (celý fond, saldo 0); PN predtým malo očakávaný čas 0.
+4. Vteriny sa zahadzujú pri každom razení, preto sa výsledok môže líšiť o minútu od výpočtu z rozdielu milisekúnd.
+5. V dni bez fondu (víkend, sviatok) sa automatický obed neodpočíta.
+6. **Otvorený rozpor kontraktu a Accessu.** Kontrakt 1.5.0 (`counts_to_lunch_base`) hovorí, že interval započítaný ako celý deň (dosiahol `full_day_min`) do základu obeda nevstupuje. Kód Accessu (`mod_08.SumarDna`) ho do základu pripočíta celým fondom. Terminál ide podľa kódu Accessu, lebo Access je základ vývoja (usmernenie majiteľky z 11. 11.); kým majiteľka nerozhodne, či sa opraví kontrakt alebo Access, kontrakt ani Access sa nemenia. Prakticky sa to prejaví len pri prerušení s `counts_to_lunch_base`, ktoré dosiahlo prah celého dňa. Odpočet obeda Access zráža z práce a pri prerušení s príznakom ho zastaví na nule; terminál ho zastaví na nule vždy.
+
+**Uzavretý mesiac** sa neprepočítava: tvar uloženého výsledku ani `RESULT_ENGINE` (1) sa nemenia, preto `month_result_problem` ostáva bez migrácie. Zmena výpočtu sa v starých uzávierkach prejaví len ako `matches = false` pri kontrolnom prepočte; platí uložený výsledok.
+
+**Čo sa ešte musí overiť.** Referenčné saldá z Accessu pre zlatý scenár `contract/scenare/2026-10` (Access scenár ešte nepočítal); `ocakavane_saldo_2026-10.csv` je z dnešného enginu a prepočíta sa len na pokyn majiteľky.

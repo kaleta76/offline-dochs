@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { computeDay, type DayResult, type PunchLike } from "./engine";
+import { computeDay, type DayResult, type PunchLike, type Unconfirmed } from "./engine";
 import { applyStoredResult, engineInputs, loadSettingsForMonth } from "./settings-model";
 import { asVerification, countUnverified, type DeviceVerification } from "./device-trace";
 
@@ -54,7 +54,16 @@ export async function loadMonth(userId: string, year: number, month: number) {
     const weekend = date.getDay() === 0 || date.getDay() === 6;
     const holiday = hol.get(key) ?? null;
     const future = date > now;
-    const r = computeDay({ punches: ps.filter((p) => !p.voided), fundHours: fund, isWorkday: !weekend && !holiday }, s);
+    // Mesiac, ktorý patrí Accessu, sa počíta podľa plánu z Accessu; klient ho zatiaľ nečíta, preto je deň nepotvrdený (nie tichý odhad).
+    const r = computeDay(
+      {
+        punches: ps.filter((p) => !p.voided),
+        fundHours: fund,
+        isWorkday: !weekend && !holiday,
+        planMissing: settings.ownedByAccess,
+      },
+      s,
+    );
     days.push({ ...r, ...(future ? { balanceMin: 0, expectedMin: 0 } : {}), date, key, holiday, weekend, punches: ps, future });
   }
   const sum = (k: keyof DayResult) => days.reduce((a, d) => a + (d[k] as number), 0);
@@ -78,12 +87,21 @@ export async function loadMonth(userId: string, year: number, month: number) {
     /** Uzavretý mesiac: čísla sú z uloženého výsledku (fromSnapshot) a či s ním sedí kontrolný prepočet (matches; null = nedá sa porovnať). */
     snapshot: closure ? { fromSnapshot: month_.fromSnapshot, matches: month_.matches, punchesCount: closure.punchesCount } : null,
     openDays: month_.days.filter((d) => d.open && !d.future && d.key !== dayKey(now)).length,
+    /** Dni (bez budúcich), ktorých saldo sa nedá potvrdiť: bez plánu z Accessu alebo s kódom či výpočtom, ktoré model nepozná. */
+    unconfirmedDays: month_.days.filter((d) => d.unconfirmed && !d.future).length,
     /** razenia z neschválených zariadení (započítavajú sa, kým ich vedúci nepotvrdí) */
     unverifiedCount: days.reduce((a, d) => a + countUnverified(d.punches), 0),
     driftCount: days.reduce((a, d) => a + d.punches.filter((p) => !p.voided && p.source === "terminal" && Math.abs(p.drift) > maxDrift).length, 0),
   };
 }
 export type MonthData = Awaited<ReturnType<typeof loadMonth>>;
+
+export const UNCONFIRMED_TEXT: Record<Unconfirmed, string> = {
+  no_plan: "Mesiac patrí Accessu a plán z Accessu terminál zatiaľ nenačítal, číslo je orientačné.",
+  unknown_calc:
+    "Prerušenie má spôsob výpočtu, ktorý terminál nepozná, a nepočíta sa; saldo overí správca.",
+  unknown_code: "Razenie s kódom, ktorý model nastavení nepozná, sa nepočíta; saldo overí správca.",
+};
 
 export const PUNCH_LABEL: Record<string, string> = {
   "WORK:IN": "Príchod",

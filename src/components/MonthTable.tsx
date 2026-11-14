@@ -1,6 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import { fmtMin } from "@/lib/engine";
-import { hm, labelOf, WEEKDAYS, type MonthData } from "@/lib/month";
+import { hm, labelOf, UNCONFIRMED_TEXT, WEEKDAYS, type MonthData } from "@/lib/month";
 import { unverifiedSummary } from "@/lib/device-trace";
 
 export interface VoidTarget {
@@ -117,7 +117,19 @@ export function MonthTable({
                     </span>
                   ))}
                   {d.open && !d.future && (
-                    <span className="text-xs font-bold text-destructive">chýba odchod</span>
+                    <span className="text-xs font-bold text-destructive">
+                      {d.anomalies?.includes("UNFINISHED_INTERRUPTION")
+                        ? "chýba návrat"
+                        : "chýba odchod"}
+                    </span>
+                  )}
+                  {d.unconfirmed && !d.future && (
+                    <span
+                      className="ml-1 rounded-sm border border-warning px-1 text-[10px] font-semibold uppercase text-warning-foreground"
+                      title={UNCONFIRMED_TEXT[d.unconfirmed]}
+                    >
+                      nepotvrdené
+                    </span>
                   )}
                 </td>
                 <td className="num py-1.5 pr-2 text-right">{d.workMin ? fmtMin(d.workMin) : ""}</td>

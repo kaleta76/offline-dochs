@@ -1,6 +1,6 @@
 {
-  "balik": "2.18.0",
-  "vytvorene": "2026-11-12 14:47:39",
+  "balik": "2.18.1",
+  "vytvorene": "2026-11-14 18:12:42",
   "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
   "zrusene": [
     "modExportLovableConfig",
@@ -147,9 +147,9 @@
     },
     "mod_22_KlientRazenia": {
       "subor": "moduly/mod_22_KlientRazenia.bas",
-      "verzia": "1.0.0",
-      "sha256": "5db630678872f1490494c30ee12a66e3bdb197a050b9eb2322fde8a68d54235d",
-      "obsah_sha256": "2141d70c646f202d75165c9a2d568b1eb3da95e20ed61a2af74200b8671593ce"
+      "verzia": "1.0.1",
+      "sha256": "22e19f4e7d2ea296b3dc0a39545aab04fbe278cf31442535e6a797ef149adffb",
+      "obsah_sha256": "b48bcf2ed7e149bb1a1d07a885bc14ff357b48df4596166ad81bcc5d851ef2a7"
     },
     "mod_UI_Core": {
       "subor": "moduly/mod_UI_Core.bas",

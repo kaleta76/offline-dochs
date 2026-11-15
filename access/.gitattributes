@@ -1,2 +1,4 @@
 # Súbory sa nesmú meniť (konverzia koncov riadkov) - inštalátor overuje SHA-256 každého modulu po bajtoch
 * -text
+# Klient na razenie (access/klient) je samostatný balík s vlastným manifestom: do ZIP-u inštalátora HR (git archive HEAD:access) nepatrí
+klient export-ignore

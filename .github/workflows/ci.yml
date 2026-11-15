@@ -56,12 +56,16 @@ jobs:
         run: python3 -I tools/test_over_access_balik.py
       - name: Kontrola VBA modulov (zatienenie funkcií, nedeklarované premenné, bloky, volania medzi modulmi)
         run: python3 -I tools/kontrola_vba.py
+      - name: Kontrola VBA modulov klienta na razenie (access/klient)
+        run: python3 -I tools/kontrola_vba.py --adresar access/klient/moduly
       - name: Testy kontroly VBA modulov
         run: python3 -I tools/test_kontrola_vba.py
       - name: Testy overenia zálohy databázy
         run: python3 -I tools/test_over_zalohu.py
       - name: Testy protokolu razení klienta v Accesse (súbory .rzn)
         run: python3 -I tools/test_klient_protokol.py
+      - name: Zhoda klienta v Accesse s referenciou v Pythone (zlaté vektory zo samotestu klienta)
+        run: python3 -I tools/test_klient_zhoda.py
       - name: Testy prevodníka skutočných dát z Accessu a porovnania sald
         run: python3 -I contract/scenare/test_z_accessu.py
   no-secrets:

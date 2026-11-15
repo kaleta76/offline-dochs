@@ -135,6 +135,84 @@ class Skuska(unittest.TestCase):
         with zipfile.ZipFile(z) as zf:
             zf.extractall(os.path.join(self.d, "rozbalene"))
         self.assertEqual(ob.kontrola(os.path.join(self.d, "rozbalene", "Dochadzka-Instalator")), [])
+        # klient na razenie (access/klient) je samostatný balík a do ZIP-u inštalátora HR nepatrí (access/.gitattributes: export-ignore)
+        self.assertFalse(os.path.exists(os.path.join(self.d, "rozbalene", "Dochadzka-Instalator", "klient")))
+        self.assertTrue(os.path.isdir(os.path.join(self.d, "rozbalene", "Dochadzka-Instalator", "moduly")))
+
+
+MODUL = 'Attribute VB_Name = "%s"\n\'@Verzia %s\nOption Compare Database\nOption Explicit\n\nPublic Function Skuska() As Long\n    Skuska = %d\nEnd Function\n'
+
+
+class DruhyBalik(unittest.TestCase):
+    """Parameter --koren: nástroje fungujú aj pre iný balík s rovnakou stavbou (access/klient) a bez parametra sa správajú ako doteraz."""
+
+    def setUp(self):
+        self.d, self.t = kopia()
+        self.addCleanup(shutil.rmtree, self.d, True)
+        self.zostav = os.path.join(self.t, "tools", "zostav_balik.py")
+        self.k = os.path.join(self.d, "maly")
+        os.makedirs(os.path.join(self.k, "moduly"))
+        self.modul("kl_99_Skuska", "1.0.0", 1)
+        with open(os.path.join(self.k, "CHANGELOG.md"), "w", encoding="utf-8", newline="\n") as f:
+            f.write("# Zmeny\n\n## Balík 1.0.0\n\nPrvá verzia.\n")
+
+    def modul(self, nazov, verzia, hodnota):
+        with open(os.path.join(self.k, "moduly", nazov + ".bas"), "w", encoding="utf-8", newline="\n") as f:
+            f.write(MODUL % (nazov, verzia, hodnota))
+
+    def spusti(self, *args):
+        return subprocess.run([sys.executable, "-I", self.zostav] + list(args), capture_output=True, text=True, encoding="utf-8")
+
+    def test_zostav_a_over_iny_balik(self):
+        povodny = open(os.path.join(self.t, "manifest.json"), "rb").read()
+        r = self.spusti("--koren", self.k, "--balik", "1.0.0")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        m = ob.nacitaj_manifest(self.k)
+        self.assertEqual((m["balik"], list(m["moduly"]), m["zrusene"]), ("1.0.0", ["kl_99_Skuska"], []))
+        self.assertEqual(ob.kontrola(self.k), [])
+        self.assertEqual(open(os.path.join(self.t, "manifest.json"), "rb").read(), povodny, "zostavenie iného balíka zmenilo manifest balíka HR")
+        s = os.path.join(TU, "over_access_balik.py")
+        r = subprocess.run([sys.executable, "-I", s, "--koren", self.k, "--verzia"], capture_output=True, text=True)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, "1.0.0"), r.stderr)
+
+    def test_iny_balik_vynucuje_verzie(self):
+        self.assertEqual(self.spusti("--koren", self.k, "--balik", "1.0.0").returncode, 0)
+        self.modul("kl_99_Skuska", "1.0.0", 2)
+        r = self.spusti("--koren", self.k)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("obsah sa zmenil", r.stdout)
+        self.assertNotEqual(ob.kontrola(self.k), [])
+        self.modul("kl_99_Skuska", "1.0.1", 2)
+        self.assertEqual(self.spusti("--koren", self.k).returncode, 0)
+        self.assertEqual(ob.kontrola(self.k), [])
+        self.assertEqual(self.spusti("--koren", self.k, "--bump", "kl_99_Skuska").returncode, 0)
+        self.assertEqual(ob.nacitaj_manifest(self.k)["moduly"]["kl_99_Skuska"]["verzia"], "1.0.2")
+
+    def test_priecinok_bez_modulov(self):
+        r = self.spusti("--koren", self.d)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("moduly", r.stdout + r.stderr)
+
+    def test_bez_parametra_ako_doteraz(self):
+        """Bez --koren sa zostaví balík, v ktorom skript leží: tie isté moduly, verzie, súčty aj zoznam zrušených."""
+        povodny = ob.nacitaj_manifest(self.t)
+        r = self.spusti()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        novy = ob.nacitaj_manifest(self.t)
+        for kluc in ("balik", "moduly", "zrusene", "poznamka"):
+            self.assertEqual(novy[kluc], povodny[kluc], kluc)
+        self.assertEqual(ob.kontrola(self.t), [])
+
+    def test_klient_ma_vlastne_moduly(self):
+        """Moduly klienta nie sú v manifeste balíka HR a naopak (balíky sú nezávislé)."""
+        klient = os.path.join(ACCESS, "klient", "moduly")
+        if not os.path.isdir(klient):
+            self.skipTest("bez access/klient")
+        hr = set(ob.nacitaj_manifest(ACCESS)["moduly"])
+        nazvy = {os.path.splitext(f)[0] for f in os.listdir(klient) if f.endswith(".bas")}
+        self.assertTrue(nazvy)
+        self.assertEqual(hr & nazvy, set())
+        self.assertTrue(all(n.startswith("kl_") for n in nazvy), nazvy)
 
 
 if __name__ == "__main__":

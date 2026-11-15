@@ -12,6 +12,10 @@ Použitie (z priečinka balíka):
     python tools/zostav_balik.py --balik 2.6.0        # nastaví verziu balíka
     python tools/zostav_balik.py --zip                # vytvorí aj ZIP vedľa priečinka balíka
     python tools/zostav_balik.py --bump mod_14_ImportModelu   # zvýši patch verziu modulu a zostaví
+    python tools/zostav_balik.py --koren klient       # iný balík s rovnakou stavbou (moduly/, manifest.json), napr. access/klient
+
+Bez --koren sa zostavuje balík, v ktorom tento skript leží (access/), rovnako ako doteraz. Zoznam zrušených modulov (ZRUSENE)
+patrí len tomuto balíku; iný balík si ponechá zoznam "zrusene" zo svojho doterajšieho manifest.json (nový balík prázdny).
 """
 import argparse, datetime, hashlib, json, os, re, sys, zipfile
 
@@ -49,8 +53,8 @@ def vs(t):
     return ".".join(str(x) for x in t)
 
 
-def zvys_patch(nazov):
-    cesta = os.path.join(MODULY, nazov + ".bas")
+def zvys_patch(nazov, moduly_dir=MODULY):
+    cesta = os.path.join(moduly_dir, nazov + ".bas")
     t = open(cesta, encoding="utf-8").read()
     riadky = t.split("\n")
     m = RE_VER.match(riadky[1])
@@ -67,22 +71,29 @@ def main():
     ap.add_argument("--balik", help="verzia balíka (predvolene sa ponechá doterajšia)")
     ap.add_argument("--zip", action="store_true")
     ap.add_argument("--bump", action="append", default=[], help="zvýši patch verziu modulu (opakovateľné)")
+    ap.add_argument("--koren", default=KOREN, help="priečinok balíka s moduly/ a manifest.json (predvolene balík, v ktorom je tento skript)")
     a = ap.parse_args()
+    koren = os.path.abspath(a.koren)
+    moduly_dir = os.path.join(koren, "moduly")
+    manifest_cesta = os.path.join(koren, "manifest.json")
+    vlastny = os.path.normcase(koren) == os.path.normcase(KOREN)
+    if not os.path.isdir(moduly_dir):
+        raise SystemExit("CHYBA: %s nie je priečinok balíka (chýba moduly/)" % koren)
 
     for n in a.bump:
-        zvys_patch(n)
+        zvys_patch(n, moduly_dir)
 
     stary = {}
-    if os.path.exists(MANIFEST):
-        stary = json.load(open(MANIFEST, encoding="utf-8"))
+    if os.path.exists(manifest_cesta):
+        stary = json.load(open(manifest_cesta, encoding="utf-8"))
     stare_moduly = stary.get("moduly", {})
 
     chyby, varovania, zmeny = [], [], []
     moduly = {}
-    for f in sorted(os.listdir(MODULY)):
+    for f in sorted(os.listdir(moduly_dir)):
         if not f.lower().endswith(".bas"):
             continue
-        nazov, ver, h, ho = nacitaj_modul(os.path.join(MODULY, f))
+        nazov, ver, h, ho = nacitaj_modul(os.path.join(moduly_dir, f))
         moduly[nazov] = {"subor": "moduly/" + f, "verzia": vs(ver), "sha256": h, "obsah_sha256": ho}
         s = stare_moduly.get(nazov)
         if s is None:
@@ -114,10 +125,10 @@ def main():
         "balik": balik,
         "vytvorene": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
-        "zrusene": ZRUSENE,
+        "zrusene": ZRUSENE if vlastny else stary.get("zrusene", []),
         "moduly": moduly,
     }
-    json.dump(manifest, open(MANIFEST, "w", encoding="utf-8", newline="\n"), ensure_ascii=False, indent=2)
+    json.dump(manifest, open(manifest_cesta, "w", encoding="utf-8", newline="\n"), ensure_ascii=False, indent=2)
     print("manifest.json zapísaný: balík %s, modulov %d" % (balik, len(moduly)))
     for z in zmeny:
         print("  " + z)
@@ -125,14 +136,14 @@ def main():
         print("  UPOZORNENIE: " + v)
 
     if a.zip:
-        meno = os.path.basename(KOREN)
-        cielzip = os.path.join(os.path.dirname(KOREN), "%s-%s.zip" % (meno, balik))
+        meno = os.path.basename(koren)
+        cielzip = os.path.join(os.path.dirname(koren), "%s-%s.zip" % (meno, balik))
         with zipfile.ZipFile(cielzip, "w", zipfile.ZIP_DEFLATED) as z:
-            for dp, dn, fn in os.walk(KOREN):
+            for dp, dn, fn in os.walk(koren):
                 dn[:] = [d for d in dn if d != "__pycache__"]
                 for x in fn:
                     p = os.path.join(dp, x)
-                    z.write(p, os.path.join(meno, os.path.relpath(p, KOREN)))
+                    z.write(p, os.path.join(meno, os.path.relpath(p, koren)))
         print("ZIP: " + cielzip)
 
 

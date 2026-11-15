@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { computeDay, type DayResult, type PunchLike, type Unconfirmed } from "./engine";
 import { applyStoredResult, engineInputs, loadSettingsForMonth } from "./settings-model";
 import { asVerification, countUnverified, type DeviceVerification } from "./device-trace";
+import { dayPlanInput, loadMonthPlan } from "./month-plan";
 
 export interface DayRow extends DayResult {
   date: Date;
@@ -31,6 +32,11 @@ export async function loadMonth(userId: string, year: number, month: number) {
   if (err) throw err;
   const s = engineInputs(settings.config);
   const closure = settings.closure;
+  // Mesiac z Accessu sa počíta podľa plánu z Accessu (len čítanie, etapa 3); terminálový mesiac plán nepoužíva a nič sa nevolá.
+  // Plán sa číta z tej istej verzie ako nastavenia (pri uzavretom mesiaci z pripnutej verzie). Bez plánu: dni „nepotvrdené“.
+  const planPromise = settings.ownedByAccess
+    ? loadMonthPlan({ y: year, m: month }, userId)
+    : Promise.resolve(null);
   // čakajúce žiadosti o zneplatnenie (razenie sa ešte počíta, ale v zozname je označené)
   const pendingVoid = new Set<number>();
   const punchIds = (punches.data ?? []).filter((p) => !p.voided_at).map((p) => p.id);
@@ -40,6 +46,7 @@ export async function loadMonth(userId: string, year: number, month: number) {
     if (pendError) throw pendError;
     for (const r of pend ?? []) pendingVoid.add(r.punch_id);
   }
+  const plan = await planPromise;
   // Uzavretý mesiac drží denný fond z uzávierky; neskoršia zmena fondu zamestnanca ho nezmení.
   const fund = Number(closure?.dailyFund ?? profile.data?.daily_fund ?? s.fundHours);
   const hol = s.holidays;
@@ -54,13 +61,16 @@ export async function loadMonth(userId: string, year: number, month: number) {
     const weekend = date.getDay() === 0 || date.getDay() === 6;
     const holiday = hol.get(key) ?? null;
     const future = date > now;
-    // Mesiac, ktorý patrí Accessu, sa počíta podľa plánu z Accessu; klient ho zatiaľ nečíta, preto je deň nepotvrdený (nie tichý odhad).
+    // Mesiac z Accessu: fond, okno a režim dňa z plánu. Bez plánu (alebo s režimom, ktorý model nepozná) je deň nepotvrdený, nie tichý odhad.
+    const fromPlan = plan ? dayPlanInput(plan, date.getDate(), s.regimes) : null;
     const r = computeDay(
       {
         punches: ps.filter((p) => !p.voided),
         fundHours: fund,
         isWorkday: !weekend && !holiday,
-        planMissing: settings.ownedByAccess,
+        ...(fromPlan
+          ? { plan: fromPlan.plan, regime: fromPlan.regime }
+          : { planMissing: settings.ownedByAccess }),
       },
       s,
     );
@@ -97,7 +107,8 @@ export async function loadMonth(userId: string, year: number, month: number) {
 export type MonthData = Awaited<ReturnType<typeof loadMonth>>;
 
 export const UNCONFIRMED_TEXT: Record<Unconfirmed, string> = {
-  no_plan: "Mesiac patrí Accessu a plán z Accessu terminál zatiaľ nenačítal, číslo je orientačné.",
+  no_plan:
+    "Mesiac patrí Accessu, ale plán z Accessu sa pre tento deň nenačítal, číslo je orientačné.",
   unknown_calc:
     "Prerušenie má spôsob výpočtu, ktorý terminál nepozná, a nepočíta sa; saldo overí správca.",
   unknown_code: "Razenie s kódom, ktorý model nastavení nepozná, sa nepočíta; saldo overí správca.",

@@ -2,6 +2,7 @@
 """Testy kontroly VBA modulov (tools/kontrola_vba.py). Spustenie: python3 -I tools/test_kontrola_vba.py"""
 import importlib.util
 import os
+import re
 import sys
 import tempfile
 import unittest

@@ -106,6 +106,42 @@ describe("okno práce", () => {
     expect(r.expectedMin).toBe(360);
     expect(r.balanceMin).toBe(90);
   });
+  it("okno režimu dňa prebije okno zamestnanca z plánu (poradie hodnôt kontraktu 1.5.0)", () => {
+    const plan = { expectedMin: 360, windowStartMin: 420, windowEndMin: 900 };
+    const punches = [IN("06:00"), OUT("16:00")];
+    const base = { ...M, windowStartMin: 360, windowEndMin: 1020 };
+    // režim s oknom 6:00 až 17:00: celý deň 6:00 až 16:00 = 600, obed 30
+    const wide = computeDay(
+      day(punches, {
+        plan,
+        regime: { rules: { work_window_start_min: 0, work_window_end_min: 1440 } },
+      }),
+      base,
+    );
+    expect(wide.workMin).toBe(570);
+    // režim bez okna ponechá okno z plánu (7:00 až 15:00 = 480, obed 30)
+    const other = computeDay(
+      day(punches, { plan, regime: { rules: { rounding_in_min: 0 } } }),
+      base,
+    );
+    expect(other.workMin).toBe(450);
+    // režim s jednou hodnotou okna prebije len ju: začiatok z režimu (6:00), koniec z plánu (15:00) = 540, obed 30
+    const half = computeDay(
+      day(punches, { plan, regime: { rules: { work_window_start_min: 360 } } }),
+      base,
+    );
+    expect(half.workMin).toBe(510);
+  });
+  it("režim nezmení fond dňa z plánu ani plán vo vstupe", () => {
+    const plan = { expectedMin: 360, windowStartMin: 420, windowEndMin: 900 };
+    const input = day([IN("06:00"), OUT("16:00")], {
+      plan,
+      regime: { rules: { work_window_start_min: 0 } },
+    });
+    const r = computeDay(input, M);
+    expect(r.expectedMin).toBe(360);
+    expect(plan).toEqual({ expectedMin: 360, windowStartMin: 420, windowEndMin: 900 });
+  });
 });
 
 describe("odpočet obedu nikdy nezníži prácu pod nulu", () => {

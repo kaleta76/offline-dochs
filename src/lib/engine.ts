@@ -203,6 +203,25 @@ export function applyRegime(
   return out;
 }
 
+/**
+ * Order of values for a day (contract 1.5.0): rules → work window of the employee in the month → values of the regime of the day.
+ * A window value that the regime sets overrides the one from the plan (per value); a regime without a window leaves the plan window.
+ */
+function planUnderRegime(
+  plan: DayPlan | undefined,
+  regime: RegimeDef | null | undefined,
+): DayPlan | undefined {
+  if (!plan || !regime) return plan;
+  const r = regime.rules ?? {};
+  const { windowStartMin, windowEndMin, ...rest } = plan;
+  const out: DayPlan = { ...rest };
+  if (windowStartMin !== undefined && num(r["work_window_start_min"]) === null)
+    out.windowStartMin = windowStartMin;
+  if (windowEndMin !== undefined && num(r["work_window_end_min"]) === null)
+    out.windowEndMin = windowEndMin;
+  return out;
+}
+
 function resolve(s: EngineSettings, plan?: DayPlan): Resolved {
   const byCode = new Map(s.interruptions ?? DEFAULT_INTERRUPTIONS);
   const byNumber = new Map<number, { code: string; props: InterruptionProps }>();
@@ -456,7 +475,7 @@ const ZERO_DAY = (expectedMin: number): DayResult => ({
 
 export function computeDay(input: DayInput, settings: EngineSettings): DayResult {
   const s = applyRegime(settings, input.regime);
-  const R = resolve(s, input.plan);
+  const R = resolve(s, planUnderRegime(input.plan, input.regime));
   const expectedMin = input.plan
     ? input.plan.expectedMin
     : input.isWorkday

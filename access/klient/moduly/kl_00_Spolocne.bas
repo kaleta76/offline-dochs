@@ -27,6 +27,7 @@ Option Explicit
 ' - CitajBajty(cesta, text, max)              : Prečíta súbor ako reťazec, v ktorom jeden znak = jeden bajt.
 ' - CitajTextUtf8(cesta, text)                : Prečíta textový súbor UTF-8 (s BOM aj bez) alebo ASCII.
 ' - Utf8NaText(bajty)                         : ČISTÁ: prevod bajtov UTF-8 (jeden znak = jeden bajt) na text.
+' - TextNaUtf8(text)                          : ČISTÁ: prevod textu na bajty UTF-8 (jeden znak = jeden bajt).
 ' - ZapisAsciiNovy(cesta, text)               : Zapíše lokálny súbor naraz (znak = bajt; cez dočasný súbor a premenovanie); vráti číslo chyby.
 ' - ZmazSubor(cesta)                          : Zmaže lokálny súbor; vráti číslo chyby.
 ' - RozdelRiadky(text)                        : ČISTÁ: riadky textu (CRLF aj LF).
@@ -249,6 +250,22 @@ Public Function Utf8NaText(ByVal strBajty As String) As String
         End If
     Loop
     Utf8NaText = s
+End Function
+
+' ČISTÁ. Text -> bajty UTF-8 (jeden znak výsledku = jeden bajt), bez BOM. Na zápis textu s diakritikou cez ZapisAsciiNovy.
+Public Function TextNaUtf8(ByVal strText As String) As String
+    Dim i As Long, c As Long, s As String
+    For i = 1 To Len(strText)
+        c = AscW(Mid$(strText, i, 1)) And &HFFFF&
+        If c < &H80 Then
+            s = s & ChrW$(c)
+        ElseIf c < &H800 Then
+            s = s & ChrW$(&HC0 Or (c \ 64)) & ChrW$(&H80 Or (c And &H3F))
+        Else
+            s = s & ChrW$(&HE0 Or (c \ 4096)) & ChrW$(&H80 Or ((c \ 64) And &H3F)) & ChrW$(&H80 Or (c And &H3F))
+        End If
+    Next i
+    TextNaUtf8 = s
 End Function
 
 Public Function CitajTextUtf8(ByVal strCesta As String, ByRef strText As String) As Boolean

@@ -283,5 +283,68 @@ class Konfiguracia(unittest.TestCase):
         self.assertEqual(kp.rozober_konfig(text), k)
 
 
+def _razenia(text):
+    return [tuple(p.split(";")) for p in text.split("|")] if text else []
+
+
+class StavDna(unittest.TestCase):
+    """OverStav a OverOtazku proti klient_protokol.stav_dna, popis_stavu a otazka_pred_razenim."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.samotest = citaj_modul("kl_08_Samotest.bas")
+        cls.razenie = citaj_modul("kl_05_Razenie.bas")
+
+    def test_stav_a_popis(self):
+        v = volania(self.samotest, "OverStav")
+        self.assertEqual({x[2].split(";")[0] for x in v}, {"ZIADNE", "PRACA", "MIMO", "PRERUSENIE"})
+        for meno, razenia, stav, nazov, popis in v:
+            with self.subTest(vektor=meno):
+                self.assertEqual(kp.stav_dna(_razenia(razenia)), stav)
+                self.assertEqual(kp.popis_stavu(stav, nazov), popis)
+
+    def test_otazky(self):
+        v = volania(self.samotest, "OverOtazku")
+        self.assertEqual({x[5] for x in v}, {"", "OPAKOVANE", "BEZ_PRICHODU"})
+        for meno, razenia, kod, smer, utc_teraz, ocakavana in v:
+            with self.subTest(vektor=meno):
+                self.assertEqual(kp.otazka_pred_razenim(_razenia(razenia), kod, smer, utc_teraz), ocakavana)
+
+    def test_hranica_opakovania(self):
+        self.assertIn("Public Const OPAKOVANE_SEK As Long = 120", self.razenie)
+        r = [("2026-11-03T06:31:12", "2026-11-03T07:31:12", "WORK", "IN")]
+        self.assertEqual(kp.otazka_pred_razenim(r, "WORK", "IN", "2026-11-03T06:33:11"), "OPAKOVANE")
+        self.assertEqual(kp.otazka_pred_razenim(r, "WORK", "IN", "2026-11-03T06:33:12"), "")
+
+    def test_texty_stavu_vo_vba(self):
+        for text in ("Dnes ešte bez razenia", "V práci od ", "Mimo práce od ", "Prerušenie: "):
+            self.assertIn('"' + text + '"', self.razenie)
+
+    def test_klient_nezapisuje_ine_kluce(self):
+        """ZostavRazenie píše presne hlavičku, povinné kľúče v poradí protokolu a #END."""
+        protokol = citaj_modul("kl_02_Protokol.bas").replace("\r\n", "\n")
+        m = re.search(r"Public Function ZostavRazenie\(.*?\n    Dim s As String\n(.*?)    ZostavRazenie = s", protokol, re.S)
+        self.assertIsNotNone(m)
+        kluce = re.findall(r'^    s = (?:s & )?(?:"([a-z_]+)=" & |(HLAVICKA_RZN|KONIEC_RZN) & )', m.group(1), re.M)
+        self.assertEqual([a or b for a, b in kluce], ["HLAVICKA_RZN"] + list(kp.POVINNE) + ["KONIEC_RZN"])
+        self.assertEqual(len(m.group(1).strip().split("\n")), len(kp.POVINNE) + 2)
+
+
+class BezOsobnychUdajov(unittest.TestCase):
+    """V moduloch a testovacích súboroch klienta je len testovací zamestnanec 9000001 / test.zam1 a žiadne e-maily."""
+
+    def test_moduly(self):
+        koren = os.path.join(MODULY, "..")
+        for adresar in (MODULY, os.path.join(koren, "testy")):
+            for nazov in sorted(os.listdir(adresar)):
+                with open(os.path.join(adresar, nazov), "rb") as f:
+                    text = f.read().decode("utf-8")
+                self.assertIsNone(re.search(r"[A-Za-z0-9._-]+@[A-Za-z0-9-]+\.[a-z]{2,}", text), nazov)
+                for oc in re.findall(r'"oc=([0-9A-Za-z]+)"', text) + re.findall(r'oc[_a-z]*=([0-9]{4,})', text) + re.findall(r'"([0-9]{6,})"', text):
+                    self.assertEqual(oc, "9000001", nazov)
+                for login in re.findall(r'"login=([^"~]+)', text):
+                    self.assertIn(login, ("test.zam1",), nazov)
+
+
 if __name__ == "__main__":
     unittest.main()

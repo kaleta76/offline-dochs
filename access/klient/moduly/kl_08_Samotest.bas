@@ -7,7 +7,8 @@ Option Explicit
 ' MODUL: kl_08_Samotest
 ' POPIS: Samotest klienta. Spúšťa ho zostavovač (Instaluj-Klienta.ps1) po zostavení a dá sa spustiť aj ručne z okna priamych
 '        príkazov:  ? kl_08_Samotest.SamoTestKlienta()
-'        Výsledok "OK n, ZLE m" vypíše do okna priamych príkazov. Samotest NIKDY nezapisuje do priečinka prijem na serveri.
+'        Výsledok "OK n, ZLE m" vypíše do okna priamych príkazov a do log\samotest.txt (UTF-8) v lokálnom priečinku klienta.
+'        Samotest NIKDY nezapisuje do priečinka prijem na serveri ani do lokálnej fronty razení.
 '
 '        ZLATÉ VEKTORY: volania OverVektor nižšie obsahujú vstupy a očakávaný súbor .rzn (každý riadok súboru jedna položka Array
 '        v poradí). Ten istý zoznam číta tools/test_klient_zhoda.py a porovnáva ho bajt po bajte s tools/klient_protokol.py
@@ -152,20 +153,20 @@ Private Sub OverIdentitu(ByVal strMeno As String, ByVal strLogin As String, ByVa
                 "identita " & strMeno & ": zdroj '" & strOcakZdroj & "'" & IIf(strZdroj <> strOcakZdroj, " (vrátil '" & strZdroj & "')", ""))
 End Sub
 
-' Rozhodnutie o identite na pevných vstupoch (znak ~ znamená koniec riadka). Posledné dva argumenty: očakávané osobné číslo a zdroj.
+' Rozhodnutie o identite na pevných vstupoch (znak ~ znamená koniec riadka; TESTB je vymyslená hodnota odlišná od 9000001). Posledné dva argumenty: očakávané osobné číslo a zdroj.
 Private Sub TestIdentity()
     Call Pis("--- identita: poradie zdrojov")
     Call OverIdentitu("z AD", "test.zam1", 0, "", "9000001", "", "9000001", "AD")
-    Call OverIdentitu("AD má prednosť pred uloženou", "test.zam1", 0, "", "9000001", "login=test.zam1~oc=9000002~", "9000001", "AD")
+    Call OverIdentitu("AD má prednosť pred uloženou", "test.zam1", 0, "", "9000001", "login=test.zam1~oc=TESTB~", "9000001", "AD")
     Call OverIdentitu("uložená pri nedostupnom AD", "test.zam1", 0, "", "", "login=test.zam1~oc=9000001~cas=2026-11-03T07:00:00~", "9000001", "CACHE")
     Call OverIdentitu("uložená, účet inou veľkosťou písmen", "Test.Zam1", 0, "", "", "login=test.zam1~oc=9000001~", "9000001", "CACHE")
-    Call OverIdentitu("uložená pre iný účet sa nepoužije", "test.zam2", 0, "", "", "login=test.zam1~oc=9000001~", "", "")
+    Call OverIdentitu("uložená pre iný účet sa nepoužije", "iny.ucet", 0, "", "", "login=test.zam1~oc=9000001~", "", "")
     Call OverIdentitu("bez AD aj bez uloženej", "test.zam1", 0, "", "", "", "", "")
     Call OverIdentitu("test pri lokálnej ceste", "test.zam1", 1, "oc_test=9000001~", "", "", "9000001", "TEST")
-    Call OverIdentitu("test má pri lokálnej ceste prednosť pred AD", "test.zam1", 1, "oc_test=9000001", "9000002", "", "9000001", "TEST")
+    Call OverIdentitu("test má pri lokálnej ceste prednosť pred AD", "test.zam1", 1, "oc_test=9000001", "TESTB", "", "9000001", "TEST")
     Call OverIdentitu("test.ini sa pri sieťovej ceste ignoruje", "test.zam1", 0, "oc_test=9000001~", "", "", "", "")
-    Call OverIdentitu("test.ini pri sieťovej ceste nemení AD", "test.zam1", 0, "oc_test=9000001~", "9000002", "", "9000002", "AD")
-    Call OverIdentitu("neplatné oc_test, lokálna cesta, AD", "test.zam1", 1, "oc_test=90 00~", "9000002", "", "9000002", "AD")
+    Call OverIdentitu("test.ini pri sieťovej ceste nemení AD", "test.zam1", 0, "oc_test=9000001~", "TESTB", "", "TESTB", "AD")
+    Call OverIdentitu("neplatné oc_test, lokálna cesta, AD", "test.zam1", 1, "oc_test=90 00~", "TESTB", "", "TESTB", "AD")
     Call OverIdentitu("neplatné osobné číslo z AD", "test.zam1", 0, "", "90-00/1", "", "", "")
     Call OverIdentitu("účet s nepovoleným znakom", "test zam1", 0, "", "9000001", "", "", "")
     Call Zaznam(kl_01_Identita.OcZIdentity(kl_01_Identita.TextIdentity("test.zam1", "9000001", DateSerial(2026, 11, 3)), "test.zam1") = "9000001", "identita.txt: zápis a spätné čítanie")
@@ -207,6 +208,89 @@ Private Sub TestKonfigu()
     Call OverKonfig("prázdny súbor", "", -1, "", "", "", "")
     Call OverKonfig("kód malými písmenami sa preskočí", "DOCHSKLIENT;1~tlacidlo=1;doctor;Lekár;x~TLACIDLO=2;TRIP;Cesta;x~#END~", 0, "", "OBED", "", "2")
     Call Zaznam(kl_00_Spolocne.Utf8NaText(ChrW$(&HEF) & ChrW$(&HBB) & ChrW$(&HBF) & "Lek" & ChrW$(&HC3) & ChrW$(&HA1) & "r " & ChrW$(&HC5) & ChrW$(&HBE)) = "Lek" & ChrW$(225) & "r " & ChrW$(382), "prevod UTF-8 s BOM na text (á, ž)")
+End Sub
+
+Private Sub OverStav(ByVal strMeno As String, ByVal strRazenia As String, ByVal strOcakStav As String, ByVal strNazovPrerusenia As String, ByVal strOcakPopis As String)
+    Dim strStav As String
+    strStav = kl_05_Razenie.StavDna(strRazenia)
+    Call Zaznam(StrComp(strStav, strOcakStav, vbBinaryCompare) = 0 And StrComp(kl_05_Razenie.PopisStavu(strStav, strNazovPrerusenia), strOcakPopis, vbBinaryCompare) = 0, _
+                "stav dňa " & strMeno & ": " & strOcakStav & IIf(strStav <> strOcakStav, " (vrátil '" & strStav & "')", ""))
+End Sub
+
+Private Sub OverOtazku(ByVal strMeno As String, ByVal strRazenia As String, ByVal strKod As String, ByVal strSmer As String, ByVal strUtcTeraz As String, ByVal strOcakavana As String)
+    Dim s As String
+    s = kl_05_Razenie.OtazkaPredRazenim(strRazenia, strKod, strSmer, strUtcTeraz)
+    Call Zaznam(StrComp(s, strOcakavana, vbBinaryCompare) = 0, "otázka pred razením " & strMeno & ": '" & strOcakavana & "'" & IIf(s <> strOcakavana, " (vrátil '" & s & "')", ""))
+End Sub
+
+' Stav dňa a otázky pred razením (zrkadlo klient_protokol.stav_dna, popis_stavu, otazka_pred_razenim).
+' Razenia dňa: položky oddelené |, položka utc;cas;KOD;SMER.
+Private Sub TestStavuDna()
+    Call Pis("--- razenie: stav dňa")
+    Call OverStav("bez razení", "", "ZIADNE", "", "Dnes ešte bez razenia")
+    Call OverStav("príchod", "2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN", "PRACA;07:31", "", "V práci od 07:31")
+    Call OverStav("odchod", "2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN|2026-11-03T10:30:05;2026-11-03T11:30:05;WORK;OUT", "MIMO;11:30", "", "Mimo práce od 11:30")
+    Call OverStav("prerušenie s textom z konfigurácie", "2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN|2026-11-03T12:15:00;2026-11-03T13:15:00;DOCTOR;OUT", "PRERUSENIE;DOCTOR;13:15", "Lekár", "Prerušenie: Lekár od 13:15")
+    Call OverStav("prerušenie bez textu", "2026-11-03T12:15:00;2026-11-03T13:15:00;TRIP;OUT", "PRERUSENIE;TRIP;13:15", "", "Prerušenie: TRIP od 13:15")
+    Call OverStav("návrat z prerušenia", "2026-11-03T12:15:00;2026-11-03T13:15:00;DOCTOR;OUT|2026-11-03T12:58:30;2026-11-03T13:58:30;WORK;IN", "PRACA;13:58", "", "V práci od 13:58")
+    Call OverStav("koniec prerušenia jeho kódom", "2026-11-03T12:15:00;2026-11-03T13:15:00;DOCTOR;OUT|2026-11-03T12:58:30;2026-11-03T13:58:30;DOCTOR;IN", "PRACA;13:58", "", "V práci od 13:58")
+    Call OverStav("rozhoduje utc, nie poradie v zozname", "2026-11-03T10:30:05;2026-11-03T11:30:05;WORK;OUT|2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN", "MIMO;11:30", "", "Mimo práce od 11:30")
+    Call OverStav("zmena času: rozhoduje utc", "2026-10-25T00:50:00;2026-10-25T02:50:00;WORK;IN|2026-10-25T01:10:00;2026-10-25T02:10:00;WORK;OUT", "MIMO;02:10", "", "Mimo práce od 02:10")
+    Call OverStav("rovnaké utc: neskoršie v zozname", "2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN|2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;OUT", "MIMO;07:31", "", "Mimo práce od 07:31")
+    Call OverStav("neplatné položky sa ignorujú", "nieco|2026-11-03T06:31:12;2026-11-03T07:31:12;NIECO;IN|2026-13-03T06:31:12;2026-11-03T07:31:12;WORK;IN|2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;VON", "ZIADNE", "", "Dnes ešte bez razenia")
+
+    Call Pis("--- razenie: otázky pred razením")
+    Call OverOtazku("prvý príchod", "", "WORK", "IN", "2026-11-03T06:31:12", "")
+    Call OverOtazku("odchod bez príchodu", "", "WORK", "OUT", "2026-11-03T14:36:02", "BEZ_PRICHODU")
+    Call OverOtazku("odchod po príchode", "2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN", "WORK", "OUT", "2026-11-03T14:36:02", "")
+    Call OverOtazku("rovnaké razenie po 119 s", "2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN", "WORK", "IN", "2026-11-03T06:33:11", "OPAKOVANE")
+    Call OverOtazku("rovnaké razenie po 120 s", "2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN", "WORK", "IN", "2026-11-03T06:33:12", "")
+    Call OverOtazku("iné razenie hneď po predošlom", "2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN", "DOCTOR", "OUT", "2026-11-03T06:31:20", "")
+    Call OverOtazku("druhý odchod hneď po prvom", "2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN|2026-11-03T14:36:02;2026-11-03T15:36:02;WORK;OUT", "WORK", "OUT", "2026-11-03T14:36:30", "OPAKOVANE")
+    Call OverOtazku("odchod, dnes len prerušenie", "2026-11-03T12:15:00;2026-11-03T13:15:00;DOCTOR;OUT", "WORK", "OUT", "2026-11-03T14:36:02", "BEZ_PRICHODU")
+    Call OverOtazku("prerušenie bez príchodu sa nepýta", "", "DOCTOR", "OUT", "2026-11-03T12:15:00", "")
+    Call OverOtazku("hodiny posunuté späť", "2026-11-03T06:31:12;2026-11-03T07:31:12;WORK;IN", "WORK", "IN", "2026-11-03T06:30:00", "OPAKOVANE")
+
+    Call Pis("--- razenie: ostatné pravidlá")
+    Call Zaznam(kl_05_Razenie.PlatnyPosun(60) And kl_05_Razenie.PlatnyPosun(120) And Not kl_05_Razenie.PlatnyPosun(0) And Not kl_05_Razenie.PlatnyPosun(180) And Not kl_05_Razenie.PlatnyPosun(-300), "posun oproti UTC: len 60 a 120 minút")
+    Call Zaznam(kl_05_Razenie.PovoleneRazenie("WORK", "IN") And kl_05_Razenie.PovoleneRazenie("WORK", "OUT") And kl_05_Razenie.PovoleneRazenie("DOCTOR", "OUT") And _
+                Not kl_05_Razenie.PovoleneRazenie("DOCTOR", "IN") And Not kl_05_Razenie.PovoleneRazenie("NIECO", "OUT") And Not kl_05_Razenie.PovoleneRazenie("WORK", "VON"), "povolené dvojice kód/smer")
+    Call Zaznam(kl_05_Razenie.NazovRazenia("WORK", "IN", "") = "Príchod" And kl_05_Razenie.NazovRazenia("WORK", "OUT", "") = "Odchod" And kl_05_Razenie.NazovRazenia("DOCTOR", "OUT", "Lekár") = "Lekár", "názvy razení pre zoznam Dnes")
+End Sub
+
+' Súbory v lokálnom priečinku klienta (nikdy nie na serveri) a informatívny výpis prostredia.
+Private Sub TestProstredia()
+    Dim strChyba As String, strCesta As String, strText As String, strSpat As String, dtCas As Date, dtUtc As Date, lPosun As Long, strId As String
+    Dim strOc As String, strLogin As String, strPc As String, strZdroj As String
+
+    Call Pis("--- lokálny priečinok a súbory")
+    strChyba = kl_00_Spolocne.PripravLokalnePriecinky()
+    Call Zaznam(Len(strChyba) = 0, "lokálne priečinky klienta existujú" & IIf(Len(strChyba) > 0, " (" & strChyba & ")", ""))
+    If Len(strChyba) = 0 Then
+        strCesta = kl_00_Spolocne.LokalnyPriecinok() & "\" & kl_00_Spolocne.PRIECINOK_LOG & "\samotest_skuska.txt"
+        strText = "DOCHSRZN;1" & vbCrLf & "skuska=1" & vbCrLf & "#END" & vbCrLf
+        Call Zaznam(kl_00_Spolocne.ZapisAsciiNovy(strCesta, strText) = 0, "zápis skúšobného súboru")
+        Call Zaznam(kl_00_Spolocne.CitajBajty(strCesta, strSpat) And StrComp(strSpat, strText, vbBinaryCompare) = 0, "čítanie skúšobného súboru vráti zapísaný text")
+        Call Zaznam(kl_00_Spolocne.VelkostSuboru(strCesta) = Len(strText), "veľkosť skúšobného súboru v bajtoch")
+        Call Zaznam(kl_00_Spolocne.ZmazSubor(strCesta) = 0 And Not kl_00_Spolocne.SuborExistuje(strCesta), "zmazanie skúšobného súboru")
+    End If
+    strText = "Príchod " & ChrW$(382) & ChrW$(318) & ChrW$(8230)
+    Call Zaznam(StrComp(kl_00_Spolocne.Utf8NaText(kl_00_Spolocne.TextNaUtf8(strText)), strText, vbBinaryCompare) = 0, "prevod textu do UTF-8 a späť")
+    strId = kl_00_Spolocne.NoveGuid()
+    Call Zaznam(kl_02_Protokol.JeGuidRazenia(strId) And strId <> kl_00_Spolocne.NoveGuid(), "nové ID razenia má tvar GUID a neopakuje sa")
+    Call kl_00_Spolocne.CasTeraz(dtCas, dtUtc, lPosun)
+    Call Zaznam(DateDiff("s", dtUtc, dtCas) = lPosun * 60 And Abs(DateDiff("s", dtCas, Now)) <= 2, "miestny čas = UTC + posun v celých minútach")
+
+    Call Pis("--- informácie (nehodnotí sa)")
+    Call Pis("INFO  verzia klienta " & kl_00_Spolocne.VERZIA_KLIENTA)
+    Call Pis("INFO  lokálny priečinok: " & kl_00_Spolocne.LokalnyPriecinok())
+    Call Pis("INFO  základ na serveri (zaklad.txt): " & IIf(Len(kl_00_Spolocne.ZakladPriecinok()) > 0, kl_00_Spolocne.ZakladPriecinok(), "nie je nastavený"))
+    Call Pis("INFO  čas " & kl_02_Protokol.CasNaText(dtCas) & ", UTC " & kl_02_Protokol.CasNaText(dtUtc) & ", posun " & lPosun & " min" & IIf(kl_05_Razenie.PlatnyPosun(lPosun), "", " (MIMO pásma Bratislava: razenie by sa nezapísalo)"))
+    If kl_01_Identita.ZistiIdentitu(strOc, strLogin, strPc, strZdroj, strChyba) Then
+        Call Pis("INFO  identita: osobné číslo " & strOc & ", účet " & strLogin & ", zdroj " & strZdroj)
+    Else
+        Call Pis("INFO  identita nezistená: " & strChyba)
+    End If
 End Sub
 
 Private Sub TestProtokolu()
@@ -258,9 +342,17 @@ Public Function SamoTestKlienta() As Long
     Call TestOdoslania
     Call TestIdentity
     Call TestKonfigu
+    Call TestStavuDna
+    Call TestProstredia
 Koniec:
     Call Pis("SÚHRN: OK " & mOk & ", ZLE " & mZle)
     SamoTestKlienta = mZle
+    On Error Resume Next
+    If Len(kl_00_Spolocne.LokalnyPriecinok()) > 0 Then
+        If kl_00_Spolocne.VytvorPriecinok(kl_00_Spolocne.LokalnyPriecinok() & "\" & kl_00_Spolocne.PRIECINOK_LOG) Then
+            Call kl_00_Spolocne.ZapisAsciiNovy(kl_00_Spolocne.LokalnyPriecinok() & "\" & kl_00_Spolocne.PRIECINOK_LOG & "\samotest.txt", ChrW$(&HEF) & ChrW$(&HBB) & ChrW$(&HBF) & kl_00_Spolocne.TextNaUtf8(mVypis))
+        End If
+    End If
     Exit Function
 Chyba:
     mZle = mZle + 1

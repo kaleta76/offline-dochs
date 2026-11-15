@@ -301,6 +301,76 @@ def rozober_konfig(obsah):
     return {"tlacidla": tlacidla[:MAX_TLACIDIEL], "odchod_bez_dovodu": odchod, "vytvorene": vytvorene, "preskocene": preskocene}
 
 
+def _razenia_dna(razenia):
+    """Platné položky (utc, cas, kod, smer) ako texty; neplatné sa ignorujú (rovnako ako kl_05_Razenie)."""
+    platne = []
+    for polozka in razenia:
+        if len(polozka) != 4:
+            continue
+        utc, cas, kod, smer = polozka
+        try:
+            if _cas(utc, "utc").year < 1900 or _cas(cas, "cas").year < 1900:
+                continue
+        except ChybaRazenia:
+            continue
+        if kod in KODY and smer in SMERY:
+            platne.append((utc, cas, kod, smer))
+    return platne
+
+
+def _posledne(platne):
+    """Razenie s najväčším utc; pri zhode vyhráva neskoršie v zozname."""
+    posledne = None
+    for r in platne:
+        if posledne is None or r[0] >= posledne[0]:
+            posledne = r
+    return posledne
+
+
+def stav_dna(razenia):
+    """Stav dňa z dnešných razení (kl_05_Razenie.StavDna). `razenia` je zoznam (utc, cas, kod, smer), časy RRRR-MM-DDTHH:MM:SS.
+
+    ZIADNE | PRACA;hh:mm (posledné je IN) | MIMO;hh:mm (posledné WORK/OUT) | PRERUSENIE;KOD;hh:mm (posledné X/OUT). Čas je miestny.
+    """
+    p = _posledne(_razenia_dna(razenia))
+    if p is None:
+        return "ZIADNE"
+    hm = p[1][11:16]
+    if p[3] == "IN":
+        return "PRACA;" + hm
+    if p[2] == "WORK":
+        return "MIMO;" + hm
+    return "PRERUSENIE;" + p[2] + ";" + hm
+
+
+def popis_stavu(stav, nazov_prerusenia=""):
+    """Text stavu dňa pre okno (kl_05_Razenie.PopisStavu)."""
+    casti = stav.split(";")
+    if casti[0] == "PRACA" and len(casti) == 2:
+        return "V práci od " + casti[1]
+    if casti[0] == "MIMO" and len(casti) == 2:
+        return "Mimo práce od " + casti[1]
+    if casti[0] == "PRERUSENIE" and len(casti) == 3:
+        return "Prerušenie: " + (nazov_prerusenia or casti[1]) + " od " + casti[2]
+    return "Dnes ešte bez razenia"
+
+
+def otazka_pred_razenim(razenia, kod, smer, utc_teraz):
+    """Na čo sa klient pred razením len opýta (kl_05_Razenie.OtazkaPredRazenim); razenie nikdy nezakáže.
+
+    OPAKOVANE: rovnaký kód a smer ako posledné razenie a menej než 120 s od neho. BEZ_PRICHODU: odchod (WORK/OUT) a v dnešných
+    razeniach nie je žiadny príchod (smer IN). Inak "".
+    """
+    platne = _razenia_dna(razenia)
+    p = _posledne(platne)
+    if p is not None and p[2] == kod and p[3] == smer:
+        if abs(int((_cas(utc_teraz, "utc") - _cas(p[0], "utc")).total_seconds())) < 120:
+            return "OPAKOVANE"
+    if kod == "WORK" and smer == "OUT" and not any(r[3] == "IN" for r in platne):
+        return "BEZ_PRICHODU"
+    return ""
+
+
 def _vypis(text):
     print(text)
 

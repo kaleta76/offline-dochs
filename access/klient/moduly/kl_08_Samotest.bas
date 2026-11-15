@@ -144,6 +144,34 @@ Private Sub TestOdoslania()
     Call Zaznam(kl_03_Fronta.DatumZNazvu(strNazov, d) And d = dCas, "deň a čas z názvu súboru")
 End Sub
 
+Private Sub OverIdentitu(ByVal strMeno As String, ByVal strLogin As String, ByVal lLokalny As Long, ByVal strTestIni As String, ByVal strOcAd As String, _
+                         ByVal strIdentitaTxt As String, ByVal strOcakOc As String, ByVal strOcakZdroj As String)
+    Dim strOc As String, strZdroj As String, strChyba As String
+    strChyba = kl_01_Identita.RozhodniIdentitu(strLogin, (lLokalny <> 0), Replace(strTestIni, "~", vbCrLf), strOcAd, Replace(strIdentitaTxt, "~", vbCrLf), strOc, strZdroj)
+    Call Zaznam(strOc = strOcakOc And strZdroj = strOcakZdroj And ((Len(strChyba) = 0) = (Len(strOcakOc) > 0)), _
+                "identita " & strMeno & ": zdroj '" & strOcakZdroj & "'" & IIf(strZdroj <> strOcakZdroj, " (vrátil '" & strZdroj & "')", ""))
+End Sub
+
+' Rozhodnutie o identite na pevných vstupoch (znak ~ znamená koniec riadka). Posledné dva argumenty: očakávané osobné číslo a zdroj.
+Private Sub TestIdentity()
+    Call Pis("--- identita: poradie zdrojov")
+    Call OverIdentitu("z AD", "test.zam1", 0, "", "9000001", "", "9000001", "AD")
+    Call OverIdentitu("AD má prednosť pred uloženou", "test.zam1", 0, "", "9000001", "login=test.zam1~oc=9000002~", "9000001", "AD")
+    Call OverIdentitu("uložená pri nedostupnom AD", "test.zam1", 0, "", "", "login=test.zam1~oc=9000001~cas=2026-11-03T07:00:00~", "9000001", "CACHE")
+    Call OverIdentitu("uložená, účet inou veľkosťou písmen", "Test.Zam1", 0, "", "", "login=test.zam1~oc=9000001~", "9000001", "CACHE")
+    Call OverIdentitu("uložená pre iný účet sa nepoužije", "test.zam2", 0, "", "", "login=test.zam1~oc=9000001~", "", "")
+    Call OverIdentitu("bez AD aj bez uloženej", "test.zam1", 0, "", "", "", "", "")
+    Call OverIdentitu("test pri lokálnej ceste", "test.zam1", 1, "oc_test=9000001~", "", "", "9000001", "TEST")
+    Call OverIdentitu("test má pri lokálnej ceste prednosť pred AD", "test.zam1", 1, "oc_test=9000001", "9000002", "", "9000001", "TEST")
+    Call OverIdentitu("test.ini sa pri sieťovej ceste ignoruje", "test.zam1", 0, "oc_test=9000001~", "", "", "", "")
+    Call OverIdentitu("test.ini pri sieťovej ceste nemení AD", "test.zam1", 0, "oc_test=9000001~", "9000002", "", "9000002", "AD")
+    Call OverIdentitu("neplatné oc_test, lokálna cesta, AD", "test.zam1", 1, "oc_test=90 00~", "9000002", "", "9000002", "AD")
+    Call OverIdentitu("neplatné osobné číslo z AD", "test.zam1", 0, "", "90-00/1", "", "", "")
+    Call OverIdentitu("účet s nepovoleným znakom", "test zam1", 0, "", "9000001", "", "", "")
+    Call Zaznam(kl_01_Identita.OcZIdentity(kl_01_Identita.TextIdentity("test.zam1", "9000001", DateSerial(2026, 11, 3)), "test.zam1") = "9000001", "identita.txt: zápis a spätné čítanie")
+    Call Zaznam(kl_00_Spolocne.JeLokalnaCesta("C:\dochadzka-test") And Not kl_00_Spolocne.JeLokalnaCesta("\\server\dochadzka") And Not kl_00_Spolocne.JeLokalnaCesta(""), "lokálna a sieťová cesta základu")
+End Sub
+
 Private Sub TestProtokolu()
     Dim strKodChyby As String, r As TRazenie
 
@@ -191,6 +219,7 @@ Public Function SamoTestKlienta() As Long
     On Error GoTo Chyba
     Call TestProtokolu
     Call TestOdoslania
+    Call TestIdentity
 Koniec:
     Call Pis("SÚHRN: OK " & mOk & ", ZLE " & mZle)
     SamoTestKlienta = mZle

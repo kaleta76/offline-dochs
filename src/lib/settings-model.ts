@@ -134,7 +134,7 @@ export interface EngineInputs extends EngineSettings {
   /** Predvolený denný fond v hodinách (použije sa, keď zamestnanec nemá vlastný). */
   fundHours: number;
   holidays: Map<string, string>;
-  /** Režimy výpočtu z modelu podľa čísla (etapa 1b); režim pre deň určuje plán, ktorý klient zatiaľ nečíta. */
+  /** Režimy výpočtu z modelu podľa čísla (etapa 1b); režim pre deň určuje plán zamestnanca z Accessu (month-plan.ts, etapa 3). */
   regimes: Map<number, RegimeDef>;
 }
 

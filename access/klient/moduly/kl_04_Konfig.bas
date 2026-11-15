@@ -186,8 +186,13 @@ Private Function SkusSubor(ByVal strCesta As String, ByVal strZdroj As String, B
         Exit Function
     End If
     If Len(strPreskocene) > 0 Then Call kl_00_Spolocne.ZapisLog("WARN", "Konfigurácia (" & strZdroj & "): preskočené chybné riadky " & strPreskocene & ".")
-    mKody = kody
-    mTexty = texty
+    If n > 0 Then
+        mKody = kody
+        mTexty = texty
+    Else
+        Erase mKody
+        Erase mTexty
+    End If
     mPocet = n
     mOdchod = strOdchod
     mVytvorene = strVytvorene

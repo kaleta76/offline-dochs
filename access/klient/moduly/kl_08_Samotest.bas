@@ -105,7 +105,7 @@ End Sub
 
 ' Tabuľka mapovania chýb odoslania (zrkadlo klient_protokol.vysledok_odoslania a novy_pocet_neuspechov).
 Private Sub TestOdoslania()
-    Dim dCas As Date, dUtc As Date, strFronta As String, strText As String, strNazov As String, d As Date
+    Dim dCas As Date, dUtc As Date, strFronta As String, strText As String, strNazov As String, d As Date, strDovod As String, bOk As Boolean
     Const ID_VZORU As String = "00000000-0000-0000-0000-00000000000A"
 
     Call Pis("--- odosielanie: mapovanie chýb")
@@ -137,12 +137,15 @@ Private Sub TestOdoslania()
     Call kl_02_Protokol.CasZTextu("2026-11-03T06:31:12", dUtc)
     strNazov = kl_02_Protokol.NazovSuboru(dCas, ID_VZORU)
     strFronta = kl_02_Protokol.ZostavRazenie(ID_VZORU, "9000001", "test.zam1", "PC-TEST", "WORK", "IN", dCas, dUtc, False, "1.0.0")
-    Call Zaznam(Len(kl_03_Fronta.TextPreOdoslanie(strFronta, strNazov, False, strText)) = 0 And StrComp(strText, strFronta, vbBinaryCompare) = 0, "pokus pri razení posiela text z fronty (odlozene=0)")
-    Call Zaznam(Len(kl_03_Fronta.TextPreOdoslanie(strFronta, strNazov, True, strText)) = 0 And _
-                StrComp(strText, kl_02_Protokol.ZostavRazenie(ID_VZORU, "9000001", "test.zam1", "PC-TEST", "WORK", "IN", dCas, dUtc, True, "1.0.0"), vbBinaryCompare) = 0, _
+    strDovod = kl_03_Fronta.TextPreOdoslanie(strFronta, strNazov, False, strText)
+    Call Zaznam(Len(strDovod) = 0 And StrComp(strText, strFronta, vbBinaryCompare) = 0, "pokus pri razení posiela text z fronty (odlozene=0)")
+    strDovod = kl_03_Fronta.TextPreOdoslanie(strFronta, strNazov, True, strText)
+    Call Zaznam(Len(strDovod) = 0 And StrComp(strText, kl_02_Protokol.ZostavRazenie(ID_VZORU, "9000001", "test.zam1", "PC-TEST", "WORK", "IN", dCas, dUtc, True, "1.0.0"), vbBinaryCompare) = 0, _
                 "pokus z časovača posiela ten istý text s odlozene=1")
-    Call Zaznam(Len(kl_03_Fronta.TextPreOdoslanie(Replace(strFronta, "#END", "#KON"), strNazov, True, strText)) > 0 And Len(strText) = 0, "poškodený text z fronty sa neodošle")
-    Call Zaznam(kl_03_Fronta.DatumZNazvu(strNazov, d) And d = dCas, "deň a čas z názvu súboru")
+    strDovod = kl_03_Fronta.TextPreOdoslanie(Replace(strFronta, "#END", "#KON"), strNazov, True, strText)
+    Call Zaznam(Len(strDovod) > 0 And Len(strText) = 0, "poškodený text z fronty sa neodošle")
+    bOk = kl_03_Fronta.DatumZNazvu(strNazov, d)
+    Call Zaznam(bOk And kl_02_Protokol.CasNaText(d) = "2026-11-03T07:31:12", "deň a čas z názvu súboru")
 End Sub
 
 Private Sub OverIdentitu(ByVal strMeno As String, ByVal strLogin As String, ByVal lLokalny As Long, ByVal strTestIni As String, ByVal strOcAd As String, _
@@ -261,7 +264,7 @@ End Sub
 ' Súbory v lokálnom priečinku klienta (nikdy nie na serveri) a informatívny výpis prostredia.
 Private Sub TestProstredia()
     Dim strChyba As String, strCesta As String, strText As String, strSpat As String, dtCas As Date, dtUtc As Date, lPosun As Long, strId As String
-    Dim strOc As String, strLogin As String, strPc As String, strZdroj As String
+    Dim strOc As String, strLogin As String, strPc As String, strZdroj As String, bOk As Boolean
 
     Call Pis("--- lokálny priečinok a súbory")
     strChyba = kl_00_Spolocne.PripravLokalnePriecinky()
@@ -270,9 +273,11 @@ Private Sub TestProstredia()
         strCesta = kl_00_Spolocne.LokalnyPriecinok() & "\" & kl_00_Spolocne.PRIECINOK_LOG & "\samotest_skuska.txt"
         strText = "DOCHSRZN;1" & vbCrLf & "skuska=1" & vbCrLf & "#END" & vbCrLf
         Call Zaznam(kl_00_Spolocne.ZapisAsciiNovy(strCesta, strText) = 0, "zápis skúšobného súboru")
-        Call Zaznam(kl_00_Spolocne.CitajBajty(strCesta, strSpat) And StrComp(strSpat, strText, vbBinaryCompare) = 0, "čítanie skúšobného súboru vráti zapísaný text")
+        bOk = kl_00_Spolocne.CitajBajty(strCesta, strSpat)
+        Call Zaznam(bOk And StrComp(strSpat, strText, vbBinaryCompare) = 0, "čítanie skúšobného súboru vráti zapísaný text")
         Call Zaznam(kl_00_Spolocne.VelkostSuboru(strCesta) = Len(strText), "veľkosť skúšobného súboru v bajtoch")
-        Call Zaznam(kl_00_Spolocne.ZmazSubor(strCesta) = 0 And Not kl_00_Spolocne.SuborExistuje(strCesta), "zmazanie skúšobného súboru")
+        bOk = (kl_00_Spolocne.ZmazSubor(strCesta) = 0)
+        Call Zaznam(bOk And Not kl_00_Spolocne.SuborExistuje(strCesta), "zmazanie skúšobného súboru")
     End If
     strText = "Príchod " & ChrW$(382) & ChrW$(318) & ChrW$(8230)
     Call Zaznam(StrComp(kl_00_Spolocne.Utf8NaText(kl_00_Spolocne.TextNaUtf8(strText)), strText, vbBinaryCompare) = 0, "prevod textu do UTF-8 a späť")
@@ -294,7 +299,7 @@ Private Sub TestProstredia()
 End Sub
 
 Private Sub TestProtokolu()
-    Dim strKodChyby As String, r As TRazenie
+    Dim strKodChyby As String, r As TRazenie, strDovod As String
 
     Call Pis("--- protokol: zlaté vektory")
     Call OverVektor("leto", "3F2A9C1E-7B64-4D0A-9E85-1C2D3E4F5A6B", "9000001", "test.zam1", "PC-TEST", "WORK", "IN", "2026-07-01T07:31:12", "2026-07-01T05:31:12", 0, "1.0.0", _
@@ -324,8 +329,10 @@ Private Sub TestProtokolu()
     Call OverZlyVzor("nazov_inak", "", "", "zle_nazov_inak.rzn", "NAZOV")
 
     Call Pis("--- protokol: ďalšie hranice")
-    Call Zaznam(Len(kl_02_Protokol.RozoberRazenie(String$(2049, "A"), "", strKodChyby, r)) > 0 And strKodChyby = "VELKOST", "text dlhší než 2048 bajtov je odmietnutý (VELKOST)")
-    Call Zaznam(Len(kl_02_Protokol.RozoberRazenie("DOCHSRZN;1" & vbCrLf & "oc=" & ChrW$(225) & vbCrLf & "#END" & vbCrLf, "", strKodChyby, r)) > 0 And strKodChyby = "ZNAKY", "znak mimo ASCII je odmietnutý (ZNAKY)")
+    strDovod = kl_02_Protokol.RozoberRazenie(String$(2049, "A"), "", strKodChyby, r)
+    Call Zaznam(Len(strDovod) > 0 And strKodChyby = "VELKOST", "text dlhší než 2048 bajtov je odmietnutý (VELKOST)")
+    strDovod = kl_02_Protokol.RozoberRazenie("DOCHSRZN;1" & vbCrLf & "oc=" & ChrW$(225) & vbCrLf & "#END" & vbCrLf, "", strKodChyby, r)
+    Call Zaznam(Len(strDovod) > 0 And strKodChyby = "ZNAKY", "znak mimo ASCII je odmietnutý (ZNAKY)")
     Call Zaznam(kl_02_Protokol.NazovSuboru(DateSerial(2026, 11, 3) + TimeSerial(7, 31, 12), "00000000-0000-0000-0000-00000000000A") = "20261103-073112_00000000-0000-0000-0000-00000000000A.rzn", "názov súboru má tvar RRRRMMDD-HHMMSS_<id>.rzn")
 End Sub
 

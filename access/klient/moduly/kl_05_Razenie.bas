@@ -59,7 +59,7 @@ Private mRazim As Boolean
 ' Posledné platné razenie z textu (najväčšie utc, pri zhode neskoršie v zozname). False = žiadne platné razenie.
 Private Function PosledneRazenie(ByVal strRazenia As String, ByRef strUtc As String, ByRef strCas As String, ByRef strKod As String, _
                                  ByRef strSmer As String, ByRef bBolPrichod As Boolean) As Boolean
-    Dim polozky() As String, i As Long, p() As String, d As Date
+    Dim polozky() As String, i As Long, p() As String, d As Date, bMam As Boolean
     bBolPrichod = False
     strUtc = ""
     If Len(strRazenia) = 0 Then Exit Function
@@ -70,16 +70,17 @@ Private Function PosledneRazenie(ByVal strRazenia As String, ByRef strUtc As Str
             If kl_02_Protokol.CasZTextu(p(0), d) And kl_02_Protokol.CasZTextu(p(1), d) And kl_02_Protokol.PlatnyKod(p(2)) And _
                (StrComp(p(3), "IN", vbBinaryCompare) = 0 Or StrComp(p(3), "OUT", vbBinaryCompare) = 0) Then
                 If StrComp(p(3), "IN", vbBinaryCompare) = 0 Then bBolPrichod = True
-                If Not PosledneRazenie Or StrComp(p(0), strUtc, vbBinaryCompare) >= 0 Then
+                If Not bMam Or StrComp(p(0), strUtc, vbBinaryCompare) >= 0 Then
                     strUtc = p(0)
                     strCas = p(1)
                     strKod = p(2)
                     strSmer = p(3)
-                    PosledneRazenie = True
+                    bMam = True
                 End If
             End If
         End If
     Next i
+    PosledneRazenie = bMam
 End Function
 
 Public Function StavDna(ByVal strRazenia As String) As String

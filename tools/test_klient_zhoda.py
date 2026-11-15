@@ -177,5 +177,60 @@ class ZleVzory(unittest.TestCase):
                     self.assertEqual(nazov, py_nazov)
 
 
+class Odoslanie(unittest.TestCase):
+    """Mapovanie chýb odoslania: vektory samotestu aj samotný Select Case v kl_03_Fronta proti klient_protokol.vysledok_odoslania."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.samotest = citaj_modul("kl_08_Samotest.bas")
+        cls.fronta = citaj_modul("kl_03_Fronta.bas")
+
+    def test_vektory_mapovania(self):
+        v = volania(self.samotest, "OverOdoslanie")
+        self.assertEqual({c for c, _ in v} >= {0, 58, 70} | set(kp.CHYBY_NEDOSTUPNY), True, "vektory nepokrývajú celú tabuľku")
+        self.assertTrue(any(kp.vysledok_odoslania(c) == "INA" for c, _ in v))
+        for cislo, ocakavany in v:
+            with self.subTest(chyba=cislo):
+                self.assertEqual(kp.vysledok_odoslania(cislo), ocakavany)
+
+    def test_vektory_pocitadla(self):
+        v = volania(self.samotest, "OverNeuspechy")
+        self.assertGreaterEqual(len(v), 5)
+        for doteraz, vysledok, ocakavany in v:
+            with self.subTest(doteraz=doteraz, vysledok=vysledok):
+                self.assertEqual(kp.novy_pocet_neuspechov(doteraz, vysledok), ocakavany)
+
+    def test_select_case_vo_vba(self):
+        """Vetvy Case funkcie VysledokOdoslania vo VBA dávajú pre čísla 0 až 100 to isté ako Python."""
+        m = re.search(r"Public Function VysledokOdoslania\(.*?\n(.*?)End Function", self.fronta.replace("\r\n", "\n"), re.S)
+        self.assertIsNotNone(m)
+        konst = dict(re.findall(r'Public Const (VYSL_[A-Z]+) As String = "([A-Z]+)"', self.fronta))
+        vetvy, ostatne = {}, None
+        for cisla, meno in re.findall(r"Case ([0-9, ]+|Else)\s*\n\s*VysledokOdoslania = (VYSL_[A-Z]+)", m.group(1)):
+            if cisla == "Else":
+                ostatne = konst[meno]
+            else:
+                for c in cisla.split(","):
+                    self.assertNotIn(int(c), vetvy)
+                    vetvy[int(c)] = konst[meno]
+        self.assertIsNotNone(ostatne)
+        self.assertGreaterEqual(len(vetvy), 11)
+        for c in range(0, 101):
+            self.assertEqual(vetvy.get(c, ostatne), kp.vysledok_odoslania(c), c)
+
+    def test_prah_upozornenia(self):
+        self.assertIn("Public Const PRAH_NEUSPECHOV As Long = %d" % kp.PRAH_NEUSPECHOV, self.fronta)
+
+    def test_server_sa_nikdy_neprepisuje(self):
+        """Na server sa píše len cez CreateTextFile bez prepísania a jedným Write; nič sa tam nemaže ani nepremenúva."""
+        kod = "\n".join(r for r in self.fronta.replace("\r\n", "\n").split("\n") if not r.lstrip().startswith("'"))
+        self.assertEqual(re.findall(r"CreateTextFile\(([^)]*)\)", kod), ["strCesta, False, False"])
+        self.assertEqual(len(re.findall(r"\bts\.Write\b", kod)), 1)
+        for zakazane in ("OpenTextFile", "WriteLine", "DeleteFile", "MoveFile", "CopyFile", "FileCopy"):
+            self.assertNotIn(zakazane, kod)
+        for m in re.finditer(r"^.*\b(Kill|Name|ZmazSubor|ZapisAsciiNovy)\b.*$", kod, re.M):
+            self.assertNotIn("strPrijem", m.group(0), "zásah do priečinka prijem: " + m.group(0).strip())
+
+
 if __name__ == "__main__":
     unittest.main()

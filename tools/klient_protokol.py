@@ -215,6 +215,35 @@ def zle_vzory():
     ]
 
 
+# ---------------------------------------------------------------- zrkadlo čistých funkcií klienta (access/klient/moduly)
+# Klient v Accesse (kl_03_Fronta, kl_05_Razenie, kl_04_Konfig) má tie isté pravidlá vo VBA; zhodu overuje
+# tools/test_klient_zhoda.py na vektoroch zo samotestu klienta (kl_08_Samotest).
+CHYBY_NEDOSTUPNY = (52, 53, 57, 67, 68, 71, 75, 76)
+PRAH_NEUSPECHOV = 5
+
+
+def vysledok_odoslania(cislo_chyby):
+    """Výsledok pokusu o vytvorenie súboru na serveri podľa čísla chyby VBA (kl_03_Fronta.VysledokOdoslania)."""
+    if cislo_chyby == 0:
+        return "DORUCENE"
+    if cislo_chyby == 58:
+        return "EXISTUJE"      # súbor s naším id už na serveri je: doručené skôr
+    if cislo_chyby in CHYBY_NEDOSTUPNY:
+        return "NEDOSTUPNY"    # cesta, sieť alebo zariadenie: ostáva vo fronte, ďalší pokus o minútu
+    if cislo_chyby == 70:
+        return "PRISTUP"       # práva alebo existujúci súbor (nejasné): ostáva vo fronte
+    return "INA"
+
+
+def novy_pocet_neuspechov(doteraz, vysledok):
+    """Počítadlo po sebe idúcich neúspechov (kl_03_Fronta.NovyPocetNeuspechov); od PRAH_NEUSPECHOV okno upozorní."""
+    if vysledok in ("DORUCENE", "EXISTUJE"):
+        return 0
+    if vysledok in ("PRISTUP", "INA"):
+        return doteraz + 1
+    return doteraz
+
+
 def _vypis(text):
     print(text)
 

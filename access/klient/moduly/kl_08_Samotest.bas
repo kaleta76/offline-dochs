@@ -94,6 +94,56 @@ Private Sub OverZlyVzor(ByVal strMeno As String, ByVal strHladaj As String, ByVa
                 "zlý vzor " & strMeno & ": odmietnutý s kódom " & strOcakavany & IIf(strKodChyby <> strOcakavany, " (vrátil '" & strKodChyby & "')", ""))
 End Sub
 
+Private Sub OverOdoslanie(ByVal lCisloChyby As Long, ByVal strOcakavany As String)
+    Call Zaznam(kl_03_Fronta.VysledokOdoslania(lCisloChyby) = strOcakavany, "chyba odoslania " & lCisloChyby & " -> " & strOcakavany)
+End Sub
+
+Private Sub OverNeuspechy(ByVal lDoteraz As Long, ByVal strVysledok As String, ByVal lOcakavany As Long)
+    Call Zaznam(kl_03_Fronta.NovyPocetNeuspechov(lDoteraz, strVysledok) = lOcakavany, "počítadlo neúspechov " & lDoteraz & " + " & strVysledok & " -> " & lOcakavany)
+End Sub
+
+' Tabuľka mapovania chýb odoslania (zrkadlo klient_protokol.vysledok_odoslania a novy_pocet_neuspechov).
+Private Sub TestOdoslania()
+    Dim dCas As Date, dUtc As Date, strFronta As String, strText As String, strNazov As String, d As Date
+    Const ID_VZORU As String = "00000000-0000-0000-0000-00000000000A"
+
+    Call Pis("--- odosielanie: mapovanie chýb")
+    Call OverOdoslanie(0, "DORUCENE")
+    Call OverOdoslanie(58, "EXISTUJE")
+    Call OverOdoslanie(52, "NEDOSTUPNY")
+    Call OverOdoslanie(53, "NEDOSTUPNY")
+    Call OverOdoslanie(57, "NEDOSTUPNY")
+    Call OverOdoslanie(67, "NEDOSTUPNY")
+    Call OverOdoslanie(68, "NEDOSTUPNY")
+    Call OverOdoslanie(71, "NEDOSTUPNY")
+    Call OverOdoslanie(75, "NEDOSTUPNY")
+    Call OverOdoslanie(76, "NEDOSTUPNY")
+    Call OverOdoslanie(70, "PRISTUP")
+    Call OverOdoslanie(5, "INA")
+    Call OverOdoslanie(61, "INA")
+    Call OverOdoslanie(-2147024891, "INA")
+    Call OverNeuspechy(0, "PRISTUP", 1)
+    Call OverNeuspechy(4, "PRISTUP", 5)
+    Call OverNeuspechy(4, "INA", 5)
+    Call OverNeuspechy(3, "NEDOSTUPNY", 3)
+    Call OverNeuspechy(7, "DORUCENE", 0)
+    Call OverNeuspechy(7, "EXISTUJE", 0)
+    Call OverNeuspechy(2, "POSKODENE", 2)
+    Call Zaznam(kl_03_Fronta.JeDorucene("DORUCENE") And kl_03_Fronta.JeDorucene("EXISTUJE") And Not kl_03_Fronta.JeDorucene("PRISTUP") And Not kl_03_Fronta.JeDorucene("NEDOSTUPNY"), "doručené je len DORUCENE a EXISTUJE")
+
+    Call Pis("--- odosielanie: odlozene pri opakovanom pokuse")
+    Call kl_02_Protokol.CasZTextu("2026-11-03T07:31:12", dCas)
+    Call kl_02_Protokol.CasZTextu("2026-11-03T06:31:12", dUtc)
+    strNazov = kl_02_Protokol.NazovSuboru(dCas, ID_VZORU)
+    strFronta = kl_02_Protokol.ZostavRazenie(ID_VZORU, "9000001", "test.zam1", "PC-TEST", "WORK", "IN", dCas, dUtc, False, "1.0.0")
+    Call Zaznam(Len(kl_03_Fronta.TextPreOdoslanie(strFronta, strNazov, False, strText)) = 0 And StrComp(strText, strFronta, vbBinaryCompare) = 0, "pokus pri razení posiela text z fronty (odlozene=0)")
+    Call Zaznam(Len(kl_03_Fronta.TextPreOdoslanie(strFronta, strNazov, True, strText)) = 0 And _
+                StrComp(strText, kl_02_Protokol.ZostavRazenie(ID_VZORU, "9000001", "test.zam1", "PC-TEST", "WORK", "IN", dCas, dUtc, True, "1.0.0"), vbBinaryCompare) = 0, _
+                "pokus z časovača posiela ten istý text s odlozene=1")
+    Call Zaznam(Len(kl_03_Fronta.TextPreOdoslanie(Replace(strFronta, "#END", "#KON"), strNazov, True, strText)) > 0 And Len(strText) = 0, "poškodený text z fronty sa neodošle")
+    Call Zaznam(kl_03_Fronta.DatumZNazvu(strNazov, d) And d = dCas, "deň a čas z názvu súboru")
+End Sub
+
 Private Sub TestProtokolu()
     Dim strKodChyby As String, r As TRazenie
 
@@ -140,6 +190,7 @@ Public Function SamoTestKlienta() As Long
     Call Pis("SAMOTEST KLIENTA " & Format$(Now, "yyyy\-mm\-dd hh:nn:ss"))
     On Error GoTo Chyba
     Call TestProtokolu
+    Call TestOdoslania
 Koniec:
     Call Pis("SÚHRN: OK " & mOk & ", ZLE " & mZle)
     SamoTestKlienta = mZle

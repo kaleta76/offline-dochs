@@ -232,5 +232,56 @@ class Odoslanie(unittest.TestCase):
             self.assertNotIn("strPrijem", m.group(0), "zásah do priečinka prijem: " + m.group(0).strip())
 
 
+class Konfiguracia(unittest.TestCase):
+    """OverKonfig(meno, obsah, pocet, tlacidla, odchod, vytvorene, preskocene) proti klient_protokol.rozober_konfig."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.vba = volania(citaj_modul("kl_08_Samotest.bas"), "OverKonfig")
+        cls.konfig = citaj_modul("kl_04_Konfig.bas")
+
+    def test_vektory(self):
+        self.assertGreaterEqual(len(self.vba), 8)
+        self.assertTrue(any(v[2] == -1 for v in self.vba) and any(v[2] == kp.MAX_TLACIDIEL for v in self.vba))
+        for meno, obsah, pocet, tlacidla, odchod, vytvorene, preskocene in self.vba:
+            with self.subTest(vektor=meno):
+                for konce in ("\r\n", "\n"):
+                    k = kp.rozober_konfig(obsah.replace("~", konce))
+                    if pocet == -1:
+                        self.assertIsNone(k)
+                        continue
+                    self.assertIsNotNone(k)
+                    self.assertEqual(len(k["tlacidla"]), pocet)
+                    self.assertEqual("|".join(a + "=" + b for a, b in k["tlacidla"]), tlacidla)
+                    self.assertEqual((k["odchod_bez_dovodu"], k["vytvorene"]), (odchod, vytvorene))
+                    self.assertEqual(",".join(str(x) for x in k["preskocene"]), preskocene)
+
+    def test_vzor_je_subor_z_balika(self):
+        """Vektor "vzor" v samoteste je presne obsah access/klient/testy/klient_konfig_vzor.txt (UTF-8 s BOM, CRLF)."""
+        with open(os.path.join(MODULY, "..", "testy", "klient_konfig_vzor.txt"), "rb") as f:
+            bajty = f.read()
+        self.assertTrue(bajty.startswith(b"\xef\xbb\xbf"))
+        vzor = [v for v in self.vba if v[0] == "vzor"]
+        self.assertEqual(len(vzor), 1)
+        self.assertEqual(vzor[0][1].replace("~", "\r\n").encode("utf-8"), bajty[3:])
+        k = kp.rozober_konfig(bajty)
+        self.assertEqual(len(k["tlacidla"]), vzor[0][2])
+        self.assertTrue(k["preskocene"])
+
+    def test_konstanty(self):
+        self.assertIn('Public Const HLAVICKA_KONFIGU As String = "%s"' % kp.HLAVICKA_KONFIGU, self.konfig)
+        self.assertIn("Public Const MAX_TLACIDIEL As Long = %d" % kp.MAX_TLACIDIEL, self.konfig)
+        self.assertIn("Public Const MAX_TEXT_TLACIDLA As Long = %d" % kp.MAX_TEXT_TLACIDLA, self.konfig)
+        self.assertIn('Private Const KODY_TLACIDIEL As String = "|%s|"' % "|".join(kp.KODY_TLACIDIEL), self.konfig)
+
+    def test_konfig_zo_strany_hr(self):
+        """Tvar, ktorý píše mod_22_KlientRazenia.GenerujKonfiguraciuKlienta (BOM, CRLF, poradie 1..n, prázdna ikona)."""
+        text = "DOCHSKLIENT;1\r\nvytvorene=2026-11-15T08:00:00\r\nodchod_bez_dovodu=OBED\r\ntlacidlo=1;DOCTOR;Lekár;stethoscope\r\ntlacidlo=2;TRIP;Služobne;\r\n#END\r\n"
+        k = kp.rozober_konfig(b"\xef\xbb\xbf" + text.encode("utf-8"))
+        self.assertEqual(k["tlacidla"], [("DOCTOR", "Lekár"), ("TRIP", "Služobne")])
+        self.assertEqual(k["preskocene"], [])
+        self.assertEqual(kp.rozober_konfig(text), k)
+
+
 if __name__ == "__main__":
     unittest.main()

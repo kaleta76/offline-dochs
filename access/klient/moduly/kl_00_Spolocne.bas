@@ -27,7 +27,7 @@ Option Explicit
 ' - CitajBajty(cesta, text, max)              : Prečíta súbor ako reťazec, v ktorom jeden znak = jeden bajt.
 ' - CitajTextUtf8(cesta, text)                : Prečíta textový súbor UTF-8 (s BOM aj bez) alebo ASCII.
 ' - Utf8NaText(bajty)                         : ČISTÁ: prevod bajtov UTF-8 (jeden znak = jeden bajt) na text.
-' - ZapisAsciiNovy(cesta, text)               : Zapíše lokálny súbor ASCII naraz (cez dočasný súbor a premenovanie); vráti číslo chyby.
+' - ZapisAsciiNovy(cesta, text)               : Zapíše lokálny súbor naraz (znak = bajt; cez dočasný súbor a premenovanie); vráti číslo chyby.
 ' - ZmazSubor(cesta)                          : Zmaže lokálny súbor; vráti číslo chyby.
 ' - RozdelRiadky(text)                        : ČISTÁ: riadky textu (CRLF aj LF).
 ' - ZoznamSuborov(priecinok, maska, a)        : Názvy súborov zoradené podľa názvu; vráti počet.
@@ -259,17 +259,21 @@ Public Function CitajTextUtf8(ByVal strCesta As String, ByRef strText As String)
     CitajTextUtf8 = True
 End Function
 
-' Zapíše lokálny súbor ASCII naraz: najprv do <cesta>.tmp, potom premenovanie (súbor s cieľovým názvom je vždy celý).
-' Existujúci cieľ sa nahradí. Vráti 0 alebo číslo chyby. Text musí byť ASCII (volajúci to overuje).
+' Zapíše lokálny súbor naraz: najprv do <cesta>.tmp, potom premenovanie (súbor s cieľovým názvom je vždy celý).
+' Existujúci cieľ sa nahradí. Vráti 0 alebo číslo chyby. Jeden znak textu = jeden bajt súboru (kódy 0 až 255, bez prevodu
+' kódovej stránky): pre text ASCII je to priamo text, pre bajty z CitajBajty presná kópia.
 Public Function ZapisAsciiNovy(ByVal strCesta As String, ByVal strText As String) As Long
-    Dim f As Integer, b() As Byte, strTmp As String
+    Dim f As Integer, b() As Byte, strTmp As String, i As Long
     On Error GoTo Chyba
     strTmp = strCesta & ".tmp"
     If SuborExistuje(strTmp) Then Kill strTmp
     f = FreeFile
     Open strTmp For Binary Access Write Lock Read Write As #f
     If Len(strText) > 0 Then
-        b = StrConv(strText, vbFromUnicode)
+        ReDim b(0 To Len(strText) - 1)
+        For i = 1 To Len(strText)
+            b(i - 1) = CByte(AscW(Mid$(strText, i, 1)) And &HFF)
+        Next i
         Put #f, 1, b
     End If
     Close #f

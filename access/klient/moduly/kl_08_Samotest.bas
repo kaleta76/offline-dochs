@@ -172,6 +172,43 @@ Private Sub TestIdentity()
     Call Zaznam(kl_00_Spolocne.JeLokalnaCesta("C:\dochadzka-test") And Not kl_00_Spolocne.JeLokalnaCesta("\\server\dochadzka") And Not kl_00_Spolocne.JeLokalnaCesta(""), "lokálna a sieťová cesta základu")
 End Sub
 
+Private Sub OverKonfig(ByVal strMeno As String, ByVal strObsah As String, ByVal lOcakPocet As Long, ByVal strOcakTlacidla As String, _
+                       ByVal strOcakOdchod As String, ByVal strOcakVytvorene As String, ByVal strOcakPreskocene As String)
+    Dim kody() As String, texty() As String, strOdchod As String, strVytvorene As String, strPreskocene As String, n As Long, i As Long, s As String
+    n = kl_04_Konfig.RozoberKonfig(Replace(strObsah, "~", vbCrLf), kody, texty, strOdchod, strVytvorene, strPreskocene)
+    For i = 0 To n - 1
+        s = s & IIf(i > 0, "|", "") & kody(i) & "=" & texty(i)
+    Next i
+    If n < 0 Then
+        Call Zaznam(lOcakPocet = -1, "konfigurácia " & strMeno & ": nie je konfigurácia")
+    Else
+        Call Zaznam(n = lOcakPocet And StrComp(s, strOcakTlacidla, vbBinaryCompare) = 0 And strOdchod = strOcakOdchod And strVytvorene = strOcakVytvorene And strPreskocene = strOcakPreskocene, _
+                    "konfigurácia " & strMeno & ": tlačidiel " & lOcakPocet & ", preskočené riadky '" & strOcakPreskocene & "'" & IIf(strPreskocene <> strOcakPreskocene, " (vrátil '" & strPreskocene & "')", ""))
+    End If
+End Sub
+
+' Rozbor konfigurácie (zrkadlo klient_protokol.rozober_konfig). Znak ~ znamená koniec riadka. Vektor "vzor" je obsah súboru
+' access/klient/testy/klient_konfig_vzor.txt. Argumenty: meno, obsah, počet tlačidiel (-1 = nie je konfigurácia),
+' tlačidlá KOD=text oddelené |, odchod_bez_dovodu, vytvorene, čísla preskočených riadkov.
+Private Sub TestKonfigu()
+    Call Pis("--- konfigurácia: rozbor klient_konfig.txt")
+    Call OverKonfig("vzor", "DOCHSKLIENT;1~vytvorene=2026-11-15T08:00:00~odchod_bez_dovodu=OBED~tlacidlo=1;DOCTOR;Lekár;stethoscope~tlacidlo=2;TRIP;Služobne;briefcase~tlacidlo=3;NIECO;Neznámy kód;x~tlacidlo=4;FAMILY;Tento text je dlhší než dvadsaťštyri znakov;x~tlacidlo=5;PRIV~buduci_kluc=hodnota~riadok bez rovnitka~tlacidlo=6;DOCTOR;Lekár druhýkrát;x~tlacidlo=7;ERRAND;Pochôdzka;~tlacidlo=x;SICK;Choroba;x~tlacidlo=8;WORK;Práca;x~#END~", _
+        4, "DOCTOR=Lekár|TRIP=Služobne|DOCTOR=Lekár druhýkrát|ERRAND=Pochôdzka", "OBED", "2026-11-15T08:00:00", "6,7,8,10,13,14")
+    Call OverKonfig("bez tlačidiel", "DOCHSKLIENT;1~vytvorene=2026-11-15T08:00:00~odchod_bez_dovodu=ODCHOD~#END~", 0, "", "ODCHOD", "2026-11-15T08:00:00", "")
+    Call OverKonfig("len hlavička a koniec, bez posledného konca riadka", "DOCHSKLIENT;1~#END", 0, "", "OBED", "", "")
+    Call OverKonfig("neznáma hodnota odchod_bez_dovodu", "DOCHSKLIENT;1~odchod_bez_dovodu=NIECO~tlacidlo=1;SICK;PN;x~#END~", 1, "SICK=PN", "OBED", "", "2")
+    Call OverKonfig("medzery a prázdne riadky", "DOCHSKLIENT;1~~  tlacidlo = 10 ; PRIV ; Súkromne ; x  ~~#END~~~", 1, "PRIV=Súkromne", "OBED", "", "")
+    Call OverKonfig("text presne 24 znakov", "DOCHSKLIENT;1~tlacidlo=1;LEAVE;123456789012345678901234;~tlacidlo=2;LEAVE;1234567890123456789012345;~#END~", 1, "LEAVE=123456789012345678901234", "OBED", "", "3")
+    Call OverKonfig("najviac 12 tlačidiel", "DOCHSKLIENT;1~tlacidlo=1;DOCTOR;A1;~tlacidlo=2;DOCTOR;A2;~tlacidlo=3;DOCTOR;A3;~tlacidlo=4;DOCTOR;A4;~tlacidlo=5;DOCTOR;A5;~tlacidlo=6;DOCTOR;A6;~tlacidlo=7;DOCTOR;A7;~tlacidlo=8;DOCTOR;A8;~tlacidlo=9;DOCTOR;A9;~tlacidlo=10;DOCTOR;A10;~tlacidlo=11;DOCTOR;A11;~tlacidlo=12;DOCTOR;A12;~tlacidlo=13;DOCTOR;A13;~tlacidlo=14;TRIP;A14;~#END~", _
+        12, "DOCTOR=A1|DOCTOR=A2|DOCTOR=A3|DOCTOR=A4|DOCTOR=A5|DOCTOR=A6|DOCTOR=A7|DOCTOR=A8|DOCTOR=A9|DOCTOR=A10|DOCTOR=A11|DOCTOR=A12", "OBED", "", "")
+    Call OverKonfig("zlá hlavička", "DOCHSKLIENT;2~tlacidlo=1;DOCTOR;Lekár;x~#END~", -1, "", "", "", "")
+    Call OverKonfig("hlavička malými písmenami", "dochsklient;1~#END~", -1, "", "", "", "")
+    Call OverKonfig("bez konca (nedopísaný súbor)", "DOCHSKLIENT;1~tlacidlo=1;DOCTOR;Lekár;x~", -1, "", "", "", "")
+    Call OverKonfig("prázdny súbor", "", -1, "", "", "", "")
+    Call OverKonfig("kód malými písmenami sa preskočí", "DOCHSKLIENT;1~tlacidlo=1;doctor;Lekár;x~TLACIDLO=2;TRIP;Cesta;x~#END~", 0, "", "OBED", "", "2")
+    Call Zaznam(kl_00_Spolocne.Utf8NaText(ChrW$(&HEF) & ChrW$(&HBB) & ChrW$(&HBF) & "Lek" & ChrW$(&HC3) & ChrW$(&HA1) & "r " & ChrW$(&HC5) & ChrW$(&HBE)) = "Lek" & ChrW$(225) & "r " & ChrW$(382), "prevod UTF-8 s BOM na text (á, ž)")
+End Sub
+
 Private Sub TestProtokolu()
     Dim strKodChyby As String, r As TRazenie
 
@@ -220,6 +257,7 @@ Public Function SamoTestKlienta() As Long
     Call TestProtokolu
     Call TestOdoslania
     Call TestIdentity
+    Call TestKonfigu
 Koniec:
     Call Pis("SÚHRN: OK " & mOk & ", ZLE " & mZle)
     SamoTestKlienta = mZle

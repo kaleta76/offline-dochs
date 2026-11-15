@@ -244,6 +244,63 @@ def novy_pocet_neuspechov(doteraz, vysledok):
     return doteraz
 
 
+HLAVICKA_KONFIGU = "DOCHSKLIENT;1"
+KODY_TLACIDIEL = tuple(k for k in KODY if k != "WORK")
+MAX_TLACIDIEL = 12
+MAX_TEXT_TLACIDLA = 24
+
+
+def rozober_konfig(obsah):
+    """Rozbor konfiguracia\\klient_konfig.txt (kl_04_Konfig.RozoberKonfig). `obsah` sú bajty UTF-8 (BOM sa toleruje) alebo text.
+
+    Vráti slovník: tlacidla = zoznam (kod, text) v poradí súboru (najviac MAX_TLACIDIEL), odchod_bez_dovodu = OBED alebo ODCHOD,
+    vytvorene = text hodnoty (alebo ""), preskocene = čísla chybných riadkov (od 1). Vráti None, ak súbor nie je konfigurácia
+    (prvý riadok nie je presne DOCHSKLIENT;1 alebo posledný neprázdny riadok nie je presne #END).
+    Pravidlá: riadky CRLF aj LF; riadok sa orezáva len o medzery; prázdny riadok sa ignoruje; riadok bez "=" sa preskočí;
+    neznámy kľúč sa ignoruje; tlacidlo=poradie;KOD;text;ikona musí mať presne 4 polia, poradie 1 až 4 číslice, KOD zo zoznamu
+    prerušení (nie WORK; ten istý kód môže mať viac tlačidiel), text 1 až 24 znakov bez riadiacich znakov; ikona sa ignoruje.
+    Chybný riadok sa preskočí a konfigurácia platí ďalej; tlačidlá nad MAX_TLACIDIEL sa zahodia (nie sú chybné).
+    """
+    if isinstance(obsah, bytes):
+        if obsah.startswith(b"\xef\xbb\xbf"):
+            obsah = obsah[3:]
+        obsah = obsah.decode("utf-8", errors="replace")
+    elif obsah.startswith("\ufeff"):
+        obsah = obsah[1:]
+    riadky = obsah.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    n = len(riadky)
+    while n > 0 and riadky[n - 1].strip(" ") == "":
+        n -= 1
+    if n < 2 or riadky[0] != HLAVICKA_KONFIGU or riadky[n - 1] != KONIEC:
+        return None
+    tlacidla, preskocene, odchod, vytvorene = [], [], "OBED", ""
+    for i in range(1, n - 1):
+        r = riadky[i].strip(" ")
+        if r == "":
+            continue
+        if "=" not in r:
+            preskocene.append(i + 1)
+            continue
+        kluc, _, hodnota = r.partition("=")
+        kluc, hodnota = kluc.strip(" "), hodnota.strip(" ")
+        if kluc == "vytvorene":
+            vytvorene = hodnota
+        elif kluc == "odchod_bez_dovodu":
+            if hodnota in ("OBED", "ODCHOD"):
+                odchod = hodnota
+            else:
+                preskocene.append(i + 1)
+        elif kluc == "tlacidlo":
+            polia = hodnota.split(";")
+            text = polia[2].strip(" ") if len(polia) == 4 else ""
+            if (len(polia) != 4 or not re.match(r"^[0-9]{1,4}$", polia[0].strip(" ")) or polia[1].strip(" ") not in KODY_TLACIDIEL
+                    or not 1 <= len(text) <= MAX_TEXT_TLACIDLA or any(ord(z) < 32 for z in text)):
+                preskocene.append(i + 1)
+            else:
+                tlacidla.append((polia[1].strip(" "), text))
+    return {"tlacidla": tlacidla[:MAX_TLACIDIEL], "odchod_bez_dovodu": odchod, "vytvorene": vytvorene, "preskocene": preskocene}
+
+
 def _vypis(text):
     print(text)
 

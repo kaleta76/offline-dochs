@@ -14,6 +14,7 @@ Prehľad celého projektu je v [koreňovom README](../README.md).
 | `CHANGELOG.md` | zmeny podľa balíkov |
 | `testy/terminal/` | vymyslené testovacie dáta a postupy na test spolupráce s terminálom (bez osobných údajov) |
 | `tools/zostav_balik.py` | kontrola verzií modulov, zápis `manifest.json` a zostavenie ZIP |
+| `klient/` | samostatný balík: klient na razenie `DochadzkaKlient.accdb` (moduly `kl_*`, zostavovač, spúšťač, vlastný `manifest.json`, `CHANGELOG.md` a `PRIRUCKA.md`); **nie je v ZIP-e inštalátora HR**, pozri `klient/README.md` |
 
 ## Ako to nainštalovať
 1. Stiahnite repozitár (**Code → Download ZIP**) alebo ho naklonujte a použite priečinok `access/`. Súbory sa nesmú meniť (konverzia koncov riadkov rozbije kontrolu SHA-256, preto je v tomto priečinku `.gitattributes` s `-text`).

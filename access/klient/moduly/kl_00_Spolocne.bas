@@ -20,7 +20,7 @@ Option Explicit
 ' ZOZNAM VEREJNÝCH PROCEDÚR A FUNKCIÍ:
 ' ------------------------------------------------------------------------------
 ' - LokalnyPriecinok(), ZakladPriecinok()     : Lokálny priečinok klienta; základ na serveri zo zaklad.txt ("" = chýba).
-' - JeLokalnaCesta(cesta)                     : ČISTÁ: cesta nie je sieťová (nezačína \\).
+' - JeLokalnaCesta(cesta)                     : Cesta nie je sieťová (nezačína \\ a nejde o namapovanú sieťovú jednotku).
 ' - PripravLokalnePriecinky()                 : Vytvorí chýbajúce lokálne priečinky; vráti "" alebo text chyby.
 ' - VytvorPriecinok(cesta)                    : Vytvorí priečinok aj s nadradenými.
 ' - SuborExistuje(cesta), PriecinokExistuje(cesta), VelkostSuboru(cesta)
@@ -88,11 +88,23 @@ Public Function LokalnyPriecinok() As String
     LokalnyPriecinok = s & "\" & NAZOV_KLIENTA
 End Function
 
-' ČISTÁ. Cesta je lokálna, ak nie je sieťová (nezačína dvoma spätnými lomkami). Prázdna cesta nie je lokálna.
+' Cesta je lokálna, ak nie je sieťová: nezačína dvoma spätnými lomkami a nejde o namapovanú sieťovú jednotku (Z:\).
+' Prázdna cesta nie je lokálna. Ak sa typ jednotky nepodarí zistiť, cesta sa berie ako sieťová (testovací režim sa nepovolí).
 Public Function JeLokalnaCesta(ByVal strCesta As String) As Boolean
+    Dim fso As Object
     strCesta = Trim$(strCesta)
     If Len(strCesta) = 0 Then Exit Function
-    JeLokalnaCesta = (Left$(strCesta, 2) <> "\\")
+    If Left$(strCesta, 2) = "\\" Then Exit Function
+    If Mid$(strCesta, 2, 1) = ":" Then
+        On Error GoTo Chyba
+        Set fso = CreateObject("Scripting.FileSystemObject")
+        JeLokalnaCesta = (fso.GetDrive(Left$(strCesta, 2)).DriveType <> 3)    ' 3 = sieťová jednotka
+        Exit Function
+    End If
+    JeLokalnaCesta = True
+    Exit Function
+Chyba:
+    JeLokalnaCesta = False
 End Function
 
 ' Základ na serveri: prvý neprázdny riadok súboru zaklad.txt (píše ho spúšťač), bez koncovej lomky. "" = súbor chýba.

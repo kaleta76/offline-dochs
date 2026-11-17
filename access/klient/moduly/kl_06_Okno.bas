@@ -23,9 +23,10 @@ Option Explicit
 ' - ObnovOkno(), ObnovKonfiguraciuOkna(), ObnovIdentituOkna(), PokazSpravu(sprava) : Prekreslenie častí okna.
 ' - KlientTlacidlo(akcia)            : Udalosť tlačidiel (PRICHOD, ODCHOD, P0 až P11).
 ' - KlientTik()                      : Udalosť časovača okna.
+' - KlientKoniec(), KlientZatvorene() : Udalosť tlačidla Koniec a zatvorenia okna (ukončia klienta).
 ' - TextTlacidlaPreOkno(s), RiadokDnes(cas, nazov, odoslane), TextCakajucich(pocet, serverNedostupny),
 '   TextUpozornenia(problemPrava, dniCakania), PomocnyTextOdchodu(odchod), DruhSpravy(sprava), RiadokIdentity(oc, login, zdroj),
-'   NazovPrichodu(vPreruseni) : ČISTÉ texty pre okno.
+'   NazovPrichodu(vPreruseni), TextPriKonci(pocet) : ČISTÉ texty pre okno.
 '===============================================================================
 
 Public Const FRM_KLIENT As String = "frmKlient"
@@ -37,6 +38,9 @@ Private Const PISMO As String = "Segoe UI"
 
 Private mKratkyTik As Boolean       ' najbližší tik časovača len odblokuje tlačidlá
 Private mTikov As Long
+Private mAktivne As Boolean         ' okno bolo otvorené cez OtvorOkno (zatvorenie pri zostavovaní klienta nesmie ukončiť Access)
+Private mKoncim As Boolean          ' ukončenie ide cez tlačidlo Koniec
+Private mVRazeni As Boolean        ' práve prebieha razenie z tlačidla: časovač nesmie odoslať práve zapísané razenie ako odložené
 
 '===============================================================================
 ' Čisté funkcie: texty
@@ -91,6 +95,18 @@ Public Function RiadokIdentity(ByVal strOc As String, ByVal strLogin As String, 
     End If
     RiadokIdentity = "Osobné číslo " & strOc & " · účet " & strLogin
     If strZdroj = "CACHE" Then RiadokIdentity = RiadokIdentity & " · z vyrovnávacej pamäte, Active Directory je nedostupné"
+End Function
+
+' Upozornenie pri ukončení klienta s neprázdnou frontou ("" = nič).
+Public Function TextPriKonci(ByVal lPocet As Long) As String
+    If lPocet <= 0 Then Exit Function
+    If lPocet = 1 Then
+        TextPriKonci = "1 razenie čaká na odoslanie, odošle sa pri ďalšom spustení."
+    ElseIf lPocet <= 4 Then
+        TextPriKonci = lPocet & " razenia čakajú na odoslanie, odošlú sa pri ďalšom spustení."
+    Else
+        TextPriKonci = lPocet & " razení čaká na odoslanie, odošlú sa pri ďalšom spustení."
+    End If
 End Function
 
 Public Function NazovPrichodu(ByVal bVPreruseni As Boolean) As String
@@ -366,7 +382,10 @@ Public Function OtvorOkno() As Boolean
     On Error GoTo Chyba
     mKratkyTik = False
     mTikov = 0
+    mKoncim = False
+    mVRazeni = False
     DoCmd.OpenForm FRM_KLIENT
+    mAktivne = True
     Call ObnovKonfiguraciuOkna
     Call ObnovIdentituOkna
     Call ObnovOkno
@@ -403,6 +422,8 @@ Public Function KlientTlacidlo(ByVal strAkcia As String) As Boolean
             strSmer = "OUT"
     End Select
 
+    If mVRazeni Then Exit Function
+    mVRazeni = True
     Call NastavTlacidla(False)
     If kl_05_Razenie.ZapisRazenie(strKod, strSmer, strNazov, strSprava) Then
         Call PokazSpravu(strSprava)
@@ -413,10 +434,12 @@ Public Function KlientTlacidlo(ByVal strAkcia As String) As Boolean
     ElseIf Len(strSprava) > 0 Then
         Call PokazSpravu(strSprava)
     End If
+    mVRazeni = False
     Call PlanujOdblokovanie
     KlientTlacidlo = True
     Exit Function
 Chyba:
+    mVRazeni = False
     Call kl_00_Spolocne.ZapisLog("ERROR", "Tlačidlo " & strAkcia & " skončilo chybou " & Err.Number & ": " & Err.Description)
     Call PokazSpravu("Razenie sa nepodarilo spracovať (chyba " & Err.Number & "). Skontrolujte zoznam Dnes.")
     Call PlanujOdblokovanie
@@ -428,6 +451,7 @@ Public Function KlientTik() As Boolean
     Dim frm As Form
     On Error GoTo Chyba
     If Not JeOtvorene() Then Exit Function
+    If mVRazeni Then Exit Function
     Set frm = Forms(FRM_KLIENT)
     If mKratkyTik Then
         mKratkyTik = False
@@ -448,4 +472,26 @@ Public Function KlientTik() As Boolean
     Exit Function
 Chyba:
     Call kl_00_Spolocne.ZapisLog("ERROR", "Časovač okna skončil chybou " & Err.Number & ": " & Err.Description)
+End Function
+
+' Tlačidlo Koniec: posledný pokus o odoslanie, upozornenie na čakajúce razenia, ukončenie klienta (uvoľní zámok inštancie).
+Public Function KlientKoniec() As Boolean
+    Dim lPocet As Long
+    On Error Resume Next
+    mKoncim = True
+    If Len(kl_03_Fronta.CestaPrijmu()) > 0 Then Call kl_03_Fronta.OdosliCakajuce(True)
+    lPocet = kl_03_Fronta.PocetVoFronte()
+    If lPocet > 0 Then MsgBox TextPriKonci(lPocet), vbInformation, "Dochádzka"
+    Err.Clear
+    Call kl_07_Spustenie.Ukonci
+    KlientKoniec = True
+End Function
+
+' Zatvorenie okna inak než tlačidlom Koniec (napr. Ctrl+F4) ukončí klienta, aby neostal bežať bez okna so zámkom inštancie.
+Public Function KlientZatvorene() As Boolean
+    If Not mAktivne Or mKoncim Then Exit Function
+    mAktivne = False
+    Call kl_00_Spolocne.ZapisLog("WARN", "Okno bolo zatvorené inak než tlačidlom Koniec, klient sa ukončuje.")
+    Call kl_07_Spustenie.Ukonci
+    KlientZatvorene = True
 End Function

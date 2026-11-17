@@ -2,7 +2,7 @@
 
 Spôsob, ako zamestnanci razia príchody, odchody a prerušenia **priamo z Accessu na svojom pracovnom počítači**, bez webového terminálu a bez akéhokoľvek servera mimo organizácie. Je určený pre prostredie, kde sa smie používať len Access a Excel (pokyn č. 19/2015, pozri `docs/` v súkromných poznámkach a odpoveď SOC z 12. 11. 2026): všetko beží v infraštruktúre organizácie.
 
-> **Stav:** návrh a **strana HR** (príjem a prevod razení v Accesse). Samotný klient (okno s tlačidlami na počítači zamestnanca) a jeho inštalátor ešte nie sú. Kód VBA sa nedá spustiť mimo Accessu, preto je všetko **neoverené v skutočnom Accesse**; po každom kroku je v `access/CHANGELOG.md` skúška na kópii databázy.
+> **Stav:** návrh, **strana HR** (príjem a prevod razení v Accesse, balík 2.18.x) a **klient** `DochadzkaKlient.accdb` (okno s tlačidlami, zostavovač a spúšťač, balík klienta 1.0.0 v [`access/klient/`](../access/klient/README.md)). Kód VBA, zostavovač ani spúšťač sa nedali spustiť mimo Accessu, preto je všetko **neoverené v skutočnom Accesse**; skúška na kópii databázy je pri strane HR v `access/CHANGELOG.md` (balík 2.18.0) a pri klientovi v `access/klient/CHANGELOG.md`. Prehľad vlastného mesiaca v klientovi (etapa 3) ešte nie je.
 
 ## Rozhodnutia (12. 11. 2026)
 
@@ -37,6 +37,7 @@ Základ (napr. `\\server\dochadzka`) je v nastavení `KlientPriecinok`.
 |---|---|---|
 | `prijem\` | **vytvárať súbory** (zápis nového súboru), nie čítať cudzie, nie meniť, nie mazať | všetko |
 | `konfiguracia\` | len čítať | zápis (Access HR tam ukladá `klient_konfig.txt`) |
+| `klient\` | len čítať | zápis (správca sem vkladá `DochadzkaKlient.accdb`, `verzia.txt`, `Spusti-Dochadzku.cmd`, `Vytvor-Odkaz.cmd`) |
 | `spracovane\`, `chybne\` | žiadny prístup | všetko |
 
 Typické nastavenie práv je „odkladacia schránka“ (drop box): skupina zamestnancov má na `prijem\` právo *Vytvárať súbory / zapisovať údaje* len pre tento priečinok a nič pre existujúce súbory; vlastníkom nového súboru je ten, kto ho vytvoril. **Neoverené v tomto prostredí**: správca siete má nastavenie vyskúšať na jednom účte (vytvoriť súbor áno, otvoriť, zmeniť, zmazať cudzí nie).
@@ -94,7 +95,7 @@ klient=1.0.0
 ## Etapy
 
 1. **Strana HR (hotové tu, neoverené v Accesse):** protokol, príjem a prevod razení (`mod_22_KlientRazenia`, `mod_19_TerminalImport.PrevedRazeniaKlienta`), konfigurácia pre klienta, referenčný zapisovač a skúšobné súbory (`tools/klient_protokol.py`).
-2. **Klient:** `DochadzkaKlient.accdb` (okno s tlačidlami, identifikácia z AD, lokálny záznam a fronta, zápis `.rzn`) a jeho inštalátor.
+2. **Klient (hotové tu, neoverené v Accesse):** `DochadzkaKlient.accdb` (okno s tlačidlami, identifikácia z AD, lokálny záznam a fronta, zápis `.rzn`), zostavovač `Instaluj-Klienta.ps1` a spúšťač `Spusti-Dochadzku.cmd`; zdroje, postup nasadenia a skúšobný postup sú v [`access/klient/`](../access/klient/README.md). Zamestnanecké počítače nič neinštalujú: správca raz zostaví `.accdb` a vloží ho do `klient\` na serveri, spúšťač si ho berie a aktualizuje.
 3. **Prehľad mesiaca a doladenie:** súbory s odpracovaným časom pre jednotlivých zamestnancov, upozornenia, príručka pre používateľov, snímač SKE a NFC.
 
 ## Skúška na kópii databázy (strana HR)

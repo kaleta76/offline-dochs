@@ -1,0 +1,15 @@
+﻿DOCHSKLIENT;1
+vytvorene=2026-11-15T08:00:00
+odchod_bez_dovodu=OBED
+tlacidlo=1;DOCTOR;Lekár;stethoscope
+tlacidlo=2;TRIP;Služobne;briefcase
+tlacidlo=3;NIECO;Neznámy kód;x
+tlacidlo=4;FAMILY;Tento text je dlhší než dvadsaťštyri znakov;x
+tlacidlo=5;PRIV
+buduci_kluc=hodnota
+riadok bez rovnitka
+tlacidlo=6;DOCTOR;Lekár druhýkrát;x
+tlacidlo=7;ERRAND;Pochôdzka;
+tlacidlo=x;SICK;Choroba;x
+tlacidlo=8;WORK;Práca;x
+#END

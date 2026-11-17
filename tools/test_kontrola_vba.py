@@ -2,6 +2,7 @@
 """Testy kontroly VBA modulov (tools/kontrola_vba.py). Spustenie: python3 -I tools/test_kontrola_vba.py"""
 import importlib.util
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -260,6 +261,37 @@ class Balik(unittest.TestCase):
     def test_moduly_balika_prechadzaju_bez_nalezu(self):
         chyby, _ = kv.skontroluj(os.path.join(os.path.dirname(HERE), "access", "moduly"))
         self.assertEqual([str(c) for c in chyby], [])
+
+
+    def test_moduly_klienta_prechadzaju_bez_nalezu(self):
+        """Druhý balík (klient na razenie, access/klient/moduly) cez parameter --adresar."""
+        klient = os.path.join(os.path.dirname(HERE), "access", "klient", "moduly")
+        chyby, _ = kv.skontroluj(klient)
+        self.assertEqual([str(c) for c in chyby], [])
+        self.assertTrue(any(f.endswith(".bas") for f in os.listdir(klient)))
+
+    def test_klient_nezavisi_od_modulov_hr(self):
+        """Klient je samostatná databáza: žiadny jeho modul nevolá mod_NN_... (lint by to v samostatnom adresári hlásil ako chybu)."""
+        klient = os.path.join(os.path.dirname(HERE), "access", "klient", "moduly")
+        for f in sorted(os.listdir(klient)):
+            with open(os.path.join(klient, f), encoding="utf-8") as h:
+                kod = "\n".join(r for r in h.read().split("\n") if not r.lstrip().startswith("'"))
+            self.assertIsNone(re.search(r"\bmod_[0-9A-Za-z_]+\.", kod), f)
+
+    def test_parameter_adresar(self):
+        import contextlib, io, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "kl_99_Zly.bas"), "w", encoding="utf-8", newline="\n") as h:
+                h.write('Attribute VB_Name = "kl_99_Zly"\n\'@Verzia 1.0.0\nOption Compare Database\nOption Explicit\n\nPublic Sub Zly()\n    x = 1\nEnd Sub\n')
+            vystup = io.StringIO()
+            with contextlib.redirect_stdout(vystup):
+                kod = kv.main(["--adresar", d])
+            self.assertEqual(kod, 1)
+            self.assertIn("kl_99_Zly", vystup.getvalue())
+            with open(os.path.join(d, "kl_99_Zly.bas"), "w", encoding="utf-8", newline="\n") as h:
+                h.write('Attribute VB_Name = "kl_99_Zly"\n\'@Verzia 1.0.0\nOption Compare Database\nOption Explicit\n\nPublic Sub Zly()\n    Dim x As Long\n    x = 1\nEnd Sub\n')
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(kv.main(["--adresar", d]), 0)
 
 
 if __name__ == "__main__":

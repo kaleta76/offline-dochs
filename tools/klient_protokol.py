@@ -215,6 +215,162 @@ def zle_vzory():
     ]
 
 
+# ---------------------------------------------------------------- zrkadlo čistých funkcií klienta (access/klient/moduly)
+# Klient v Accesse (kl_03_Fronta, kl_05_Razenie, kl_04_Konfig) má tie isté pravidlá vo VBA; zhodu overuje
+# tools/test_klient_zhoda.py na vektoroch zo samotestu klienta (kl_08_Samotest).
+CHYBY_NEDOSTUPNY = (52, 53, 57, 67, 68, 71, 75, 76)
+PRAH_NEUSPECHOV = 5
+
+
+def vysledok_odoslania(cislo_chyby):
+    """Výsledok pokusu o vytvorenie súboru na serveri podľa čísla chyby VBA (kl_03_Fronta.VysledokOdoslania)."""
+    if cislo_chyby == 0:
+        return "DORUCENE"
+    if cislo_chyby == 58:
+        return "EXISTUJE"      # súbor s naším id už na serveri je: doručené skôr
+    if cislo_chyby in CHYBY_NEDOSTUPNY:
+        return "NEDOSTUPNY"    # cesta, sieť alebo zariadenie: ostáva vo fronte, ďalší pokus o minútu
+    if cislo_chyby == 70:
+        return "PRISTUP"       # práva alebo existujúci súbor (nejasné): ostáva vo fronte
+    return "INA"
+
+
+def novy_pocet_neuspechov(doteraz, vysledok):
+    """Počítadlo po sebe idúcich neúspechov (kl_03_Fronta.NovyPocetNeuspechov); od PRAH_NEUSPECHOV okno upozorní."""
+    if vysledok in ("DORUCENE", "EXISTUJE"):
+        return 0
+    if vysledok in ("PRISTUP", "INA"):
+        return doteraz + 1
+    return doteraz
+
+
+HLAVICKA_KONFIGU = "DOCHSKLIENT;1"
+KODY_TLACIDIEL = tuple(k for k in KODY if k != "WORK")
+MAX_TLACIDIEL = 12
+MAX_TEXT_TLACIDLA = 24
+
+
+def rozober_konfig(obsah):
+    """Rozbor konfiguracia\\klient_konfig.txt (kl_04_Konfig.RozoberKonfig). `obsah` sú bajty UTF-8 (BOM sa toleruje) alebo text.
+
+    Vráti slovník: tlacidla = zoznam (kod, text) v poradí súboru (najviac MAX_TLACIDIEL), odchod_bez_dovodu = OBED alebo ODCHOD,
+    vytvorene = text hodnoty (alebo ""), preskocene = čísla chybných riadkov (od 1). Vráti None, ak súbor nie je konfigurácia
+    (prvý riadok nie je presne DOCHSKLIENT;1 alebo posledný neprázdny riadok nie je presne #END).
+    Pravidlá: riadky CRLF aj LF; riadok sa orezáva len o medzery; prázdny riadok sa ignoruje; riadok bez "=" sa preskočí;
+    neznámy kľúč sa ignoruje; tlacidlo=poradie;KOD;text;ikona musí mať presne 4 polia, poradie 1 až 4 číslice, KOD zo zoznamu
+    prerušení (nie WORK; ten istý kód môže mať viac tlačidiel), text 1 až 24 znakov bez riadiacich znakov; ikona sa ignoruje.
+    Chybný riadok sa preskočí a konfigurácia platí ďalej; tlačidlá nad MAX_TLACIDIEL sa zahodia (nie sú chybné).
+    """
+    if isinstance(obsah, bytes):
+        if obsah.startswith(b"\xef\xbb\xbf"):
+            obsah = obsah[3:]
+        obsah = obsah.decode("utf-8", errors="replace")
+    elif obsah.startswith("\ufeff"):
+        obsah = obsah[1:]
+    riadky = obsah.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    n = len(riadky)
+    while n > 0 and riadky[n - 1].strip(" ") == "":
+        n -= 1
+    if n < 2 or riadky[0] != HLAVICKA_KONFIGU or riadky[n - 1] != KONIEC:
+        return None
+    tlacidla, preskocene, odchod, vytvorene = [], [], "OBED", ""
+    for i in range(1, n - 1):
+        r = riadky[i].strip(" ")
+        if r == "":
+            continue
+        if "=" not in r:
+            preskocene.append(i + 1)
+            continue
+        kluc, _, hodnota = r.partition("=")
+        kluc, hodnota = kluc.strip(" "), hodnota.strip(" ")
+        if kluc == "vytvorene":
+            vytvorene = hodnota
+        elif kluc == "odchod_bez_dovodu":
+            if hodnota in ("OBED", "ODCHOD"):
+                odchod = hodnota
+            else:
+                preskocene.append(i + 1)
+        elif kluc == "tlacidlo":
+            polia = hodnota.split(";")
+            text = polia[2].strip(" ") if len(polia) == 4 else ""
+            if (len(polia) != 4 or not re.match(r"^[0-9]{1,4}$", polia[0].strip(" ")) or polia[1].strip(" ") not in KODY_TLACIDIEL
+                    or not 1 <= len(text) <= MAX_TEXT_TLACIDLA or any(ord(z) < 32 for z in text)):
+                preskocene.append(i + 1)
+            else:
+                tlacidla.append((polia[1].strip(" "), text))
+    return {"tlacidla": tlacidla[:MAX_TLACIDIEL], "odchod_bez_dovodu": odchod, "vytvorene": vytvorene, "preskocene": preskocene}
+
+
+def _razenia_dna(razenia):
+    """Platné položky (utc, cas, kod, smer) ako texty; neplatné sa ignorujú (rovnako ako kl_05_Razenie)."""
+    platne = []
+    for polozka in razenia:
+        if len(polozka) != 4:
+            continue
+        utc, cas, kod, smer = polozka
+        try:
+            if _cas(utc, "utc").year < 1900 or _cas(cas, "cas").year < 1900:
+                continue
+        except ChybaRazenia:
+            continue
+        if kod in KODY and smer in SMERY:
+            platne.append((utc, cas, kod, smer))
+    return platne
+
+
+def _posledne(platne):
+    """Razenie s najväčším utc; pri zhode vyhráva neskoršie v zozname."""
+    posledne = None
+    for r in platne:
+        if posledne is None or r[0] >= posledne[0]:
+            posledne = r
+    return posledne
+
+
+def stav_dna(razenia):
+    """Stav dňa z dnešných razení (kl_05_Razenie.StavDna). `razenia` je zoznam (utc, cas, kod, smer), časy RRRR-MM-DDTHH:MM:SS.
+
+    ZIADNE | PRACA;hh:mm (posledné je IN) | MIMO;hh:mm (posledné WORK/OUT) | PRERUSENIE;KOD;hh:mm (posledné X/OUT). Čas je miestny.
+    """
+    p = _posledne(_razenia_dna(razenia))
+    if p is None:
+        return "ZIADNE"
+    hm = p[1][11:16]
+    if p[3] == "IN":
+        return "PRACA;" + hm
+    if p[2] == "WORK":
+        return "MIMO;" + hm
+    return "PRERUSENIE;" + p[2] + ";" + hm
+
+
+def popis_stavu(stav, nazov_prerusenia=""):
+    """Text stavu dňa pre okno (kl_05_Razenie.PopisStavu)."""
+    casti = stav.split(";")
+    if casti[0] == "PRACA" and len(casti) == 2:
+        return "V práci od " + casti[1]
+    if casti[0] == "MIMO" and len(casti) == 2:
+        return "Mimo práce od " + casti[1]
+    if casti[0] == "PRERUSENIE" and len(casti) == 3:
+        return "Prerušenie: " + (nazov_prerusenia or casti[1]) + " od " + casti[2]
+    return "Dnes ešte bez razenia"
+
+
+def otazka_pred_razenim(razenia, kod, smer, utc_teraz):
+    """Na čo sa klient pred razením len opýta (kl_05_Razenie.OtazkaPredRazenim); razenie nikdy nezakáže.
+
+    OPAKOVANE: rovnaký kód a smer ako posledné razenie a menej než 120 s od neho. BEZ_PRICHODU: odchod (WORK/OUT) a v dnešných
+    razeniach nie je žiadny príchod (smer IN). Inak "".
+    """
+    platne = _razenia_dna(razenia)
+    p = _posledne(platne)
+    if p is not None and p[2] == kod and p[3] == smer:
+        if abs(int((_cas(utc_teraz, "utc") - _cas(p[0], "utc")).total_seconds())) < 120:
+            return "OPAKOVANE"
+    if kod == "WORK" and smer == "OUT" and not any(r[3] == "IN" for r in platne):
+        return "BEZ_PRICHODU"
+    return ""
+
+
 def _vypis(text):
     print(text)
 

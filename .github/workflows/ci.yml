@@ -54,6 +54,8 @@ jobs:
         run: python3 -I tools/over_access_balik.py
       - name: Testy kontroly balíka Access
         run: python3 -I tools/test_over_access_balik.py
+      - name: Kontrola balíka klienta na razenie (access/klient, kontrolné súčty modulov, verzie, zakázané súbory)
+        run: python3 -I tools/over_access_balik.py --koren access/klient
       - name: Kontrola VBA modulov (zatienenie funkcií, nedeklarované premenné, bloky, volania medzi modulmi)
         run: python3 -I tools/kontrola_vba.py
       - name: Kontrola VBA modulov klienta na razenie (access/klient)

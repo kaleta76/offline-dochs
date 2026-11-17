@@ -60,28 +60,28 @@ Táto kópia **nie je pracovný súbor**. Má nové údaje (vymyslené), nemá m
 
 ## 5. Ukážka v súbore
 
-September 2026, vymyslené údaje: 18 dní s príchodom a odchodom, jedna priepustka (17. 9., 10:00 až 11:15), dovolenka celý deň 21. a 22. 9., pol dňa 25. 9. (príchod 7:30, odchod 11:15, dovolenka 3:45).
+September 2026, vymyslené údaje: 20 dní s príchodom a odchodom, jedna priepustka (17. 9., 10:00 až 11:15), dovolenka celý deň 21. a 22. 9., pol dňa 25. 9. (príchod 7:30, odchod 11:15, dovolenka 3:45).
 
 | Veličina | Hodnota |
 |---|---|
-| odpracované (`F41`) | 130:40 |
+| odpracované (`F41`) | 145:40 |
 | priepustky (`L`) | 1:15 |
 | dovolenka (`O`) | 18:45 |
-| započítané hodiny (`F43`) | 150:40 |
-| pracovný fond (`F46`) | 150:00 (20 dní) |
+| započítané hodiny (`F43`) | 165:40 |
+| pracovný fond (`F46`) | 165:00 (22 dní) |
 | **saldo (`F47`)** | **+0:40** |
-| týždenné súčty (`Q`) | 22:15, 37:25, 28:30, 38:30 |
+| týždenné súčty (`Q`) | 29:45, 37:25, 36:00, 38:30 |
 
 Overenie: výsledok sa nezávisle prepočítal v Pythone, súbor sa prepočítal v LibreOffice a vytlačil sa v skutočnom Exceli (obrázok vyššie). Tabuľka Veľkej noci (roky 2000 až 2041, 42 riadkov) sa porovnala s nezávislým výpočtom: 0 rozdielov.
 
-**Pozor na sviatky v ukážke.** Zoznam sviatkov v zošite berie 1. 9. a 15. 9. ako sviatky (pracovný fond septembra je preto o dva dni kratší). Podľa zákona č. 241/1993 Z. z. (informatívne znenie od 29. 10. 2026, [slov-lex](https://static.slov-lex.sk/static/SK/ZZ/1993/241/20261029.html)) 1. 9. nie je dňom pracovného pokoja a v roku 2026 podľa § 4b nie sú dňami pracovného pokoja ani 8. 5. a 15. 9. Čísla v ukážke preto platia pre Excel tak, ako je, nie pre zákon: pri 22 pracovných dňoch by fond bol 165:00.
+**Sviatky v tejto kópii.** Pôvodná šablóna je z roku 2024 a v jej zozname sviatkov (skrytý hárok `sviatky`) boli aj 1. 9., 8. 5. a 15. 9. Podľa zákona č. 241/1993 Z. z. (informatívne znenie od 29. 10. 2026, [slov-lex](https://static.slov-lex.sk/static/SK/ZZ/1993/241/20261029.html)) 1. 9. nie je dňom pracovného pokoja a v roku 2026 podľa § 4b nie sú dňami pracovného pokoja ani 8. 5. a 15. 9. Preto sú tieto tri riadky v tejto kópii z hárka `sviatky` odstránené: september 2026 má 22 pracovných dní a fond 165:00. Výnimka v § 4b platí len pre rok 2026, pre ďalšie roky treba zoznam skontrolovať (obmedzenie 4).
 
 ## 6. Obmedzenia
 
 1. **Ručný prepis.** Excel nenačíta údaje z papiera, Accessu ani terminála. Chybný prepis dá chybný výsledok; značka M len upozorní, že čas nie je aktuálny čas, nepotvrdzuje správnosť.
 2. **Jeden súbor = jeden zamestnanec a jeden rok.** Nie je prehľad tímu, nie sú zostavy a nie je import ani export do HR Accessu alebo terminála.
 3. **Pravidlá sú vo vzorcoch a skrytých hárkoch** (norma 7:30, obed 0:30, limity 8:00 a 14:30, sviatky). Zmena pravidla sa musí urobiť v každom súbore zvlášť.
-4. **Zoznam sviatkov je pevný** (hárok `sviatky`, dátumy sa skladajú s rokom). Veľká noc sa počíta, ostatné dátumy nie. Pri zmene zákona (pozri vyššie) alebo pri sviatku, ktorý nie je dňom pracovného pokoja, treba zoznam upraviť ručne a skontrolovať každý rok.
+4. **Zoznam sviatkov je pevný** (hárok `sviatky`, dátumy sa skladajú s rokom). Veľká noc sa počíta, ostatné dátumy nie. Pri zmene zákona alebo pri sviatku, ktorý nie je dňom pracovného pokoja, treba zoznam upraviť ručne a skontrolovať každý rok. Hárok sa odkryje cez pravý klik na kartu ľubovoľného hárka, Odkryť. Riadok sviatku má v `C` deň, v `D` mesiac, v `B` názov a v `A` vzorec, napríklad v riadku 12 `=DATE(február!$P$1,D12,C12)`. Vymazanie riadka (A až D) sviatok vyradí, doplnenie ho vráti; hárok sa číta z buniek `A7:A30`.
 5. **Rok sa berie z názvu súboru** (za prvým `_`). Ak v názve nie je rok, použije sa rok z hodín počítača a v januári sa výkaz prepočíta na nový rok. Funkcia `CELL("filename")` potrebuje uložený súbor.
 6. **Priepustka v lete.** Horná hranica (bunka `K5`) sa v júli a auguste prepína na 13:00. Dolná hranica (`J5`) odkazuje na `O2` (text „Mesiac:“) namiesto `P2` (číslo mesiaca), takže letná dolná hranica 8:00 sa nepoužije. Týka sa len júla a augusta, nebolo to overované s údajmi.
 7. **Týždenné zvýraznenie** pod 37:30 je len v prvom týždni mesiaca (bunky `Q10:Q14`).

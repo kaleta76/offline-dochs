@@ -102,6 +102,7 @@ CI na GitHube (`.github/workflows/ci.yml`) spúšťa po každom PR a pushi do `m
 | [`docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md`](docs/ZRUSENIE-TESTOVACEJ-ORGANIZACIE.md) | označenie a zrušenie testovacej organizácie správcom, ručné zrušenie |
 | [`docs/PRENOS-ORGANIZACIE.md`](docs/PRENOS-ORGANIZACIE.md) | prenos celej organizácie na iný server: export po stránkach, zámok razení, kód potvrdenia, zrušenie pôvodnej organizácie (migrácia 0016), import tlačidlom na cieľovom serveri (migrácia 0017), razenia, ktoré ostali v zariadení po presťahovaní (migrácia 0019), vlastná správa a oznam o zrušení bez presunu (migrácia 0020), kontrola zmien od exportu bez párovacích kódov zariadení (migrácia 0021) |
 | [`access/README.md`](access/README.md), [`access/CHANGELOG.md`](access/CHANGELOG.md) | inštalácia a zmeny dochádzkového systému v Accesse |
+| [`docs/excel-saldo/README.md`](docs/excel-saldo/README.md) | Excel na saldo popri dochádzkovom zošite: očistená testovacia kópia (bez makier a metadát), použitie, pravidlá výpočtu, obmedzenia, doplnenie makra |
 | [`roadmap.md`](roadmap.md) | hotové a otvorené úlohy |
 
 ## Stav a čo nie je overené

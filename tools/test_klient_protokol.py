@@ -189,5 +189,62 @@ class Vzorky(unittest.TestCase):
             self.assertEqual(kp.main(["over", os.path.join(d, "neexistuje.rzn")]), 1)
 
 
+class KonfiguraciaKlienta(unittest.TestCase):
+    """rozober_konfig: konfiguracia\\klient_konfig.txt, ktorú číta klient v Accesse (access/klient)."""
+
+    VZOR = os.path.join(TU, "..", "access", "klient", "testy", "klient_konfig_vzor.txt")
+
+    def test_vzor(self):
+        with open(self.VZOR, "rb") as f:
+            k = kp.rozober_konfig(f.read())
+        self.assertEqual(k["tlacidla"], [("DOCTOR", "Lekár"), ("TRIP", "Služobne"), ("DOCTOR", "Lekár druhýkrát"), ("ERRAND", "Pochôdzka")])
+        self.assertEqual(k["odchod_bez_dovodu"], "OBED")
+        self.assertEqual(k["vytvorene"], "2026-11-15T08:00:00")
+        self.assertEqual(k["preskocene"], [6, 7, 8, 10, 13, 14])
+
+    def test_nie_je_konfiguracia(self):
+        for zly in ("", "DOCHSKLIENT;1", "DOCHSKLIENT;1\n", "DOCHSKLIENT;2\n#END\n", " DOCHSKLIENT;1\n#END\n", "DOCHSKLIENT;1\ntlacidlo=1;DOCTOR;A;\n",
+                    "DOCHSKLIENT;1\n#END \n", "#END\nDOCHSKLIENT;1\n"):
+            self.assertIsNone(kp.rozober_konfig(zly), repr(zly))
+
+    def test_bom_a_konce_riadkov(self):
+        text = "DOCHSKLIENT;1\nodchod_bez_dovodu=ODCHOD\ntlacidlo=1;SICK;PN;\n#END\n"
+        ocakavane = {"tlacidla": [("SICK", "PN")], "odchod_bez_dovodu": "ODCHOD", "vytvorene": "", "preskocene": []}
+        for obsah in (text, text.replace("\n", "\r\n"), text.encode("utf-8"), b"\xef\xbb\xbf" + text.replace("\n", "\r\n").encode("utf-8"), "\ufeff" + text):
+            self.assertEqual(kp.rozober_konfig(obsah), ocakavane)
+
+    def test_chybny_riadok_nezhodi_konfiguraciu(self):
+        k = kp.rozober_konfig("DOCHSKLIENT;1\ntlacidlo=1;DOCTOR;\ntlacidlo=2;TRIP;Cesta;x;navyse\ntlacidlo=3;PRIV;S\tT;\ntlacidlo=4;PRIV;Súkromne;\n#END\n")
+        self.assertEqual(k["tlacidla"], [("PRIV", "Súkromne")])
+        self.assertEqual(k["preskocene"], [2, 3, 4])
+
+    def test_najviac_dvanast(self):
+        k = kp.rozober_konfig("DOCHSKLIENT;1\n" + "".join("tlacidlo=%d;TRIP;T%d;\n" % (i, i) for i in range(1, 20)) + "#END\n")
+        self.assertEqual(len(k["tlacidla"]), kp.MAX_TLACIDIEL)
+        self.assertEqual(k["tlacidla"][-1], ("TRIP", "T12"))
+        self.assertEqual(k["preskocene"], [])
+
+    def test_work_nie_je_tlacidlo(self):
+        self.assertNotIn("WORK", kp.KODY_TLACIDIEL)
+        self.assertEqual(set(kp.KODY_TLACIDIEL) | {"WORK"}, set(kp.KODY))
+
+
+class OdoslanieKlienta(unittest.TestCase):
+    def test_mapovanie(self):
+        self.assertEqual(kp.vysledok_odoslania(0), "DORUCENE")
+        self.assertEqual(kp.vysledok_odoslania(58), "EXISTUJE")
+        self.assertEqual({kp.vysledok_odoslania(c) for c in (52, 53, 57, 67, 68, 71, 75, 76)}, {"NEDOSTUPNY"})
+        self.assertEqual(kp.vysledok_odoslania(70), "PRISTUP")
+        self.assertEqual({kp.vysledok_odoslania(c) for c in (5, 61, 62, -2147024891)}, {"INA"})
+
+    def test_pocitadlo(self):
+        n = 0
+        for v in ("PRISTUP", "INA", "NEDOSTUPNY", "PRISTUP", "INA", "PRISTUP"):
+            n = kp.novy_pocet_neuspechov(n, v)
+        self.assertEqual(n, kp.PRAH_NEUSPECHOV)
+        self.assertEqual(kp.novy_pocet_neuspechov(n, "EXISTUJE"), 0)
+        self.assertEqual(kp.novy_pocet_neuspechov(n, "DORUCENE"), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

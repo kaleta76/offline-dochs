@@ -1,0 +1,62 @@
+{
+  "balik": "1.0.0",
+  "vytvorene": "2026-11-17 06:45:32",
+  "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
+  "zrusene": [],
+  "moduly": {
+    "kl_00_Spolocne": {
+      "subor": "moduly/kl_00_Spolocne.bas",
+      "verzia": "1.0.0",
+      "sha256": "4ddf95bc5e32f8471b2c66ecb4819eb9ee8623c046dd097426d1c749a17e7b25",
+      "obsah_sha256": "96b7203024a05475ceec2ac1c55925796d5d26200e19d9763d8bf76c4bcc1f9d"
+    },
+    "kl_01_Identita": {
+      "subor": "moduly/kl_01_Identita.bas",
+      "verzia": "1.0.0",
+      "sha256": "f4d534bd56ce1b2de3f54d6284b7fb3a332b055e8bc16206f76f24f104386668",
+      "obsah_sha256": "e337a8f3cab20305592528f3a99065772d73063510cbf46023a1ec958543eca8"
+    },
+    "kl_02_Protokol": {
+      "subor": "moduly/kl_02_Protokol.bas",
+      "verzia": "1.0.0",
+      "sha256": "a694aee44d02c06aae0a2b99b9d49cf1e5f7ffba3c3e8bf449151f7f7753b8ee",
+      "obsah_sha256": "e9a8dbe9f0202a2c2630e7610f309968bb16d14a56f1e4afb2f8791779ea3edf"
+    },
+    "kl_03_Fronta": {
+      "subor": "moduly/kl_03_Fronta.bas",
+      "verzia": "1.0.0",
+      "sha256": "713226c44e1fbed7754b967779df58f667ac218322b90dd0e1ee23c818f41f2f",
+      "obsah_sha256": "d7b7e0adfe92969420e45e85f1f756183041355fc342fce6487e2c4d6995294e"
+    },
+    "kl_04_Konfig": {
+      "subor": "moduly/kl_04_Konfig.bas",
+      "verzia": "1.0.0",
+      "sha256": "f42eb231ad374a5129cc09b96b37395570799aaa8a99da51a2825e4deb2c8e62",
+      "obsah_sha256": "555b4cbedfa7aa83260a100348193dc22d89c5b2c4296fcb0053e1ada453211a"
+    },
+    "kl_05_Razenie": {
+      "subor": "moduly/kl_05_Razenie.bas",
+      "verzia": "1.0.0",
+      "sha256": "6cb7ce71da46d6d0c9a72fa35cd3057c744fe84f18a9310c0c37621d07be3cb7",
+      "obsah_sha256": "f022e85c47efcf0ee8ce12d9d2a124e7beb979b942b0467974be53a8bc765eca"
+    },
+    "kl_06_Okno": {
+      "subor": "moduly/kl_06_Okno.bas",
+      "verzia": "1.0.0",
+      "sha256": "b3e7e348c0324da101c4178c6d3712d7194714fe316245a898894b0c59fbeb24",
+      "obsah_sha256": "6ac0a83390bdd4af5336a8e466a716dab265ed10cbb4fa6d7cc09041e9b86228"
+    },
+    "kl_07_Spustenie": {
+      "subor": "moduly/kl_07_Spustenie.bas",
+      "verzia": "1.0.0",
+      "sha256": "20945ac21b026338401f623bce5e1f044be368e16496a252acf40d6c3313ba40",
+      "obsah_sha256": "6a3d47d9a7cb09428d08d2ad758c359dad418ba32dfa6de5ead5066770b4e171"
+    },
+    "kl_08_Samotest": {
+      "subor": "moduly/kl_08_Samotest.bas",
+      "verzia": "1.0.0",
+      "sha256": "5c8348849e814000e68caf09228b1dc5f413bcd122ae08c4953cba14241c8fef",
+      "obsah_sha256": "891fe02078130b18e8c3cc135a86d69f165de33d4e6faf5e1a98cedac6b8e704"
+    }
+  }
+}

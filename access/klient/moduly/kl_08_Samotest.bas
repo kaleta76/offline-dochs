@@ -336,6 +336,28 @@ Private Sub TestProtokolu()
     Call Zaznam(kl_02_Protokol.NazovSuboru(DateSerial(2026, 11, 3) + TimeSerial(7, 31, 12), "00000000-0000-0000-0000-00000000000A") = "20261103-073112_00000000-0000-0000-0000-00000000000A.rzn", "názov súboru má tvar RRRRMMDD-HHMMSS_<id>.rzn")
 End Sub
 
+' Texty okna (kl_06_Okno): čisté funkcie bez prístupu k formuláru.
+Private Sub TestOkna()
+    Call Pis("--- okno: texty")
+    Call Zaznam(kl_06_Okno.TextTlacidlaPreOkno("Lekár & ošetrenie") = "Lekár && ošetrenie", "znak & v texte tlačidla sa zdvojí")
+    Call Zaznam(kl_06_Okno.TextCakajucich(0, True) = "Čaká na odoslanie: 0", "bez čakajúcich sa server nespomína")
+    Call Zaznam(kl_06_Okno.TextCakajucich(3, True) = "Čaká na odoslanie: 3 (server nedostupný)", "čakajúce a server nedostupný")
+    Call Zaznam(kl_06_Okno.TextCakajucich(3, False) = "Čaká na odoslanie: 3", "čakajúce, server dostupný")
+    Call Zaznam(Len(kl_06_Okno.TextUpozornenia(False, 0)) = 0 And Len(kl_06_Okno.TextUpozornenia(False, 1)) = 0, "bez upozornenia do 1 dňa čakania")
+    Call Zaznam(kl_06_Okno.TextUpozornenia(False, 2) = "Razenie čaká už 2 dni, HR ho nemusí prijať.", "upozornenie od 2 dní (2 dni)")
+    Call Zaznam(kl_06_Okno.TextUpozornenia(False, 5) = "Razenie čaká už 5 dní, HR ho nemusí prijať.", "upozornenie od 2 dní (5 dní)")
+    Call Zaznam(Left$(kl_06_Okno.TextUpozornenia(True, 4), 20) = "Problém s právami na", "problém s právami má prednosť")
+    Call Zaznam(kl_06_Okno.DruhSpravy("") = "" And kl_06_Okno.DruhSpravy("Zapísané a odoslané 07:31") = "OK", "druh správy: prázdna a odoslané")
+    Call Zaznam(kl_06_Okno.DruhSpravy("Zapísané 07:31 (server nedostupný)") = "CAKA" And kl_06_Okno.DruhSpravy("Razenie sa nezapísalo") = "CHYBA", "druh správy: čaká a chyba")
+    Call Zaznam(kl_06_Okno.RiadokIdentity("", "", "") = "Osobné číslo: nezistené", "identita: nezistená")
+    Call Zaznam(kl_06_Okno.RiadokIdentity("9000001", "test.zam1", "AD") = "Osobné číslo 9000001 · účet test.zam1", "identita: z Active Directory")
+    Call Zaznam(InStr(kl_06_Okno.RiadokIdentity("9000001", "test.zam1", "CACHE"), "vyrovnávacej pamäte") > 0, "identita: z vyrovnávacej pamäte sa označí")
+    Call Zaznam(kl_06_Okno.NazovPrichodu(False) = "Príchod" And kl_06_Okno.NazovPrichodu(True) = "Návrat do práce", "názov tlačidla Príchod")
+    Call Zaznam(kl_06_Okno.PomocnyTextOdchodu("OBED") <> kl_06_Okno.PomocnyTextOdchodu("ODCHOD"), "pomocný text odchodu podľa konfigurácie")
+    Call Zaznam(Left$(kl_06_Okno.RiadokDnes("07:31", "Príchod", True), 10) = "07:31   Pr" And Right$(kl_06_Okno.RiadokDnes("07:31", "Príchod", True), 8) = "odoslané", "riadok Dnes: odoslané")
+    Call Zaznam(Right$(kl_06_Okno.RiadokDnes("14:36", "Odchod", False), 17) = "čaká na odoslanie", "riadok Dnes: čaká")
+End Sub
+
 '===============================================================================
 ' Hlavný vstup. Vráti počet ZLE.
 '===============================================================================
@@ -350,6 +372,7 @@ Public Function SamoTestKlienta() As Long
     Call TestIdentity
     Call TestKonfigu
     Call TestStavuDna
+    Call TestOkna
     Call TestProstredia
 Koniec:
     Call Pis("SÚHRN: OK " & mOk & ", ZLE " & mZle)

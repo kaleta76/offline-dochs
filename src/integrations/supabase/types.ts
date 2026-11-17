@@ -44,57 +44,6 @@ export type Database = {
         }
         Relationships: []
       }
-      access_config: {
-        Row: {
-          config: Json
-          config_version: string
-          employee_months_count: number
-          employees_count: number
-          imported_at: string
-          imported_by: string | null
-          organization_id: string
-          period_from: string
-          period_to: string
-        }
-        Insert: {
-          config: Json
-          config_version: string
-          employee_months_count: number
-          employees_count: number
-          imported_at?: string
-          imported_by?: string | null
-          organization_id: string
-          period_from: string
-          period_to: string
-        }
-        Update: {
-          config?: Json
-          config_version?: string
-          employee_months_count?: number
-          employees_count?: number
-          imported_at?: string
-          imported_by?: string | null
-          organization_id?: string
-          period_from?: string
-          period_to?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "access_config_imported_by_fkey"
-            columns: ["imported_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "access_config_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: true
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       audit_log: {
         Row: {
           action: string
@@ -316,6 +265,7 @@ export type Database = {
           personnel_number: string
           regime_ids: number[] | null
           template_id: number
+          version_id: string
           window_end_min: number | null
           window_start_min: number | null
         }
@@ -331,6 +281,7 @@ export type Database = {
           personnel_number: string
           regime_ids?: number[] | null
           template_id: number
+          version_id: string
           window_end_min?: number | null
           window_start_min?: number | null
         }
@@ -346,6 +297,7 @@ export type Database = {
           personnel_number?: string
           regime_ids?: number[] | null
           template_id?: number
+          version_id?: string
           window_end_min?: number | null
           window_start_min?: number | null
         }
@@ -356,6 +308,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_month_plan_version_fk"
+            columns: ["organization_id", "version_id"]
+            isOneToOne: false
+            referencedRelation: "settings_versions"
+            referencedColumns: ["organization_id", "id"]
           },
         ]
       }
@@ -373,6 +332,70 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      month_closure_snapshots: {
+        Row: {
+          created_at: string
+          daily_fund: number | null
+          last_record_hash: string | null
+          month: number
+          organization_id: string
+          punches_count: number
+          result: Json | null
+          result_at: string | null
+          settings_version_id: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          daily_fund?: number | null
+          last_record_hash?: string | null
+          month: number
+          organization_id: string
+          punches_count?: number
+          result?: Json | null
+          result_at?: string | null
+          settings_version_id: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          daily_fund?: number | null
+          last_record_hash?: string | null
+          month?: number
+          organization_id?: string
+          punches_count?: number
+          result?: Json | null
+          result_at?: string | null
+          settings_version_id?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "month_closure_snapshots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "month_closure_snapshots_organization_id_settings_version_i_fkey"
+            columns: ["organization_id", "settings_version_id"]
+            isOneToOne: false
+            referencedRelation: "settings_versions"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "month_closure_snapshots_user_id_year_month_fkey"
+            columns: ["user_id", "year", "month"]
+            isOneToOne: true
+            referencedRelation: "month_closures"
+            referencedColumns: ["user_id", "year", "month"]
+          },
+        ]
       }
       month_closures: {
         Row: {
@@ -803,6 +826,65 @@ export type Database = {
         }
         Relationships: []
       }
+      settings_versions: {
+        Row: {
+          config: Json
+          config_version: string | null
+          created_at: string
+          created_by: string | null
+          employee_months_count: number | null
+          employees_count: number | null
+          id: string
+          ord: number
+          organization_id: string
+          origin: string
+          period_from: string | null
+          period_to: string | null
+          reason: string
+          valid_from: string | null
+        }
+        Insert: {
+          config: Json
+          config_version?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_months_count?: number | null
+          employees_count?: number | null
+          id?: string
+          ord: number
+          organization_id: string
+          origin: string
+          period_from?: string | null
+          period_to?: string | null
+          reason: string
+          valid_from?: string | null
+        }
+        Update: {
+          config?: Json
+          config_version?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_months_count?: number | null
+          employees_count?: number | null
+          id?: string
+          ord?: number
+          organization_id?: string
+          origin?: string
+          period_from?: string | null
+          period_to?: string | null
+          reason?: string
+          valid_from?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settings_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -823,7 +905,50 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      access_config: {
+        Row: {
+          config: Json | null
+          config_version: string | null
+          employee_months_count: number | null
+          employees_count: number | null
+          imported_at: string | null
+          imported_by: string | null
+          organization_id: string | null
+          period_from: string | null
+          period_to: string | null
+        }
+        Insert: {
+          config?: Json | null
+          config_version?: string | null
+          employee_months_count?: number | null
+          employees_count?: number | null
+          imported_at?: string | null
+          imported_by?: string | null
+          organization_id?: string | null
+          period_from?: string | null
+          period_to?: string | null
+        }
+        Update: {
+          config?: Json | null
+          config_version?: string | null
+          employee_months_count?: number | null
+          employees_count?: number | null
+          imported_at?: string | null
+          imported_by?: string | null
+          organization_id?: string | null
+          period_from?: string | null
+          period_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settings_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       approve_device: {
@@ -844,6 +969,10 @@ export type Database = {
       can_see: { Args: { _emp: string }; Returns: boolean }
       can_see_personnel: { Args: { _pn: string }; Returns: boolean }
       claim_recovery_code: { Args: { _token_hash: string }; Returns: string }
+      close_month: {
+        Args: { _month: number; _result?: Json; _user: string; _year: number }
+        Returns: undefined
+      }
       confirm_unverified_punch: {
         Args: { _punch_id: number }
         Returns: undefined
@@ -884,6 +1013,19 @@ export type Database = {
       late_punches_import: {
         Args: { _dry_run?: boolean; _payload: Json }
         Returns: Json
+      }
+      month_closure_store_result: {
+        Args: { _month: number; _result: Json; _user: string; _year: number }
+        Returns: undefined
+      }
+      month_plan: { Args: { _month?: string; _user?: string }; Returns: Json }
+      month_punch_fingerprint: {
+        Args: { _month: number; _user: string; _year: number }
+        Returns: Record<string, unknown>
+      }
+      month_result_problem: {
+        Args: { _month: number; _result: Json; _year: number }
+        Returns: string
       }
       my_organization: { Args: never; Returns: string }
       new_pairing_code: { Args: never; Returns: string }
@@ -975,6 +1117,75 @@ export type Database = {
       }
       set_idle_timeout: { Args: { _hours: number }; Returns: undefined }
       set_organization_test: { Args: { _is_test: boolean }; Returns: undefined }
+      settings_admin_org: { Args: never; Returns: string }
+      settings_check_valid_from: {
+        Args: { _org: string; _valid_from: string }
+        Returns: string
+      }
+      settings_default_config: {
+        Args: { _from: string; _org: string }
+        Returns: Json
+      }
+      settings_for_month: {
+        Args: { _month?: string; _user?: string }
+        Returns: Json
+      }
+      settings_import_access: {
+        Args: {
+          _confirm?: boolean
+          _dry_run?: boolean
+          _payload: Json
+          _valid_from?: string
+        }
+        Returns: Json
+      }
+      settings_insert_version: {
+        Args: {
+          _config: Json
+          _config_version?: string
+          _emp?: number
+          _emp_months?: number
+          _org: string
+          _origin: string
+          _period_from?: string
+          _period_to?: string
+          _reason: string
+          _valid_from: string
+        }
+        Returns: string
+      }
+      settings_month_now: { Args: never; Returns: string }
+      settings_num: {
+        Args: {
+          _default: number
+          _hi: number
+          _lo: number
+          _mult: number
+          _v: string
+        }
+        Returns: number
+      }
+      settings_oldest_open: { Args: { _org: string }; Returns: string }
+      settings_open_months: { Args: { _org: string }; Returns: Json }
+      settings_terminal_save: {
+        Args: { _config: Json; _valid_from?: string }
+        Returns: Json
+      }
+      settings_timeline: { Args: never; Returns: Json }
+      settings_unpair: {
+        Args: { _choice?: string; _confirm?: boolean; _valid_from?: string }
+        Returns: Json
+      }
+      settings_validate_model: {
+        Args: { _config: Json; _org: string; _valid_from: string }
+        Returns: Json
+      }
+      settings_version_config: { Args: { _id: string }; Returns: Json }
+      settings_version_for: {
+        Args: { _month: string; _org: string }
+        Returns: string
+      }
+      settings_version_meta: { Args: { _id: string }; Returns: Json }
       test_organization_summary: { Args: never; Returns: Json }
       verify_punch_synced: {
         Args: {

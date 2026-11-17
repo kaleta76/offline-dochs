@@ -2,29 +2,32 @@
 
 ## Balík 1.0.0
 
-**Stav: rozpracované (etapa 2, míľnik M1 hotový; M2 okno, spúšťač a zostavovač a M3 dokumentácia ešte nie sú).** Klient sa zatiaľ nedá zostaviť ani spustiť: chýba okno (`kl_06_Okno`), štart (`kl_07_Spustenie`), `Spusti-Dochadzku.cmd`, `Instaluj-Klienta.ps1` a `manifest.json`. Skúšobný postup pre Access príde s M2 a M3.
+Prvé vydanie klienta na razenie: malý samostatný súbor Accessu `DochadzkaKlient.accdb` na pracovnom počítači zamestnanca. Zamestnanec klikne Príchod, Odchod alebo tlačidlo prerušenia, klient razenie zapíše najprv do lokálneho záznamu a potom ako súbor `.rzn` (protokol v1) do `prijem\` na serveri, odkiaľ ho HR prevezme príjmom z balíka 2.18.x. Návrh, protokol a práva na priečinky: `docs/KLIENT-ACCESS.md`. Postup pre zamestnanca: `PRIRUCKA.md`, pre správcu: `README.md`.
 
-### Čo je hotové (M1, jadro bez okna)
+**Stav: hotové okrem overenia v skutočnom Accesse (etapa 2, míľniky M1 až M3).** Nič z VBA, PowerShellu ani `.cmd` sa tu nedalo spustiť; skúšobný postup je nižšie.
 
-- `kl_02_Protokol`: zostavenie a kontrola súboru `.rzn` (protokol v1), čisté funkcie, zrkadlo `tools/klient_protokol.py`.
-- `kl_00_Spolocne`: priečinky, čítanie a zápis súborov, log, čas v UTC, ID razenia.
-- `kl_03_Fronta`: lokálny záznam, fronta, odosielanie na server, mapovanie chýb odoslania.
-- `kl_01_Identita`: účet zo Windows, osobné číslo z AD, záloha identity, testovací režim.
-- `kl_04_Konfig`: tlačidlá prerušení z `klient_konfig.txt` (server, lokálna kópia, predvolené).
-- `kl_05_Razenie`: razenie, stav dňa, otázky pred razením.
-- `kl_08_Samotest`: zlaté vektory a kontroly čistých funkcií, súborov a prostredia.
-- Nástroje: `access/tools/zostav_balik.py --koren`, zrkadlá v `tools/klient_protokol.py` (`rozober_konfig`, `vysledok_odoslania`, `novy_pocet_neuspechov`, `stav_dna`, `popis_stavu`, `otazka_pred_razenim`), test zhody `tools/test_klient_zhoda.py`, kroky v CI.
+### Čo balík obsahuje
+
+- `moduly/kl_00` až `kl_08`: spoločné funkcie, identita (Windows a AD), protokol `.rzn`, fronta a odosielanie, konfigurácia tlačidiel, razenie, okno `frmKlient`, štart, samotest.
+- `Spusti-Dochadzku.cmd` (spúšťač na počítači zamestnanca), `Vytvor-Odkaz.cmd` (odkaz na ploche a v Po spustení), `Instaluj-Klienta.ps1` + `.cmd` (zostavovač pre správcu), `manifest.json`, `testy/klient_konfig_vzor.txt`.
+- Nástroje a testy mimo balíka: `access/tools/zostav_balik.py --koren`, `tools/over_access_balik.py --koren`, `tools/klient_protokol.py` (referencia a zrkadlá), `tools/test_klient_zhoda.py`, kroky v CI.
 
 ### Overené (mimo Accessu)
 
 - Lint `python3 -I tools/kontrola_vba.py --adresar access/klient/moduly`: 0 chýb, 0 varovaní. Lint balíka HR: 0 chýb.
+- `python3 -I tools/over_access_balik.py --koren access/klient`: balík 1.0.0, 9 modulov, kontrolné súčty sedia. Balík HR (2.18.1) nezmenený.
 - `tools/test_klient_zhoda.py`: zlaté vektory v `kl_08_Samotest.bas` sa bajt po bajte zhodujú s `klient_protokol.zostav` a prejdú `rozober`; zlé vzory dávajú rovnaké kódy chýb ako `zle_vzory()`; tabuľka chýb odoslania (vektory aj vetvy `Select Case` v `kl_03_Fronta`), počítadlo neúspechov, stav dňa, otázky pred razením a rozbor konfigurácie sa zhodujú s Pythonom; zmena vektora bez zmeny pravidla test zhodí.
-- `tools/test_klient_protokol.py`, `tools/test_over_access_balik.py`, `tools/test_kontrola_vba.py` a ostatné testy v `tools/` a `contract/` prechádzajú.
+- `tools/test_klient_protokol.py`, `tools/test_over_access_balik.py`, `tools/test_kontrola_vba.py` a ostatné testy v `tools/` a `contract/` prechádzajú; CI je zelené.
 - ZIP inštalátora HR (`git archive HEAD:access`) neobsahuje `klient/` (`access/.gitattributes`: `klient export-ignore`).
+- Súbory `Spusti-Dochadzku.cmd`, `Vytvor-Odkaz.cmd`, `Instaluj-Klienta.cmd` sú ASCII s CRLF; `Instaluj-Klienta.ps1` je UTF-8 s BOM (ako inštalátor HR).
 
-### Neoverené v skutočnom Accesse
+### Neoverené v skutočnom Accesse a vo Windows
 
-**Všetok kód VBA.** Nebol skompilovaný ani spustený. Test zhody overuje len to, že vektory vo VBA a pravidlá v Pythone tvrdia to isté, nie že VBA kód počíta správne; to ukáže až `SamoTestKlienta` v Accesse. Osobitne neoverené: volania Windows (`GetSystemTime`, `CoCreateGuid`) v 32- aj 64-bitovom Office, čítanie osobného čísla z AD, čísla chýb pri zápise do `prijem\` so skutočnými právami na serveri, správanie pri nedostupnej sieti.
+**Všetok kód VBA.** Nebol skompilovaný ani spustený. Test zhody overuje len to, že vektory vo VBA a pravidlá v Pythone tvrdia to isté, nie že VBA kód počíta správne; to ukáže až `SamoTestKlienta` v Accesse. Osobitne neoverené:
+
+- **Zostavovač `Instaluj-Klienta.ps1`** (COM Access, import modulov, kompilácia, makro AutoExec, samotest) a **spúšťač `Spusti-Dochadzku.cmd`** (UNC cesty, `chcp 65001`, výmena `.accdb`, `reg add` do dôveryhodných umiestnení) sa nespúšťali; PowerShell nebol k dispozícii ani na kontrolu syntaxe.
+- **Okno `frmKlient`**: `CreateForm` a `CreateControl`, udalosti `=Funkcia()`, zablokovanie a odblokovanie tlačidiel časovačom, `CloseButton = False`, skrytie pásu kariet a navigačného panela.
+- Volania Windows (`GetSystemTime`, `CoCreateGuid`) v 32- aj 64-bitovom Office, čítanie osobného čísla z AD, zámok inštancie (`klient.lock`), čísla chýb pri zápise do `prijem\` so skutočnými právami na serveri, správanie pri nedostupnej sieti.
 
 ### Rozhodnutia implementácie (kde zadanie nechalo voľbu alebo sa od odporúčania odchyľujem)
 
@@ -41,10 +44,39 @@
 - **Testovací režim**: pri lokálnej ceste a platnom `oc_test` sa AD vôbec nepýta.
 - **Log** `klient.log` je v kódovaní Windows (zápis `Print #`), `samotest.txt` v UTF-8.
 - **Balík HR**: `access/klient` je vylúčený zo ZIP-u inštalátora HR cez `export-ignore`.
+- **Okno**: formulár `frmKlient` vzniká raz pri zostavení (`kl_07_Spustenie.PripravKlienta`), udalosti sú výrazy `=Funkcia()` na verejné funkcie štandardného modulu (bez triedy formulára). Tlačidlo najprv zablokuje tlačidlá, `ZapisRazenie` zapíše, okno sa prekreslí („Zapísané hh:mm (odosielam…)“, `DoEvents`) a až potom `DorucRazenie` urobí jediný pokus o server. Odblokovanie robí krátky tik časovača okna podľa `BlokovaneDo()`.
+- **Časovač počas razenia**: kým beží razenie z tlačidla, tik časovača nič nerobí (príznak v `kl_06_Okno`), takže práve zapísané razenie nemôže odísť s `odlozene=1`. Súbeh s odosielaním z časovača ďalej chráni `mOdosielam` v `kl_03_Fronta`.
+- **Koniec**: tlačidlo Koniec skúsi ešte raz odoslať čakajúce razenia, upozorní na tie, ktoré zostali, uvoľní zámok a ukončí Access. Zatvorenie okna inak (napr. Ctrl+F4) klienta tiež ukončí, aby nebežal bez okna so zámkom inštancie. Tlačidlo Zavrieť okna je vypnuté (`CloseButton = False`).
+- **Zámok inštancie**: `klient.lock` sa otvorí na výhradný zápis po celý čas behu; chyba 70 = klient už beží (druhá inštancia to oznámi a skončí). Iná chyba pri zámku sa zaloguje a klient beží ďalej (razenia majú vlastné `id`, súbeh nič nezdvojí).
+- **Skrytie panelov**: pás kariet a navigačný panel sa skrývajú pri každom štarte (`DoCmd.ShowToolbar`, `NavigateTo` + `acCmdWindowHide`, ako v konzole HR); nič sa netrvalo nezamyká a správca otvorí klienta so Shiftom.
+- **Namapovaná sieťová jednotka** (poznámka z kontroly M1): `JeLokalnaCesta` pozná aj `Z:\` cez `FileSystemObject.GetDrive(...).DriveType`; sieťová jednotka sa berie ako sieťová cesta (testovací režim sa nepovolí). Ak sa typ jednotky nepodarí zistiť, cesta sa berie ako sieťová. V ostrej prevádzke sa aj tak odporúča UNC cesta.
+- **Spúšťač**: zapisuje `zaklad.txt` po `chcp 65001` (UTF-8 bez BOM; klient číta UTF-8 aj ASCII); cesta zakladu nesmie obsahovať `&`, `^` ani `!`. `.accdb` sa kopíruje pod názvom `.new` a premenuje sa až po úspešnom skopírovaní, `verzia.txt` sa kopíruje ako posledný (zlyhá výmena = ostáva stará verzia, nič sa nehlási). Dôveryhodné umiestnenie sa zapisuje len do `HKCU` (bez práv správcu), len ak existuje kľúč Accessu danej verzie; `Path` s koncovým `\\` v príkaze `reg add`. Spúšťač píše stručný `spustac.log` (bez mien).
+- **Zostavovač**: zostavuje vždy nový súbor (doterajší sa premenuje na `DochadzkaKlient_stary_<čas>.accdb`), po kompilácii vytvorí formulár, spustí samotest (pri ZLE končí s kódom 6) a až potom vytvorí makro AutoExec (`Spusti()`), aby sa počas zostavovania nič nespustilo samo. `verzia.txt` (`klient=<verzia>`, `sha256=<SHA-256 súboru>`) sa počíta po zatvorení Accessu. Pri `-Publikuj` ide najprv `.accdb` pod dočasným názvom (kontrola SHA-256), potom spúšťače a `verzia.txt` až nakoniec. Protokol zostavenia nezapisuje používateľské meno z cesty profilu.
+- **`ZapisAsciiNovy`** (len lokálne súbory) prepíše existujúci cieľ; názov je zavádzajúci, správanie pre lokálny záznam je správne, preto sa nepremenúvalo.
+- **Otázky pred razením** (`MsgBox`) zastavia kód, kým používateľ neodpovie; časovač okna počas toho nebeží a ďalšie razenie chráni príznak `mRazim`.
 
 ### Neoverené / otvorené
 
 - Skutočné práva na serveri a čísla chýb pri pokuse o prepísanie existujúceho súboru (tabuľka v `kl_03_Fronta` je podľa zadania, klient loguje presné číslo chyby).
-- Zamrznutie okna počas pokusu o nedostupný server (časový limit SMB) sa akceptuje.
-- **Pre M2**: `zaklad.txt` číta klient ako UTF-8 alebo ASCII. Spúšťač `.cmd` zapisuje v kódovej stránke konzoly, takže cesta k základu s diakritikou by sa prečítala zle: spúšťač musí pred zápisom prepnúť `chcp 65001`, alebo sa cesta obmedzí na ASCII a zapíše sa to do README.
-- **Pre M2**: okno má volať `ZapisRazenie`, prekresliť sa a až potom `DorucRazenie` (alebo `Razit`, ktoré robí oboje s `DoEvents` medzi krokmi); časovač volá `kl_03_Fronta.OdosliCakajuce(True)` a každý 10. tik `kl_04_Konfig.NacitajKonfig`.
+- Zamrznutie okna počas pokusu o nedostupný server (časový limit SMB) sa akceptuje; zapísané razenie je vtedy už v lokálnom zázname.
+- Politika makier (GPO) môže zablokovať dôveryhodné umiestnenie; správca ho potom nastaví politikou. Pri mazaní profilu (VDI, `%LOCALAPPDATA%`) sa stratí aj fronta a záznam razení.
+- `.accde` a podpis kódu sa nerobili (možné spevnenie, pozri `README.md`).
+- Etapa 3 (prehľad vlastného mesiaca) nie je v tomto balíku.
+
+### Skúšobný postup (na jednom počítači s Accessom, bez servera)
+
+**Príprava.** Kópia databázy HR, v nej testovací zamestnanec `9000001` s `LoginAD` = váš Windows účet (zistíte ho príkazom `echo %USERNAME%`; postup ako v balíku 2.18.0, krok 1). Karta 7, „Klient na razenie v Accesse: nastaviť priečinok…“, zadajte `C:\dochadzka-test` (vzniknú `prijem`, `konfiguracia`, `spracovane`, `chybne` a `konfiguracia\klient_konfig.txt`). V tabuľke `NastaveniaSystemu` nastavte `KlientAjDnesne` = `1` a `KlientKontrolaVlastnika` = `UPOZORNIT`.
+
+1. **Zostavenie.** V repozitári `access\klient\Instaluj-Klienta.cmd -Vystup C:\dochadzka-test\klient` (najprv môžete s `-IbaOtestuj`). Očakávané: „Kompilácia prebehla bez chyby“, „Samotest klienta: ZLE 0“, makro AutoExec vytvorené, „Zostavenie dokončené“; v `C:\dochadzka-test\klient` je `DochadzkaKlient.accdb`, `verzia.txt` (dva riadky `klient=1.0.0` a `sha256=...`), `Spusti-Dochadzku.cmd`, `Vytvor-Odkaz.cmd` a protokol `instalacia_klient_*.log`. Ak kompilácia hlási chybu, Access ostane otvorený na riadku s chybou: pošlite názov modulu, riadok a text.
+2. **Spustenie.** `mkdir "%LOCALAPPDATA%\DochadzkaKlient"` a `echo oc_test=9000001> "%LOCALAPPDATA%\DochadzkaKlient\test.ini"`. Potom `C:\dochadzka-test\klient\Spusti-Dochadzku.cmd C:\dochadzka-test`. Očakávané: okno „Dochádzka – razenie“, oranžový pruh „TESTOVACÍ REŽIM“, „Osobné číslo 9000001 · účet <váš účet>“, tlačidlá prerušení zodpovedajú `klient_konfig.txt`, stav „Dnes ešte bez razenia“. Zapíšte, či Access hlásil blokovaný obsah (spúšťač mal pridať dôveryhodné umiestnenie; `%LOCALAPPDATA%\DochadzkaKlient\spustac.log`).
+3. **Razenie.** Príchod, Odchod (obed), Príchod, Lekár, Návrat do práce, Odchod. V `C:\dochadzka-test\prijem` je 6 súborov `RRRRMMDD-HHMMSS_<id>.rzn`, v okne zoznam „Dnes“ so šiestimi razeniami „odoslané“. Jeden súbor otvorte (ASCII, `#END` na konci, `odlozene=0`) a všetky skontrolujte: `python3 -I tools/klient_protokol.py over C:\dochadzka-test\prijem\*.rzn`. Odchod bez príchodu a rýchle opakovanie rovnakého razenia sa majú pýtať Áno/Nie.
+4. **Príjem v HR.** Karta 7, „Prijať razenia z klientov“, najprv nanečisto, potom naozaj: 6 prijatých, v `DochadzkaImport` v správnom poradí (príchod, obed, návrat, lekár, návrat, odchod), v `KlientRazenia` vlastník = váš účet.
+5. **Výpadok.** Premenujte `C:\dochadzka-test\prijem` na `prijem_x` a razte Príchod: okno hlási „Zapísané hh:mm, čaká na odoslanie“, dolu „Čaká na odoslanie: 1 (server nedostupný)“, súbor je v `%LOCALAPPDATA%\DochadzkaKlient\razenia\fronta`. Vráťte názov `prijem`: do minúty sa razenie odošle a súbor v `prijem` má `odlozene=1`. Zapíšte číslo chyby z `log\klient.log`.
+6. **Opakovanie.** Skopírujte hotový súbor zo `spracovane` späť do `prijem`: HR ho vyhlási za duplicitu a nevloží druhýkrát.
+7. **Aktualizácia.** Zatvorte klienta tlačidlom Koniec. V `kl_00_Spolocne.bas` zmeňte `VERZIA_KLIENTA` na `"1.0.1"`, potom `python3 -I access/tools/zostav_balik.py --koren access/klient --bump kl_00_Spolocne --balik 1.0.1`, zostavte s `-Vystup C:\dochadzka-test\klient` a spustite spúšťač: v okne je „klient v1.0.1“ a razenia v `razenia\odoslane` ostali. Zmenu potom vráťte (`git checkout access/klient`).
+8. **Zlý čas.** V nastaveniach Windows zmeňte časové pásmo na iné než Bratislava, razte: nesmie sa zapísať nič a okno povie „Hodiny počítača nie sú v časovom pásme Bratislava, razenie sa nezapísalo.“ Pásmo vráťte.
+9. **Samotest a druhá inštancia.** V okne priamych príkazov klienta (Ctrl+G, otvorený so Shiftom) `? kl_08_Samotest.SamoTestKlienta()` vráti `0`. Pri bežiacom klientovi spustite spúšťač znova: druhá inštancia povie „Klient už beží“.
+10. **Skutočný server (neskôr).** V `\\server\dochadzka\prijem` s účtom zamestnanca: vytvorenie súboru áno; zápis do už existujúceho súboru nie (zapíšte číslo chyby z `klient.log`); zoznam a čítanie cudzích súborov nie; vlastník súboru = účet zamestnanca. Výsledok pošlite, podľa neho sa upraví tabuľka mapovania chýb.
+11. **Upratanie.** `rmdir /s /q C:\dochadzka-test`, `rmdir /s /q "%LOCALAPPDATA%\DochadzkaKlient"`, `reg delete "HKCU\Software\Microsoft\Office\16.0\Access\Security\Trusted Locations\DochadzkaKlient" /f` (verziu Office upravte), v HR kópii `?mod_19_TerminalImport.OdstranTestoveData()` a ručne riadky `TerminalInbox` s `KL-%` a tabuľku `KlientRazenia` (ako v 2.18.0).
+
+Na vyhodnotenie pošlite: protokol zostavenia, `log\klient.log`, `log\samotest.txt`, `spustac.log` a text chýb, ktoré Access zobrazil.

@@ -1,6 +1,6 @@
 {
   "balik": "1.0.0",
-  "vytvorene": "2026-11-17 06:40:46",
+  "vytvorene": "2026-11-17 06:45:32",
   "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
   "zrusene": [],
   "moduly": {
@@ -43,8 +43,8 @@
     "kl_06_Okno": {
       "subor": "moduly/kl_06_Okno.bas",
       "verzia": "1.0.0",
-      "sha256": "d1be300e42754f68983be180f21c11a539af8eccf73d229a9642cc9336b51ead",
-      "obsah_sha256": "2981a5b4cda02826b5cd442f191bf1654f70fd3826f93632bade6b217082b4f0"
+      "sha256": "b3e7e348c0324da101c4178c6d3712d7194714fe316245a898894b0c59fbeb24",
+      "obsah_sha256": "6ac0a83390bdd4af5336a8e466a716dab265ed10cbb4fa6d7cc09041e9b86228"
     },
     "kl_07_Spustenie": {
       "subor": "moduly/kl_07_Spustenie.bas",

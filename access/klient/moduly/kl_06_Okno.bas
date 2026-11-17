@@ -178,7 +178,8 @@ Public Function VytvorFormular() As String
     On Error GoTo Chyba
 
     Call NovaPopiska(strTmp, "lblNadpis", "Dochádzka – razenie", 300, 120, 6000, 460, 18, True, RGB(15, 30, 90))
-    Call NovaPopiska(strTmp, "lblVerzia", "klient v" & kl_00_Spolocne.VERZIA_KLIENTA, 6600, 220, 2100, 300, 9, False, RGB(110, 120, 140)).TextAlign = 3
+    Set ctl = NovaPopiska(strTmp, "lblVerzia", "klient v" & kl_00_Spolocne.VERZIA_KLIENTA, 6600, 220, 2100, 300, 9, False, RGB(110, 120, 140))
+    ctl.TextAlign = 3
 
     Set ctl = NovaPopiska(strTmp, "lblTest", "TESTOVACÍ REŽIM", 300, 650, 8400, 330, 11, True, RGB(255, 255, 255))
     ctl.BackStyle = 1
@@ -189,7 +190,8 @@ Public Function VytvorFormular() As String
     Call NovaPopiska(strTmp, "lblIdentita", "", 300, 1030, 8400, 320, 10, False, RGB(60, 70, 95))
     Call NovaPopiska(strTmp, "lblStav", "", 300, 1420, 8400, 600, 20, True, RGB(15, 30, 90))
     Call NovaPopiska(strTmp, "lblSprava", "", 300, 2080, 6800, 330, 11, True, RGB(15, 30, 90))
-    Call NovaPopiska(strTmp, "lblCas", "", 7300, 2080, 1400, 330, 11, False, RGB(60, 70, 95)).TextAlign = 3
+    Set ctl = NovaPopiska(strTmp, "lblCas", "", 7300, 2080, 1400, 330, 11, False, RGB(60, 70, 95))
+    ctl.TextAlign = 3
 
     Call NoveTlacidlo(strTmp, "btnPrichod", "Príchod", 300, 2500, 4100, 900, 20, "=KlientTlacidlo(""PRICHOD"")")
     Call NoveTlacidlo(strTmp, "btnOdchod", "Odchod", 4600, 2500, 4100, 900, 20, "=KlientTlacidlo(""ODCHOD"")")
@@ -274,14 +276,15 @@ End Sub
 
 ' Zablokuje tlačidlá do konca ochrany pred dvojklikom a nastaví krátky tik časovača, ktorý ich odblokuje.
 Private Sub PlanujOdblokovanie()
-    Dim lMs As Long
+    Dim dMs As Double, lMs As Long
     On Error Resume Next
-    lMs = CLng((kl_05_Razenie.BlokovaneDo() - Now) * 86400# * 1000#) + 300
-    If lMs < 500 Then
+    dMs = (kl_05_Razenie.BlokovaneDo() - Now) * 86400# * 1000# + 300#
+    If dMs < 500# Then
         Call NastavTlacidla(True)
         Exit Sub
     End If
-    If lMs > 7000 Then lMs = 7000
+    If dMs > 7000# Then dMs = 7000#
+    lMs = CLng(dMs)
     Call NastavTlacidla(False)
     mKratkyTik = True
     Forms(FRM_KLIENT).TimerInterval = lMs

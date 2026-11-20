@@ -2,7 +2,7 @@
 
 Spôsob, ako zamestnanci razia príchody, odchody a prerušenia **priamo z Accessu na svojom pracovnom počítači**, bez webového terminálu a bez akéhokoľvek servera mimo organizácie. Je určený pre prostredie, kde sa smie používať len Access a Excel (pokyn č. 19/2015, pozri `docs/` v súkromných poznámkach a odpoveď SOC z 12. 11. 2026): všetko beží v infraštruktúre organizácie.
 
-> **Stav:** návrh, **strana HR** (príjem a prevod razení v Accesse, balík 2.18.x) a **klient** `DochadzkaKlient.accdb` (okno s tlačidlami, zostavovač a spúšťač, balík klienta 1.0.0 v [`access/klient/`](../access/klient/README.md)). Kód VBA, zostavovač ani spúšťač sa nedali spustiť mimo Accessu, preto je všetko **neoverené v skutočnom Accesse**; skúška na kópii databázy je pri strane HR v `access/CHANGELOG.md` (balík 2.18.0) a pri klientovi v `access/klient/CHANGELOG.md`. Prehľad vlastného mesiaca v klientovi (etapa 3) ešte nie je.
+> **Stav:** návrh, **strana HR** (príjem a prevod razení v Accesse, balík 2.18.x) a **klient** `DochadzkaKlient.accdb` (okno s tlačidlami, zostavovač a spúšťač, balík klienta 1.0.1 v [`access/klient/`](../access/klient/README.md)). Kód VBA, zostavovač ani spúšťač sa nedali spustiť mimo Accessu, preto je všetko **neoverené v skutočnom Accesse**; skúška na kópii databázy je pri strane HR v `access/CHANGELOG.md` (balík 2.18.0) a pri klientovi v `access/klient/CHANGELOG.md`. Prehľad vlastného mesiaca v klientovi (etapa 3) ešte nie je.
 
 ## Rozhodnutia (12. 11. 2026)
 

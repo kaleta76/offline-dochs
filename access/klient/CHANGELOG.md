@@ -1,5 +1,34 @@
 # Zmeny klienta na razenie (DochadzkaKlient.accdb)
 
+## Balík 1.0.1
+
+Opravy z nezávislej kontroly balíka 1.0.0 (D1 až D4 a drobnosti) a z prvej skúšky v Accesse 17. 11. 2026. **Nič z toho sa tu nedalo spustiť**: platí rovnaké „neoverené“ ako pri 1.0.0, skúšobný postup nižšie sa len rozšíril (kroky 2, 5 a 7).
+
+### Čo sa zmenilo
+
+- **D1: klient sa otvorí aj pri výpadku servera.** `Vytvor-Odkaz.cmd` teraz skopíruje `Spusti-Dochadzku.cmd` do `%LOCALAPPDATA%\DochadzkaKlient\`, zapíše tam `zaklad.txt` (cesta k serveru) a odkazy (plocha aj Po spustení) mieria na **lokálnu kópiu**. Lokálna kópia berie základ zo `zaklad.txt` a klienta zo `<základ>\klient`; ak `zaklad.txt` chýba, ukáže pokyn spustiť raz `Vytvor-Odkaz.cmd` zo servera. Spúšťač spustený priamo zo servera (a s argumentom na skúšku) funguje ako doteraz. Vedľajší prínos: lokálny `.cmd` nevyvolá varovanie o neoverenom vydavateľovi zo sieťovej cesty. **Zmenený spúšťač sa k zamestnancom dostane opätovným spustením `Vytvor-Odkaz.cmd`** (zriedka; staré odkazy na server fungujú ďalej).
+- **D2: dôveryhodné umiestnenie aj na čistom profile.** Spúšťač už nevyžaduje, aby v `HKCU` existoval kľúč Accessu (nemá ho používateľ, ktorý Access ešte nespustil): verzia Office sa berie aj z `HKLM\SOFTWARE\Microsoft\Office\<verzia>\Access\InstallRoot` (aj `WOW6432Node`); ak sa nenájde žiadna, pridá sa kľúč pre 16.0. Zápis ostáva len do `HKCU`.
+- **D3: cesta so zátvorkou.** Zápisy a hlásenia so zakladom sú mimo blokov `if ( ... )` (skoky `goto` na návestia), takže cesta ako `C:\dochadzka (test)` spúšťač nerozbije. Zakázané ostáva `&`, `^`, `!`.
+- **D4: orezané správy v okne.** Základné chybové texty sú kratšie (`CHYBA_OC`, `CHYBA_UCET`, `CHYBA_PC`, `SPRAVA_BEZ_ZAKLADU`, najviac 60 znakov); správa dlhšia než 60 znakov sa ukáže menším písmom (9), dlhšia než 76 znakov sa skráti na „...“ a celý text je v bubline po nastavení myši (`ControlTipText`). Nové čisté funkcie `VelkostPismaSpravy` a `TextSpravyPreOkno` overuje samotest.
+- **Zatvorenie okna inak než tlačidlom Koniec** (Ctrl+F4 a pod.) robí posledný pokus o odoslanie a upozorní na čakajúce razenia, rovnako ako tlačidlo Koniec (špecifikácia §6.5).
+- **Drobnosti.** Chýbajúci `verzia.txt` na serveri už nespôsobí kopírovanie `.accdb` pri každom štarte (lokálny klient sa nechá); `spustac.log` sa nad 200 kB odloží do `spustac.old`; `Vytvor-Odkaz.cmd` odmietne spustenie z lokálneho priečinka (zlá cesta k serveru); odstránená nepoužitá premenná `lKopia`. Verzia klienta v okne a v `.rzn` je 1.0.1.
+
+### Zámerne nezmenené
+
+- **D5 (prázdny text Príchod v blokovanom stave)** sa pri druhom spustení nezopakoval; nechané na pozorovanie, nie opravované naslepo. Ak sa objaví, podozrenie je prepisovanie `btnPrichod.Caption` pri každom tiku.
+- Etapa 3 (prehľad mesiaca v klientovi) nie je súčasťou tejto opravy.
+
+### Overené (mimo Accessu)
+
+- Lint `kontrola_vba.py` (klient aj HR): 0 chýb. `over_access_balik.py --koren access/klient`: balík 1.0.1, 9 modulov. Testy `test_klient_protokol`, `test_klient_zhoda`, `test_kontrola_vba`, `test_over_access_balik`: prechádzajú.
+- Súbory `.cmd` sú ASCII s CRLF. Logika spúšťača a odkazu sa prešla očami (štruktúra skokov, návestia, blokové zátvorky); `cmd` sa tu nespúšťal.
+
+### Do skúšobného postupu navyše
+
+- Krok 2: zapísať, či Access hlásil blokovaný obsah (D2), a skúsiť aj na čistom profile.
+- Krok 5: **odpojiť server (alebo premenovať `klient\` na serveri) a spustiť odkaz na ploche**: klient sa musí otvoriť a razenie sa uloží lokálne (D1). Skúsiť aj cestu so zátvorkou, napr. `Spusti-Dochadzku.cmd "C:\dochadzka (test)"` (D3).
+- Krok 7: zavrieť okno inak než tlačidlom Koniec pri čakajúcom razení a skontrolovať upozornenie.
+
 ## Balík 1.0.0
 
 Prvé vydanie klienta na razenie: malý samostatný súbor Accessu `DochadzkaKlient.accdb` na pracovnom počítači zamestnanca. Zamestnanec klikne Príchod, Odchod alebo tlačidlo prerušenia, klient razenie zapíše najprv do lokálneho záznamu a potom ako súbor `.rzn` (protokol v1) do `prijem\` na serveri, odkiaľ ho HR prevezme príjmom z balíka 2.18.x. Návrh, protokol a práva na priečinky: `docs/KLIENT-ACCESS.md`. Postup pre zamestnanca: `PRIRUCKA.md`, pre správcu: `README.md`.

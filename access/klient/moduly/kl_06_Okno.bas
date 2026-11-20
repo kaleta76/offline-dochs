@@ -1,5 +1,5 @@
 Attribute VB_Name = "kl_06_Okno"
-'@Verzia 1.0.0
+'@Verzia 1.0.1
 Option Compare Database
 Option Explicit
 
@@ -26,7 +26,7 @@ Option Explicit
 ' - KlientKoniec(), KlientZatvorene() : Udalosť tlačidla Koniec a zatvorenia okna (ukončia klienta).
 ' - TextTlacidlaPreOkno(s), RiadokDnes(cas, nazov, odoslane), TextCakajucich(pocet, serverNedostupny),
 '   TextUpozornenia(problemPrava, dniCakania), PomocnyTextOdchodu(odchod), DruhSpravy(sprava), RiadokIdentity(oc, login, zdroj),
-'   NazovPrichodu(vPreruseni), TextPriKonci(pocet) : ČISTÉ texty pre okno.
+'   NazovPrichodu(vPreruseni), TextPriKonci(pocet), TextSpravyPreOkno(sprava), VelkostPismaSpravy(sprava) : ČISTÉ texty pre okno.
 '===============================================================================
 
 Public Const FRM_KLIENT As String = "frmKlient"
@@ -109,6 +109,19 @@ Public Function TextPriKonci(ByVal lPocet As Long) As String
     End If
 End Function
 
+' Riadok správy v okne má šírku na asi 60 znakov písma 11 alebo asi 76 znakov písma 9; dlhší text sa skráti (celý je v bubline a v logu).
+Public Function VelkostPismaSpravy(ByVal strSprava As String) As Long
+    VelkostPismaSpravy = IIf(Len(strSprava) > 60, 9, 11)
+End Function
+
+Public Function TextSpravyPreOkno(ByVal strSprava As String) As String
+    If Len(strSprava) > 76 Then
+        TextSpravyPreOkno = Left$(strSprava, 73) & "..."
+    Else
+        TextSpravyPreOkno = strSprava
+    End If
+End Function
+
 Public Function NazovPrichodu(ByVal bVPreruseni As Boolean) As String
     NazovPrichodu = IIf(bVPreruseni, "Návrat do práce", "Príchod")
 End Function
@@ -144,7 +157,7 @@ Private Function NoveTlacidlo(ByVal strFrm As String, ByVal strMeno As String, B
 End Function
 
 Public Function VytvorFormular() As String
-    Dim frm As Form, strTmp As String, ctl As Control, i As Long, x As Long, y As Long, lKopia As Long, v As Variant, colDel As Collection
+    Dim frm As Form, strTmp As String, ctl As Control, i As Long, x As Long, y As Long, v As Variant, colDel As Collection
 
     On Error Resume Next
     DoCmd.Close acForm, FRM_KLIENT, acSaveNo
@@ -306,7 +319,9 @@ Public Sub PokazSpravu(ByVal strSprava As String)
             lFarba = RGB(15, 30, 90)
     End Select
     Set ctl = Forms(FRM_KLIENT).Controls("lblSprava")
-    ctl.Caption = strSprava
+    ctl.FontSize = VelkostPismaSpravy(strSprava)
+    ctl.Caption = TextSpravyPreOkno(strSprava)
+    ctl.ControlTipText = strSprava          ' celý text po nastavení myši, ak sa v riadku nezmestí
     ctl.ForeColor = lFarba
     Err.Clear
 End Sub
@@ -491,10 +506,18 @@ Public Function KlientKoniec() As Boolean
 End Function
 
 ' Zatvorenie okna inak než tlačidlom Koniec (napr. Ctrl+F4) ukončí klienta, aby neostal bežať bez okna so zámkom inštancie.
+' Rovnako ako pri tlačidle Koniec: posledný pokus o odoslanie a upozornenie na čakajúce razenia.
 Public Function KlientZatvorene() As Boolean
+    Dim lPocet As Long
     If Not mAktivne Or mKoncim Then Exit Function
     mAktivne = False
     Call kl_00_Spolocne.ZapisLog("WARN", "Okno bolo zatvorené inak než tlačidlom Koniec, klient sa ukončuje.")
+    On Error Resume Next
+    If Len(kl_03_Fronta.CestaPrijmu()) > 0 Then Call kl_03_Fronta.OdosliCakajuce(True)
+    lPocet = kl_03_Fronta.PocetVoFronte()
+    If lPocet > 0 Then MsgBox TextPriKonci(lPocet), vbInformation, "Dochádzka"
+    Err.Clear
+    On Error GoTo 0
     Call kl_07_Spustenie.Ukonci
     KlientZatvorene = True
 End Function

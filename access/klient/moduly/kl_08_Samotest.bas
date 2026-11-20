@@ -1,5 +1,5 @@
 Attribute VB_Name = "kl_08_Samotest"
-'@Verzia 1.0.0
+'@Verzia 1.0.1
 Option Compare Database
 Option Explicit
 
@@ -355,6 +355,9 @@ Private Sub TestOkna()
     Call Zaznam(Len(kl_06_Okno.TextPriKonci(0)) = 0 And Left$(kl_06_Okno.TextPriKonci(1), 8) = "1 razeni", "upozornenie pri konci: 0 a 1 razenie")
     Call Zaznam(Left$(kl_06_Okno.TextPriKonci(3), 28) = "3 razenia čakajú na odoslani" And Left$(kl_06_Okno.TextPriKonci(7), 22) = "7 razení čaká na odosl", "upozornenie pri konci: 3 a 7 razení")
     Call Zaznam(kl_06_Okno.NazovPrichodu(False) = "Príchod" And kl_06_Okno.NazovPrichodu(True) = "Návrat do práce", "názov tlačidla Príchod")
+    Call Zaznam(kl_06_Okno.VelkostPismaSpravy("Zapísané 07:31") = 11 And kl_06_Okno.VelkostPismaSpravy(String$(60, "x")) = 11 And kl_06_Okno.VelkostPismaSpravy(String$(61, "x")) = 9, "veľkosť písma správy podľa dĺžky")
+    Call Zaznam(kl_06_Okno.TextSpravyPreOkno(String$(76, "x")) = String$(76, "x") And kl_06_Okno.TextSpravyPreOkno(String$(77, "x")) = String$(73, "x") & "...", "dlhá správa sa skráti na 76 znakov")
+    Call Zaznam(Len(kl_01_Identita.CHYBA_OC) <= 60 And Len(kl_01_Identita.CHYBA_UCET) <= 60 And Len(kl_01_Identita.CHYBA_PC) <= 60 And Len(kl_07_Spustenie.SPRAVA_BEZ_ZAKLADU) <= 60, "základné chybové texty sa zmestia do riadku okna")
     Call Zaznam(kl_06_Okno.PomocnyTextOdchodu("OBED") <> kl_06_Okno.PomocnyTextOdchodu("ODCHOD"), "pomocný text odchodu podľa konfigurácie")
     Call Zaznam(Left$(kl_06_Okno.RiadokDnes("07:31", "Príchod", True), 10) = "07:31   Pr" And Right$(kl_06_Okno.RiadokDnes("07:31", "Príchod", True), 8) = "odoslané", "riadok Dnes: odoslané")
     Call Zaznam(Right$(kl_06_Okno.RiadokDnes("14:36", "Odchod", False), 17) = "čaká na odoslanie", "riadok Dnes: čaká")

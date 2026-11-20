@@ -2,7 +2,7 @@
 
 Malý samostatný súbor Accessu na pracovnom počítači zamestnanca. Zamestnanec klikne **Príchod**, **Odchod** alebo tlačidlo prerušenia (Lekár, Služobne, …) a klient razenie zapíše ako súbor `.rzn` (protokol v1) do zdieľaného priečinka `prijem\` na serveri; HR ich prevezme príjmom v Accesse HR (karta 7). Bez webového terminálu, bez internetu, bez servera mimo organizácie. Návrh, protokol a práva na priečinky: [`docs/KLIENT-ACCESS.md`](../../docs/KLIENT-ACCESS.md). Postup pre zamestnanca: [`PRIRUCKA.md`](PRIRUCKA.md). Zmeny, **čo je overené a čo nie**, a skúšobný postup: [`CHANGELOG.md`](CHANGELOG.md).
 
-> **Stav (balík 1.0.0): hotové, ale neoverené v skutočnom Accesse.** Kód VBA, zostavovač a spúšťač sa mimo Windows s Accessom nedajú spustiť. Pred nasadením urobte skúšobný postup z `CHANGELOG.md` na jednom počítači.
+> **Stav (balík 1.0.1): hotové, ale neoverené v skutočnom Accesse.** Kód VBA, zostavovač a spúšťač sa mimo Windows s Accessom nedajú spustiť. Pred nasadením urobte skúšobný postup z `CHANGELOG.md` na jednom počítači.
 
 ## Čo tu je
 
@@ -11,8 +11,8 @@ Malý samostatný súbor Accessu na pracovnom počítači zamestnanca. Zamestnan
 | `moduly/kl_00` … `kl_08` | zdrojový kód VBA (2. riadok `'@Verzia X.Y.Z`): spoločné funkcie, identita, protokol, fronta, konfigurácia, razenie, okno, štart, samotest |
 | `manifest.json` | verzia balíka a SHA-256 modulov (`access/tools/zostav_balik.py --koren access/klient`) |
 | `Instaluj-Klienta.cmd`, `Instaluj-Klienta.ps1` | **zostavovač** (správca, raz na jednom počítači s Accessom): vytvorí `DochadzkaKlient.accdb` |
-| `Spusti-Dochadzku.cmd` | **spúšťač** (zamestnanec): skopíruje novšiu verziu zo servera a otvorí klienta |
-| `Vytvor-Odkaz.cmd` | odkaz na ploche a v priečinku Po spustení |
+| `Spusti-Dochadzku.cmd` | **spúšťač** (zamestnanec): skopíruje novšiu verziu zo servera a otvorí klienta; beží z lokálnej kópie, takže funguje aj pri výpadku servera |
+| `Vytvor-Odkaz.cmd` | skopíruje spúšťač do `%LOCALAPPDATA%\DochadzkaKlient\`, zapíše `zaklad.txt` a vytvorí odkaz na ploche a v priečinku Po spustení (mieri na lokálnu kópiu) |
 | `testy/klient_konfig_vzor.txt` | vzor konfigurácie tlačidiel pre testy |
 | `CHANGELOG.md`, `PRIRUCKA.md` | zmeny a skúšobný postup; príručka pre zamestnanca |
 
@@ -42,7 +42,7 @@ Server (základ napr. `\\server\dochadzka`):
 | `klient\` | len čítať | zápis: `DochadzkaKlient.accdb`, `verzia.txt`, `Spusti-Dochadzku.cmd`, `Vytvor-Odkaz.cmd` |
 | `spracovane\`, `chybne\` | nič | všetko |
 
-Zamestnanec nič neinštaluje a nepotrebuje práva správcu. Raz spustí `\\server\dochadzka\klient\Vytvor-Odkaz.cmd` (odkaz na ploche a v Po spustení); potom pri každom spustení `Spusti-Dochadzku.cmd`: zapíše cestu zakladu do `zaklad.txt`, ak je na serveri iná `verzia.txt`, skopíruje nový `.accdb` (najprv pod dočasným názvom, výmena až po úspešnom skopírovaní; otvorený alebo nedostupný súbor nič nepokazí a ostane stará verzia), pridá lokálny priečinok medzi dôveryhodné umiestnenia Accessu (`HKCU`) a otvorí klienta. Hromadné nasadenie odkazov cez prihlasovací skript správcu je mimo tohto balíka. Cesta zakladu nesmie obsahovať znaky `&`, `^`, `!`.
+Zamestnanec nič neinštaluje a nepotrebuje práva správcu. Raz spustí `\\server\dochadzka\klient\Vytvor-Odkaz.cmd` (lokálna kópia spúšťača a odkaz na ploche a v Po spustení; pri zmene spúšťača na serveri ho treba spustiť znova); potom pri každom spustení lokálna kópia `Spusti-Dochadzku.cmd`: zapíše cestu zakladu do `zaklad.txt`, ak je na serveri iná `verzia.txt`, skopíruje nový `.accdb` (najprv pod dočasným názvom, výmena až po úspešnom skopírovaní; otvorený alebo nedostupný súbor nič nepokazí a ostane stará verzia), pridá lokálny priečinok medzi dôveryhodné umiestnenia Accessu (`HKCU`; aj na čistom profile, verzia Office sa berie z `HKCU` alebo `HKLM`) a otvorí klienta; pri nedostupnom serveri otvorí klienta, ktorý už je lokálne. Hromadné nasadenie odkazov cez prihlasovací skript správcu je mimo tohto balíka. Cesta zakladu nesmie obsahovať znaky `&`, `^`, `!` (zátvorky sú v poriadku).
 
 V ostrej prevádzke používajte **UNC cestu** (`\\server\dochadzka`), nie namapovanú jednotku; klient namapovanú jednotku poznáva ako sieťovú, ale UNC je spoľahlivejšie.
 

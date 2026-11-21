@@ -1,5 +1,26 @@
 # Zmeny klienta na razenie (DochadzkaKlient.accdb)
 
+## Balík 1.0.2
+
+Tri drobnosti z prvej skúšky balíka 1.0.1 v skutočnom Accesse (20. 11. 2026, súkromný počítač, testovacie dáta). Skúška potvrdila opravy D1 až D4 v rozsahu opísanom v README; tu sú len zistené drobnosti.
+
+### Čo sa zmenilo
+
+- **Kratšia správa o priečinku.** Pri nevytvorenom lokálnom priečinku okno ukazovalo skrátené „... priečinok C:...“ (názov priečinka sa stratil). Teraz správa začína názvom priečinka (`Chýba priečinok log: C:\...`), takže je viditeľný aj v skrátenej správe, celá cesta ostáva v bubline. `kl_00_Spolocne` (1.0.2).
+- **Diagnostika tlačidla Koniec.** `KlientKoniec` zapíše do logu „Tlačidlo Koniec stlačené.“ hneď na začiatku. Pri skúške sa klik myšou na Koniec raz neprejavil, kým Enter zafungoval; príčina nie je známa a naslepo sa nemenila. Ak sa to zopakuje, log ukáže, či udalosť do klienta prišla. `kl_06_Okno` (1.0.2).
+- **Zostavovač zapisuje stav `AccessVBOM`.** Po zostavení sa do protokolu zapíše, či sa nastavenie „Dôverovať prístupu k objektovému modelu projektu VBA“ vrátilo na pôvodnú hodnotu alebo sa odstránilo; ak sa nevrátilo úplne, je to varovanie. `Instaluj-Klienta.ps1` (mimo balíka modulov, bez verzie).
+- Verzia klienta v okne a v `.rzn` je 1.0.2 (`VERZIA_KLIENTA`).
+
+### Overené (mimo Accessu)
+
+- Lint a testy rovnako ako pri 1.0.1 (pozri vyššie), `over_access_balik.py` pre balík 1.0.2. **Zmena v `Instaluj-Klienta.ps1` sa tu nedala spustiť ani syntakticky skontrolovať v PowerShelli** (je tu len Python); skontrolovaný bol len zápis a vyváženie zátvoriek. Pri najbližšom zostavení treba v protokole nájsť nový riadok o `AccessVBOM`.
+
+### Skúška v Accesse (zopakovať po zostavení)
+
+1. V protokole zostavenia je riadok „Nastavenie AccessVBOM vrátené ... alebo odstránené“.
+2. Odpojiť priečinok `log` (v lokálnom priečinku klienta ho nahradiť súborom `log`): správa v okne začína „Chýba priečinok log:“.
+3. Po stlačení Koniec je v `log\klient.log` riadok „Tlačidlo Koniec stlačené.“.
+
 ## Balík 1.0.1
 
 Opravy z nezávislej kontroly balíka 1.0.0 (D1 až D4 a drobnosti) a z prvej skúšky v Accesse 17. 11. 2026. **Nič z toho sa tu nedalo spustiť**: platí rovnaké „neoverené“ ako pri 1.0.0, skúšobný postup nižšie sa len rozšíril (kroky 2, 5 a 7).

@@ -108,6 +108,16 @@ function Restore-VbomPristup {
     try {
         if ($Stav.Existoval) { Set-ItemProperty -LiteralPath $Stav.Kluc -Name 'AccessVBOM' -Value $Stav.Povodna }
         else { Remove-ItemProperty -LiteralPath $Stav.Kluc -Name 'AccessVBOM' -ErrorAction SilentlyContinue }
+        # Do protokolu sa zapíše, čo ostalo v registri (skúška 20. 11.: po zostavení bola hodnota 1 a z protokolu nebolo jasné, či je to pôvodná hodnota).
+        $p = Get-ItemProperty -LiteralPath $Stav.Kluc -Name 'AccessVBOM' -ErrorAction SilentlyContinue
+        $ma = ($null -ne $p -and ($p.PSObject.Properties.Name -contains 'AccessVBOM'))
+        if ($Stav.Existoval -and $ma -and ([string]$p.AccessVBOM -eq [string]$Stav.Povodna)) {
+            Write-Log ('Nastavenie AccessVBOM vrátené na pôvodnú hodnotu {0} (pred zostavením bolo nastavené).' -f $Stav.Povodna) 'OK'
+        } elseif (-not $Stav.Existoval -and -not $ma) {
+            Write-Log 'Nastavenie AccessVBOM odstránené (pred zostavením nebolo nastavené).' 'OK'
+        } else {
+            Write-Log ('Nastavenie AccessVBOM sa nevrátilo úplne (pôvodne: {0}, teraz: {1}). Skontrolujte v Accesse: Centrum zabezpečenia, Nastavenia makier.' -f $(if ($Stav.Existoval) { $Stav.Povodna } else { 'nenastavené' }), $(if ($ma) { $p.AccessVBOM } else { 'nenastavené' })) 'WARN'
+        }
     } catch { Write-Log ('Nepodarilo sa obnoviť pôvodné nastavenie AccessVBOM: {0}' -f $_.Exception.Message) 'WARN' }
 }
 

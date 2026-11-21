@@ -115,12 +115,63 @@ function Enable-VbomPristup {
     return $stav
 }
 
-function Restore-VbomPristup {
+function Get-VbomHodnota {
+    param($Kluc)
+    $p = Get-ItemProperty -LiteralPath $Kluc -Name 'AccessVBOM' -ErrorAction SilentlyContinue
+    if ($null -ne $p -and ($p.PSObject.Properties.Name -contains 'AccessVBOM')) { return [pscustomobject]@{ Ma = $true; Hodnota = $p.AccessVBOM } }
+    return [pscustomobject]@{ Ma = $false; Hodnota = $null }
+}
+
+function Test-VbomPovodne {
+    # $true, ak je AccessVBOM v registri taký, aký bol pred inštaláciou (nastavený na rovnakú hodnotu alebo nenastavený).
     param($Stav)
+    $h = Get-VbomHodnota $Stav.Kluc
+    if ($Stav.Existoval) { return ($h.Ma -and ([string]$h.Hodnota -eq [string]$Stav.Povodna)) }
+    return (-not $h.Ma)
+}
+
+function Set-VbomPovodne {
+    param($Stav)
+    if ($Stav.Existoval) { Set-ItemProperty -LiteralPath $Stav.Kluc -Name 'AccessVBOM' -Value $Stav.Povodna }
+    else { Remove-ItemProperty -LiteralPath $Stav.Kluc -Name 'AccessVBOM' -ErrorAction SilentlyContinue }
+}
+
+function Wait-AccessKoniec {
+    # Po Quit() Access ešte chvíľu dobieha a pri ukončení si môže zapísať nastavenia do registra
+    # (skúška zostavovača klienta 21. 11.: po zostavení bol AccessVBOM=1, hoci ho zostavovač odstránil). Preto sa pred vrátením
+    # hodnoty počká, kým skončia procesy MSACCESS spustené inštalátorom.
+    param([int[]]$PovodnePid = @(), [int]$MaxSek = 20)
+    $limit = (Get-Date).AddSeconds($MaxSek)
+    do {
+        $bezi = @(Get-Process -Name 'MSACCESS' -ErrorAction SilentlyContinue | Where-Object { $PovodnePid -notcontains $_.Id })
+        if ($bezi.Count -eq 0) { Write-Log 'Access sa ukončil.' 'INFO'; return $true }
+        Start-Sleep -Milliseconds 500
+    } while ((Get-Date) -lt $limit)
+    Write-Log ('Access po {0} s stále beží; nastavenie AccessVBOM sa vráti teraz a skontroluje sa ešte raz.' -f $MaxSek) 'WARN'
+    return $false
+}
+
+function Restore-VbomPristup {
+    param($Stav, [int]$SledujSek = 3)
     if ($null -eq $Stav) { return }
     try {
-        if ($Stav.Existoval) { Set-ItemProperty -LiteralPath $Stav.Kluc -Name 'AccessVBOM' -Value $Stav.Povodna }
-        else { Remove-ItemProperty -LiteralPath $Stav.Kluc -Name 'AccessVBOM' -ErrorAction SilentlyContinue }
+        Set-VbomPovodne $Stav
+        # Hodnotu krátko sledujeme: ak ju Access po ukončení zapíše znova, vráti sa ešte raz.
+        $znova = 0
+        for ($i = 0; $i -lt ($SledujSek * 2); $i++) {
+            Start-Sleep -Milliseconds 500
+            if (-not (Test-VbomPovodne $Stav)) { $znova++; Set-VbomPovodne $Stav }
+        }
+        if ($znova -gt 0) { Write-Log ('Nastavenie AccessVBOM sa po vrátení {0}x zmenilo (zapísal ho Access pri ukončení); vrátené znova.' -f $znova) 'WARN' }
+        # Do protokolu sa zapíše, čo ostalo v registri.
+        $h = Get-VbomHodnota $Stav.Kluc
+        if ($Stav.Existoval -and (Test-VbomPovodne $Stav)) {
+            Write-Log ('Nastavenie AccessVBOM vrátené na pôvodnú hodnotu {0} (pred inštaláciou bolo nastavené).' -f $Stav.Povodna) 'OK'
+        } elseif (-not $Stav.Existoval -and (Test-VbomPovodne $Stav)) {
+            Write-Log 'Nastavenie AccessVBOM odstránené (pred inštaláciou nebolo nastavené).' 'OK'
+        } else {
+            Write-Log ('Nastavenie AccessVBOM sa nevrátilo úplne (pôvodne: {0}, teraz: {1}). Skontrolujte v Accesse: Centrum zabezpečenia, Nastavenia makier.' -f $(if ($Stav.Existoval) { $Stav.Povodna } else { 'nenastavené' }), $(if ($h.Ma) { $h.Hodnota } else { 'nenastavené' })) 'WARN'
+        }
     } catch { Write-Log ('Nepodarilo sa obnoviť pôvodné nastavenie AccessVBOM: {0}' -f $_.Exception.Message) 'WARN' }
 }
 
@@ -499,6 +550,8 @@ function Invoke-Instalacia {
     $kod = 0
     $vbomStav = $null
     $acc = $null
+    $accSpusteny = $false
+    $pidyAccessPred = @()
     $nechajOtvorene = $false
     try {
         try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
@@ -572,7 +625,9 @@ function Invoke-Instalacia {
 
         # 4) Access (zatiaľ skrytý - slúži aj na rozpoznanie existujúcich databáz) -----------------
         Write-Log 'Spúšťam Microsoft Access...' 'STEP'
+        $pidyAccessPred = @(Get-Process -Name 'MSACCESS' -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
         $acc = New-AccessAplikacia
+        $accSpusteny = $true
         try { $acc.AutomationSecurity = 1 } catch { }   # msoAutomationSecurityLow: bez výziev na makrá počas inštalácie
 
         # 5) Rozpoznanie databáz v priečinku a predvolený postup ----------------------------------
@@ -724,6 +779,7 @@ function Invoke-Instalacia {
             $acc = $null
             [GC]::Collect(); [GC]::WaitForPendingFinalizers()
         }
+        if ($accSpusteny -and -not $nechajOtvorene) { [void](Wait-AccessKoniec $pidyAccessPred) }
         Restore-VbomPristup $vbomStav
     }
 

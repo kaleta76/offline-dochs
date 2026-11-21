@@ -1,5 +1,5 @@
 Attribute VB_Name = "kl_07_Spustenie"
-'@Verzia 1.0.0
+'@Verzia 1.0.1
 Option Compare Database
 Option Explicit
 
@@ -22,7 +22,7 @@ Option Explicit
 ' - PripravKlienta()   : Pre zostavovač: vytvorí formulár a nastaví vlastnosti aplikácie; vráti "" alebo text chyby.
 '===============================================================================
 
-Public Const SPRAVA_BEZ_ZAKLADU As String = "Klient nebol spustený cez Spusti-Dochadzku.cmd. Zatvorte ho a spustite Dochádzku odkazom na ploche."
+Public Const SPRAVA_BEZ_ZAKLADU As String = "Spustite Dochádzku odkazom na ploche, nie priamo z Accessu."
 Public Const NADPIS_OKNA As String = "Dochádzka"
 Private Const CHYBA_ZAMKNUTE As Long = 70
 
@@ -133,7 +133,7 @@ Public Function Spusti() As Boolean
 
     strChyba = kl_00_Spolocne.PripravLokalnePriecinky()
     If Len(strChyba) > 0 Then
-        Call kl_05_Razenie.VypniRazenie(strChyba & " Razenie je vypnuté, obráťte sa na IT.")
+        Call kl_05_Razenie.VypniRazenie("Razenie je vypnuté, obráťte sa na IT. " & strChyba)
     ElseIf Not ZiskajZamok() Then
         MsgBox "Klient už beží. Použite jeho okno (nájdete ho na paneli úloh).", vbInformation, NADPIS_OKNA
         Call Ukonci

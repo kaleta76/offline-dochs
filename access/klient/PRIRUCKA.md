@@ -24,7 +24,7 @@ Razenie je **zapísané** na vašom počítači a nestratí sa. Odošle sa samo,
 
 | Správa | Čo urobiť |
 |---|---|
-| „Osobné číslo sa nepodarilo zistiť z Active Directory. Obráťte sa na HR.“ | Razenie je vypnuté; napíšte HR. |
+| „Osobné číslo sa nepodarilo zistiť z AD. Napíšte HR.“ | Razenie je vypnuté; napíšte HR. |
 | „Hodiny počítača nie sú v časovom pásme Bratislava, razenie sa nezapísalo.“ | Opravte dátum, čas a časové pásmo v nastaveniach Windows (alebo požiadajte IT) a razte znova. |
 | „Razenie sa NEZAPÍSALO: nedá sa zapísať na disk počítača …“ | Nič sa nezapísalo; napíšte IT a medzitým dajte HR vedieť čas príchodu/odchodu. |
 | „Problém s právami na odoslanie, obráťte sa na HR.“ (červený pruh) | Razenia sú v počítači v bezpečí, ale neodchádzajú; napíšte HR. |

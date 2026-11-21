@@ -1,5 +1,5 @@
 Attribute VB_Name = "kl_01_Identita"
-'@Verzia 1.0.0
+'@Verzia 1.0.1
 Option Compare Database
 Option Explicit
 
@@ -26,9 +26,9 @@ Option Explicit
 Public Const ZDROJ_AD As String = "AD"
 Public Const ZDROJ_CACHE As String = "CACHE"
 Public Const ZDROJ_TEST As String = "TEST"
-Public Const CHYBA_OC As String = "Osobné číslo sa nepodarilo zistiť z Active Directory. Obráťte sa na HR."
-Public Const CHYBA_UCET As String = "Účet Windows nemožno použiť v razení (nepovolené znaky alebo dĺžka). Obráťte sa na HR."
-Public Const CHYBA_PC As String = "Názov počítača nemožno použiť v razení (nepovolené znaky alebo dĺžka). Obráťte sa na IT."
+Public Const CHYBA_OC As String = "Osobné číslo sa nepodarilo zistiť z AD. Napíšte HR."
+Public Const CHYBA_UCET As String = "Účet Windows nemožno použiť v razení. Napíšte HR."
+Public Const CHYBA_PC As String = "Názov počítača nemožno použiť v razení. Napíšte IT."
 
 '===============================================================================
 ' Čisté funkcie

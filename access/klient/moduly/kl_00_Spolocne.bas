@@ -1,5 +1,5 @@
 Attribute VB_Name = "kl_00_Spolocne"
-'@Verzia 1.0.0
+'@Verzia 1.0.1
 Option Compare Database
 Option Explicit
 
@@ -37,7 +37,7 @@ Option Explicit
 ' - NoveGuid()                                : Nové ID razenia (GUID veľkými písmenami bez zátvoriek); "" pri zlyhaní.
 '===============================================================================
 
-Public Const VERZIA_KLIENTA As String = "1.0.0"
+Public Const VERZIA_KLIENTA As String = "1.0.1"
 Public Const NAZOV_KLIENTA As String = "DochadzkaKlient"
 Public Const SUBOR_ZAKLAD As String = "zaklad.txt"
 Public Const SUBOR_TEST As String = "test.ini"

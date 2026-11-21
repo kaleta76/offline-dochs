@@ -1,14 +1,14 @@
 {
-  "balik": "1.0.1",
-  "vytvorene": "2026-11-20 15:06:45",
+  "balik": "1.0.2",
+  "vytvorene": "2026-11-21 09:57:52",
   "poznamka": "Verzie modulov: pri každej zmene obsahu modulu zvýšte '@Verzia (tools/zostav_balik.py to vynúti).",
   "zrusene": [],
   "moduly": {
     "kl_00_Spolocne": {
       "subor": "moduly/kl_00_Spolocne.bas",
-      "verzia": "1.0.1",
-      "sha256": "28c5cfc59e57e51140f9b80c7ffa336da116455ed9c977abf930d3c3eea2d364",
-      "obsah_sha256": "163731df09c752c077e3567e1eda72c2fdd5b561c3a310cc5cca47cb165c14f7"
+      "verzia": "1.0.2",
+      "sha256": "d06ad8d17eb6cb63d2ef6f5c98621485e3229bbf3f8b9db22f389585774bee4c",
+      "obsah_sha256": "03f8a5f80774858987d28b40db67fd0b0ee3104d10d0b59128bf9adc071eb6f8"
     },
     "kl_01_Identita": {
       "subor": "moduly/kl_01_Identita.bas",
@@ -42,9 +42,9 @@
     },
     "kl_06_Okno": {
       "subor": "moduly/kl_06_Okno.bas",
-      "verzia": "1.0.1",
-      "sha256": "2b1f1dd99b614ec451a0f1bd35dc16e63d28790a86d2031d9f7b8b5801674a0c",
-      "obsah_sha256": "c420aeb9a785ba81eb2a46a8c70c8080bd7d579aac0ee358766d25bbeee59cbc"
+      "verzia": "1.0.2",
+      "sha256": "7fd2e35b50e3835e571f771bebab5f0641fdd6d537d262b30f2ef732c4234286",
+      "obsah_sha256": "7f7865162a9a3b056bac6b279863d3276b9785b60c2e5487a6e4dc46142fec72"
     },
     "kl_07_Spustenie": {
       "subor": "moduly/kl_07_Spustenie.bas",

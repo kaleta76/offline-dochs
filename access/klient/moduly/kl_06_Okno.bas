@@ -1,5 +1,5 @@
 Attribute VB_Name = "kl_06_Okno"
-'@Verzia 1.0.1
+'@Verzia 1.0.2
 Option Compare Database
 Option Explicit
 
@@ -497,6 +497,8 @@ Public Function KlientKoniec() As Boolean
     Dim lPocet As Long
     On Error Resume Next
     mKoncim = True
+    ' Zápis hneď na začiatku: ak by tlačidlo niekedy nezareagovalo, log ukáže, či udalosť vôbec prišla (skúška 20. 11.: klik myšou na Koniec sa raz neprejavil, Enter áno).
+    Call kl_00_Spolocne.ZapisLog("INFO", "Tlačidlo Koniec stlačené.")
     If Len(kl_03_Fronta.CestaPrijmu()) > 0 Then Call kl_03_Fronta.OdosliCakajuce(True)
     lPocet = kl_03_Fronta.PocetVoFronte()
     If lPocet > 0 Then MsgBox TextPriKonci(lPocet), vbInformation, "Dochádzka"

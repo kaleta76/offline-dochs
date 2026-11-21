@@ -2,7 +2,7 @@
 
 Malý samostatný súbor Accessu na pracovnom počítači zamestnanca. Zamestnanec klikne **Príchod**, **Odchod** alebo tlačidlo prerušenia (Lekár, Služobne, …) a klient razenie zapíše ako súbor `.rzn` (protokol v1) do zdieľaného priečinka `prijem\` na serveri; HR ich prevezme príjmom v Accesse HR (karta 7). Bez webového terminálu, bez internetu, bez servera mimo organizácie. Návrh, protokol a práva na priečinky: [`docs/KLIENT-ACCESS.md`](../../docs/KLIENT-ACCESS.md). Postup pre zamestnanca: [`PRIRUCKA.md`](PRIRUCKA.md). Zmeny, **čo je overené a čo nie**, a skúšobný postup: [`CHANGELOG.md`](CHANGELOG.md).
 
-> **Stav (balík 1.0.1): hotové, ale neoverené v skutočnom Accesse.** Kód VBA, zostavovač a spúšťač sa mimo Windows s Accessom nedajú spustiť. Pred nasadením urobte skúšobný postup z `CHANGELOG.md` na jednom počítači.
+> **Stav (balík 1.0.2): skúšané v skutočnom Accesse len čiastočne.** 20. 11. 2026 sa na jednom súkromnom počítači (Office 2024, testovacie dáta) overilo zostavenie (kompilácia, samotest), spúšťač s cestou so zátvorkou, razenia do prijmu, výpadok servera s frontou, upozornenie pri zatvorení okna a chybové správy. **Neoverené:** čistý profil bez kľúča v registri, `Vytvor-Odkaz.cmd`, druhá inštancia klienta, príjem razení v HR Accesse, Active Directory a práva na firemnom serveri. Pred nasadením urobte skúšobný postup z `CHANGELOG.md` na jednom počítači.
 
 ## Čo tu je
 

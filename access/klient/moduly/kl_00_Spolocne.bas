@@ -1,5 +1,5 @@
 Attribute VB_Name = "kl_00_Spolocne"
-'@Verzia 1.0.1
+'@Verzia 1.0.2
 Option Compare Database
 Option Explicit
 
@@ -37,7 +37,7 @@ Option Explicit
 ' - NoveGuid()                                : Nové ID razenia (GUID veľkými písmenami bez zátvoriek); "" pri zlyhaní.
 '===============================================================================
 
-Public Const VERZIA_KLIENTA As String = "1.0.1"
+Public Const VERZIA_KLIENTA As String = "1.0.2"
 Public Const NAZOV_KLIENTA As String = "DochadzkaKlient"
 Public Const SUBOR_ZAKLAD As String = "zaklad.txt"
 Public Const SUBOR_TEST As String = "test.ini"
@@ -180,12 +180,13 @@ Public Function PripravLokalnePriecinky() As String
     Dim strLok As String, v As Variant
     strLok = LokalnyPriecinok()
     If Len(strLok) = 0 Then
-        PripravLokalnePriecinky = "Nepodarilo sa zistiť lokálny priečinok používateľa (LOCALAPPDATA)."
+        PripravLokalnePriecinky = "Chýba priečinok LOCALAPPDATA."
         Exit Function
     End If
+    ' Názov priečinka je na začiatku, aby ostal viditeľný aj v skrátenej správe okna (okno skracuje nad 76 znakov); celá cesta ide za ním.
     For Each v In Array("", PRIECINOK_KONFIG, PRIECINOK_FRONTA, PRIECINOK_ODOSLANE, PRIECINOK_LOG)
         If Not VytvorPriecinok(strLok & IIf(Len(CStr(v)) > 0, "\" & CStr(v), "")) Then
-            PripravLokalnePriecinky = "Nepodarilo sa vytvoriť priečinok " & strLok & IIf(Len(CStr(v)) > 0, "\" & CStr(v), "") & "."
+            PripravLokalnePriecinky = "Chýba priečinok " & IIf(Len(CStr(v)) > 0, CStr(v), "klienta") & ": " & strLok & IIf(Len(CStr(v)) > 0, "\" & CStr(v), "") & "."
             Exit Function
         End If
     Next v

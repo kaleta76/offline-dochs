@@ -11,6 +11,16 @@ Tri drobnosti z prvej skúšky balíka 1.0.1 v skutočnom Accesse (20. 11. 2026,
 - **Zostavovač zapisuje stav `AccessVBOM`.** Po zostavení sa do protokolu zapíše, či sa nastavenie „Dôverovať prístupu k objektovému modelu projektu VBA“ vrátilo na pôvodnú hodnotu alebo sa odstránilo; ak sa nevrátilo úplne, je to varovanie. `Instaluj-Klienta.ps1` (mimo balíka modulov, bez verzie).
 - Verzia klienta v okne a v `.rzn` je 1.0.2 (`VERZIA_KLIENTA`).
 
+### Dodatok k zostavovaču (21. 11. 2026): `AccessVBOM` po zostavení
+
+Skúška 21. 11. potvrdila, že po zostavení ostáva v registri `AccessVBOM=1` (`HKCU\Software\Microsoft\Office\16.0\Access\Security`), hoci protokol zostavenia o 10:07 napísal „odstránené (pred zostavením nebolo nastavené)“ a hodnota pred zostavením nebola nastavená. Pri kontrole o 10:41 (Access zatvorený) bola hodnota 1. Najpravdepodobnejšie ju Access zapísal znova pri dobiehaní po `Quit()`, keď ju zostavovač už odstránil. Príčina sa nepotvrdila, preto zostavovač teraz:
+
+- po zatvorení Accessu počká (najviac 20 s), kým skončia procesy `MSACCESS`, ktoré spustil (`Wait-AccessKoniec`),
+- hodnotu vráti a ešte 3 s sleduje; ak sa zmení, vráti ju znova a zapíše varovanie „zapísal ho Access pri ukončení“ (`Restore-VbomPristup`),
+- do protokolu zapíše výsledok (OK alebo varovanie) ako doteraz.
+
+Zmena je len v `Instaluj-Klienta.ps1` (mimo balíka modulov; verzia balíka sa nemení). Rovnaký vzor má aj `access/Instaluj-Dochadzku.ps1` (inštalátor HR); tam sa zatiaľ nič nezmenilo. Skúška: pred zostavením hodnotu `AccessVBOM` odstrániť, zostaviť a hodnotu čítať ihneď, po 10 s a po 40 s; pri zhode nesmie byť nastavená ani raz.
+
 ### Overené (mimo Accessu)
 
 - Lint a testy rovnako ako pri 1.0.1 (pozri vyššie), `over_access_balik.py` pre balík 1.0.2. **Zmena v `Instaluj-Klienta.ps1` sa tu nedala spustiť ani syntakticky skontrolovať v PowerShelli** (je tu len Python); skontrolovaný bol len zápis a vyváženie zátvoriek. Pri najbližšom zostavení treba v protokole nájsť nový riadok o `AccessVBOM`.
